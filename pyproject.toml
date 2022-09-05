@@ -13,7 +13,7 @@ torchvision = { version = "^0.12.0", source="torch" }
 [tool.poetry.dev-dependencies]
 yapf = { version = "^0.32.0", source = "pypi" }
 mypy = { version = "^0.971", source = "pypi" }
-flake8 = { version = "^5.0.4", source = "pypi" }
+pylint = {version = "^2.14.5", source = "pypi"}
 
 [[tool.poetry.source]]
 name = "torch"
