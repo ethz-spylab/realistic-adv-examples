@@ -27,11 +27,16 @@ secondary = true
 profile = "google"
 src_paths = ["src", "test"]
 
-[tool.pylint]
+[tool.pylint.messages_control]
 max-line-length = 120
+disable = [
+    "invalid-name",
+    "missing-docstring"
+]
 
 [tool.yapf]
 based_on_style = "google"
+column_limit = 120
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
