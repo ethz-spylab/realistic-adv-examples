@@ -31,8 +31,18 @@ src_paths = ["src", "test"]
 max-line-length = 120
 disable = [
     "invalid-name",
-    "missing-docstring"
+    "missing-docstring",
+    "too-many-arguments",
 ]
+
+[tool.pylama]
+format = "pylint"
+skip = "*/.tox/*,*/.env/*"
+linters = "pycodestyle,mccabe"
+ignore = "E731"
+
+[tool.pylama.linter.pycodestyle]
+max_line_length = 120
 
 [tool.yapf]
 based_on_style = "google"

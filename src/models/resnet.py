@@ -23,13 +23,12 @@ Reference:
 If you use this implementation in you work, please don't forget to mention the
 author, Yerlan Idelbayev.
 '''
-import torch
-import torch.nn.functional as F
-
 from timm.models.helpers import build_model_with_cfg
 from timm.models.registry import register_model
+import torch
 from torch import nn
 from torch.nn import init
+import torch.nn.functional as F
 
 CIFAR10_DEFAULT_MEAN = [0.485, 0.456, 0.406]
 CIFAR10_DEFAULT_STD = [0.229, 0.224, 0.225]
