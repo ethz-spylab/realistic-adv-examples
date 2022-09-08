@@ -1,6 +1,5 @@
 from functools import partial
-from turtle import forward
-from typing import Callable, Tuple
+from typing import Callable
 
 import functorch as ft
 import torch
@@ -8,10 +7,11 @@ from torch import nn
 
 DistanceFn = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
-GradAndValue = Tuple[torch.Tensor, torch.Tensor]
+GradAndValue = tuple[torch.Tensor, torch.Tensor]
 ScoreFn = Callable[[torch.Tensor, torch.Tensor], GradAndValue]
 ChangeOfVarsFn = Callable[[torch.Tensor], torch.Tensor]
-Bounds = Tuple[float, float]
+Bounds = tuple[float, float]
+AttackFn = Callable[[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], tuple[torch.Tensor, int]]
 
 
 def onehot_like(x: torch.Tensor, indices: torch.Tensor, *, value: float = 1) -> torch.Tensor:
@@ -54,19 +54,22 @@ def cw_to_model_space(x: torch.Tensor, bounds: Bounds, eps: float = 1e-6) -> tor
 class CWAdvLoss(nn.Module):
     k: torch.Tensor
 
-    def __init__(self, k: float = 0.) -> None:
+    def __init__(self, k: float = 0., targeted: bool = True) -> None:
         super().__init__()
         self.register_buffer("k", torch.tensor([k]))
+        self.targeted = targeted
 
     def forward(self, logits: torch.Tensor, y: torch.Tensor):
         other_classes_logits = logits - onehot_like(logits, y, value=torch.inf)
         best_other_classes, _ = torch.max(other_classes_logits, dim=-1)
         correct_classes = logits[torch.arange(logits.size(0)), y]
-        return torch.maximum(correct_classes - best_other_classes, self.k)
+        if self.targeted:
+            return torch.maximum(correct_classes - best_other_classes, self.k)
+        return torch.maximum(best_other_classes - correct_classes, self.k)
 
 
 def find_boundary_interpolation(x: torch.Tensor, x_adv: torch.Tensor, y: torch.Tensor, model: nn.Module,
-                                step_size: float, max_steps: int) -> Tuple[torch.Tensor, int]:
+                                step_size: float, max_steps: int) -> tuple[torch.Tensor, int]:
     boundary_x = x_adv.detach().clone()
     alpha = torch.tensor([0.], device=x.device)
     step_size_ = torch.tensor([step_size], device=x.device)
@@ -140,8 +143,8 @@ class BoundaryHitException(Exception):
     ...
 
 
-def multi_point_grad_nes(f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor], x: torch.Tensor, y: torch.Tensor,
-                         num_samples: int, radius: float) -> GradAndValue:
+def nes_grad(f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor], x: torch.Tensor, y: torch.Tensor,
+             num_samples: int, radius: float) -> GradAndValue:
     """From
     https://github.com/MadryLab/robustness/blob/a9541241defd9972e9334bfcdb804f6aefe24dc7/robustness/tools/helpers.py#L20"""
     B, *_ = x.shape
@@ -166,17 +169,19 @@ def multi_point_grad_nes(f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
 
 def score_based_attack(x: torch.Tensor,
+                       y: torch.Tensor,
                        x_target: torch.Tensor,
                        y_target: torch.Tensor,
                        model: nn.Module,
+                       eps: float,
                        distance_fn: DistanceFn,
                        grad_and_score_fn: ScoreFn,
                        attack_steps: int,
                        step_size: float,
                        conf_factor: float,
-                       dist_factor: float,
+                       targeted: bool,
                        bounds: Bounds = (0, 1),
-                       log_freq: int = 100) -> Tuple[torch.Tensor, int]:
+                       log_freq: int = 100) -> tuple[torch.Tensor, int]:
     delta = torch.zeros_like(x_target)
 
     to_model_space = partial(cw_to_model_space, bounds=bounds)
@@ -187,41 +192,51 @@ def score_based_attack(x: torch.Tensor,
 
     for step in range(attack_steps):
         iter_x = to_model_space(x_attack + delta)
-        if model(iter_x).argmax(-1).item() != y_target.item():
-            print("Hit boundary after update, returning earlier")
+        if targeted and model(iter_x).argmax(-1).item() != y_target.item():
+            print("Hit target boundary after update, returning earlier")
+            return iter_x, step
+        elif model(iter_x).argmax(-1).item() == y.item():
+            print("Hit bad boundary after update, returning earlier")
             return iter_x, step
         try:
             # Compute score and (approx of) gradient of the score
-            score_grad_est, score_est = grad_and_score_fn(iter_x, y_target)
+            if targeted:
+                score_grad_est, score_est = grad_and_score_fn(iter_x, y_target)
+            else:
+                score_grad_est, score_est = grad_and_score_fn(iter_x, y)
         except BoundaryHitException:
             print("Hit boundary in gradient estimation, returning earlier")
             return iter_x, step
         # Compute distance and gradient of the distance
         distance_grad, distance = grad_and_distance_fn(iter_x, x)
         # Compute overall gradient and score
-        tot_grad = dist_factor * distance_grad - conf_factor * score_grad_est
-        f = dist_factor * distance - conf_factor * score_est
+        tot_grad = distance_grad - conf_factor * score_grad_est
+        f = distance - conf_factor * score_est
         # Update delta
         delta = delta - step_size * tot_grad
         if step % log_freq == 0:
             print(f"step {step}. f = {f.item()}, score = {score_est.item()}, distance = {distance.item()}")
 
+        if (distance < eps).item():
+            print("Perturbation successful")
+            return iter_x, step
+
     return to_model_space(x_attack + delta), attack_steps
 
 
-def score_based_attack_exact_loss(x: torch.Tensor, x_target: torch.Tensor, y_target: torch.Tensor, model: nn.Module,
-                                  distance_fn: DistanceFn, attack_steps: int, step_size: float, conf_factor: float,
-                                  dist_factor: float, loss: nn.Module, n_points: int,
-                                  smooth_radius: float) -> Tuple[torch.Tensor, int]:
+def score_based_attack_exact_loss(x: torch.Tensor, y: torch.Tensor, x_target: torch.Tensor, y_target: torch.Tensor,
+                                  model: nn.Module, eps: float, distance_fn: DistanceFn, attack_steps: int,
+                                  step_size: float, conf_factor: float, loss: nn.Module, n_points: int,
+                                  smooth_radius: float, targeted: bool) -> tuple[torch.Tensor, int]:
     loss_fn = lambda x_, y_: loss(model(x_), y_)
-    grad_and_score_fn = lambda x_, y_: multi_point_grad_nes(loss_fn, x_, y_, n_points, smooth_radius)
-    return score_based_attack(x, x_target, y_target, model, distance_fn, grad_and_score_fn, attack_steps, step_size,
-                              conf_factor, dist_factor)
+    grad_and_score_fn = lambda x_, y_: nes_grad(loss_fn, x_, y_, n_points, smooth_radius)
+    return score_based_attack(x, y, x_target, y_target, model, eps, distance_fn, grad_and_score_fn, attack_steps,
+                              step_size, conf_factor, targeted)
 
 
-def gradient_based_attack(x: torch.Tensor, x_target: torch.Tensor, y_target: torch.Tensor, model: nn.Module,
-                          distance_fn: DistanceFn, attack_steps: int, step_size: float, conf_factor: float,
-                          dist_factor: float, loss: nn.Module) -> Tuple[torch.Tensor, int]:
+def gradient_based_attack(x: torch.Tensor, y: torch.Tensor, x_target: torch.Tensor, y_target: torch.Tensor,
+                          model: nn.Module, eps: float, distance_fn: DistanceFn, attack_steps: int, step_size: float,
+                          conf_factor: float, loss: nn.Module, targeted: bool) -> tuple[torch.Tensor, int]:
     grad_and_score_fn = lambda x_, y_: grad_exact(x_, y_, model, loss)
-    return score_based_attack(x, x_target, y_target, model, distance_fn, grad_and_score_fn, attack_steps, step_size,
-                              conf_factor, dist_factor)
+    return score_based_attack(x, y, x_target, y_target, model, eps, distance_fn, grad_and_score_fn, attack_steps,
+                              step_size, conf_factor, targeted)

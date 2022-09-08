@@ -51,3 +51,22 @@ column_limit = 120
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+include = ["src"]
+exclude = []
+ignore = []
+defineConstant = {}
+venv = "~/.pyenv/versions/torch/"
+
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportIncompatibleMethodOverride = false
+
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+
+executionEnvironments = []
