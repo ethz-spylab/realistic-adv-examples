@@ -17,6 +17,8 @@ from src import utils
 def main(settings: utils.AttackSettings) -> int:
     model = timm.create_model(settings.model, pretrained=True)
 
+    base_dir = utils.init_attack_run(settings)
+
     data_dir = "~/data"
     default_cfg = unwrap_model(model).default_cfg
     model: nn.Module = utils.normalize_model(model, mean=default_cfg["mean"], std=default_cfg["std"])
@@ -33,33 +35,50 @@ def main(settings: utils.AttackSettings) -> int:
     model, dl, loss_fn = accelerator.prepare(model, dl, loss_fn)  # type: ignore
 
     attack: attacks.AttackFn = lambda x, y, x_target, y_target: attacks.score_based_attack_exact_loss(
-        x, y, x_target, y_target, model, settings.eps, distance_fn, steps * estimation_steps_factor, settings.step_size
-        / estimation_steps_factor, settings.c * estimation_steps_factor, loss_fn, settings.n_points, settings.
+        x, y, x_target, y_target, model, settings.eps, distance_fn, settings.steps * estimation_steps_factor, settings.
+        step_size / estimation_steps_factor, settings.c * estimation_steps_factor, loss_fn, settings.n_points, settings.
         random_radius, settings.targeted)
 
     attack_exact: attacks.AttackFn = lambda x, y, x_target, y_target: attacks.gradient_based_attack(
-        x, y, x_target, y_target, model, settings.eps, distance_fn, steps, settings.step_size, settings.c, loss_fn,
-        settings.targeted)
+        x, y, x_target, y_target, model, settings.eps, distance_fn, settings.steps, settings.step_size, settings.c,
+        loss_fn, settings.targeted)
+
+    n_successes_exact = 0
+    n_successes_bb = 0
+    n_original_misclassified = 0
 
     for i, (x, y) in enumerate(dl):
         if model(x).argmax().item() != y.item():
             print("Skipping as the first element is already misclassified")
+            n_original_misclassified += 1
             continue
         x_target, y_target = utils.init_targets(model, x, y)
 
         original_distance = distance_fn(x, x_target)
-        original_confidence = loss_fn(model(x_target), y_target)
-        print(f"original_distance = {original_distance.item()}, original_confidece = {original_confidence.item()}")
+        if settings.targeted:
+            original_confidence = loss_fn(model(x_target), y_target)
+        else:
+            original_confidence = loss_fn(model(x_target), y)
+        print(f"original_distance = {original_distance.item()}, original_confidence = {original_confidence.item()}")
 
         x_adv_exact, steps = attack_exact(x, y, x_target, y_target)
         distance_exact = distance_fn(x, x_adv_exact)
+        if distance_exact.item() < settings.eps:
+            n_successes_exact += 1
         print(f"distance_exact = {distance_exact.item()}, steps = {steps}")
 
         x_adv_bb, steps = attack(x, y, x_target, y_target)
         distance_bb = distance_fn(x, x_adv_bb)
+        if distance_bb.item() < settings.eps:
+            n_successes_bb += 1
         print(f"distance_bb = {distance_bb.item()}, steps = {steps}")
 
-        utils.show_grid([x[0], x_target[0], x_adv_exact[0], x_adv_bb[0]], filename=f"imgs/{i}.jpg")
+        n_actual_attacks = i + 1 - n_original_misclassified
+        print(
+            f"successes exact = {n_successes_exact}/{n_actual_attacks} - successes bb = {n_successes_bb}/{n_actual_attacks}"
+        )
+        if settings.log_images:
+            utils.show_grid([x[0], x_target[0], x_adv_exact[0], x_adv_bb[0]], filename=base_dir / f"{i}.jpg")
 
     return 0
 

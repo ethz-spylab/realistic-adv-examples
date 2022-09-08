@@ -181,7 +181,7 @@ def score_based_attack(x: torch.Tensor,
                        conf_factor: float,
                        targeted: bool,
                        bounds: Bounds = (0, 1),
-                       log_freq: int = 100) -> tuple[torch.Tensor, int]:
+                       log_freq: int = 500) -> tuple[torch.Tensor, int]:
     delta = torch.zeros_like(x_target)
 
     to_model_space = partial(cw_to_model_space, bounds=bounds)

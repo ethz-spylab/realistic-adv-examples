@@ -1,3 +1,4 @@
+import datetime
 from collections import OrderedDict
 from pathlib import Path
 from typing import Iterable
@@ -38,7 +39,7 @@ def show_grid(xs: Iterable[torch.Tensor],
               ncols: int = 4,
               cmap: str | None = None,
               labels: list[str] | None = None,
-              filename: str | None = None,
+              filename: Path | None = None,
               axes_pad: float = 1.5) -> None:
     xs_np = [np.asarray(F.to_pil_image(x)) for x in xs]
     fig = plt.figure(figsize=(30, 30))
@@ -57,7 +58,7 @@ def show_grid(xs: Iterable[torch.Tensor],
         ax.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
 
     if filename is not None:
-        fig.savefig(filename)
+        fig.savefig(str(filename))
 
 
 def init_targets(model: nn.Module, x: torch.Tensor, y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -78,7 +79,16 @@ class AttackSettings(BaseSettings):
     random_radius: float = Field(default=0.005,
                                  description="The radius of the random points for the gradient estimation")
     eps: float = Field(default=0.5, description="The epsilon of the attack")
+    log_dir: str = Field(default="logs", description="Where to log stuff")
+    log_images: bool = Field(default=False, description="Whether to log images to disk")
 
 
-def init_attack_run() -> Path:
-    ...
+def init_attack_run(settings: AttackSettings) -> Path:
+    base_dir = Path(settings.log_dir)
+    run_dir_name = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+    experiment_dir = base_dir / run_dir_name
+    experiment_dir.mkdir(parents=True)
+    with open(experiment_dir / "config.json", "w") as f:
+        f.write(settings.json(sort_keys=True, indent=4))
+        f.write("\n")
+    return experiment_dir
