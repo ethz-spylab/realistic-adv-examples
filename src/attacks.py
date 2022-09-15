@@ -8,10 +8,11 @@ from torch import nn
 DistanceFn = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
 GradAndValue = tuple[torch.Tensor, torch.Tensor]
-ScoreFn = Callable[[torch.Tensor, torch.Tensor], GradAndValue]
+GradAndScoreFn = Callable[[torch.Tensor, torch.Tensor], GradAndValue]
 ChangeOfVarsFn = Callable[[torch.Tensor], torch.Tensor]
 Bounds = tuple[float, float]
 AttackFn = Callable[[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], tuple[torch.Tensor, int]]
+LossFn = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
 
 
 def onehot_like(x: torch.Tensor, indices: torch.Tensor, *, value: float = 1) -> torch.Tensor:
@@ -175,7 +176,7 @@ def score_based_attack(x: torch.Tensor,
                        model: nn.Module,
                        eps: float,
                        distance_fn: DistanceFn,
-                       grad_and_score_fn: ScoreFn,
+                       grad_and_score_fn: GradAndScoreFn,
                        attack_steps: int,
                        step_size: float,
                        conf_factor: float,
@@ -228,8 +229,8 @@ def score_based_attack_exact_loss(x: torch.Tensor, y: torch.Tensor, x_target: to
                                   model: nn.Module, eps: float, distance_fn: DistanceFn, attack_steps: int,
                                   step_size: float, conf_factor: float, loss: nn.Module, n_points: int,
                                   smooth_radius: float, targeted: bool) -> tuple[torch.Tensor, int]:
-    loss_fn = lambda x_, y_: loss(model(x_), y_)
-    grad_and_score_fn = lambda x_, y_: nes_grad(loss_fn, x_, y_, n_points, smooth_radius)
+    loss_fn: LossFn = lambda x_, y_: loss(model(x_), y_)
+    grad_and_score_fn: GradAndScoreFn = lambda x_, y_: nes_grad(loss_fn, x_, y_, n_points, smooth_radius)
     return score_based_attack(x, y, x_target, y_target, model, eps, distance_fn, grad_and_score_fn, attack_steps,
                               step_size, conf_factor, targeted)
 
@@ -237,6 +238,6 @@ def score_based_attack_exact_loss(x: torch.Tensor, y: torch.Tensor, x_target: to
 def gradient_based_attack(x: torch.Tensor, y: torch.Tensor, x_target: torch.Tensor, y_target: torch.Tensor,
                           model: nn.Module, eps: float, distance_fn: DistanceFn, attack_steps: int, step_size: float,
                           conf_factor: float, loss: nn.Module, targeted: bool) -> tuple[torch.Tensor, int]:
-    grad_and_score_fn = lambda x_, y_: grad_exact(x_, y_, model, loss)
+    grad_and_score_fn: GradAndScoreFn = lambda x_, y_: grad_exact(x_, y_, model, loss)
     return score_based_attack(x, y, x_target, y_target, model, eps, distance_fn, grad_and_score_fn, attack_steps,
                               step_size, conf_factor, targeted)

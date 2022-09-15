@@ -23,6 +23,7 @@ Reference:
 If you use this implementation in you work, please don't forget to mention the
 author, Yerlan Idelbayev.
 '''
+from typing import Any, Callable
 from timm.models.helpers import build_model_with_cfg
 from timm.models.registry import register_model
 import torch
@@ -62,12 +63,12 @@ def _weights_init(m):
 
 class LambdaLayer(nn.Module):
 
-    def __init__(self, lambd):
+    def __init__(self, lambda_: Callable[[torch.Tensor], torch.Tensor]):
         super(LambdaLayer, self).__init__()
-        self.lambd = lambd
+        self.lambda_ = lambda_
 
-    def forward(self, x):
-        return self.lambd(x)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.lambda_(x)
 
 
 class BasicBlock(nn.Module):
@@ -141,16 +142,17 @@ class ResNet(nn.Module):
         return out
 
 
-def _create_resnet(variant, pretrained=False, **kwargs):
-    return build_model_with_cfg(ResNet, variant, pretrained, pretrained_custom_load=True, **kwargs)
+def _create_resnet(variant: str, pretrained: bool = False, **kwargs: dict[str, Any]) -> ResNet:
+    return build_model_with_cfg(ResNet, variant, pretrained, pretrained_custom_load=True, **kwargs)  # type: ignore
 
 
 @register_model
-def resnet20_cifar10(pretrained=False, **kwargs):
+def resnet20_cifar10(pretrained: bool = False, **kwargs: dict[str, Any]) -> ResNet:
     """Constructs a ResNet-10 model for CIFAR10
     """
     model_args = dict(block=BasicBlock, layers=[3, 3, 3], **kwargs)
-    return _create_resnet('resnet20_cifar10', pretrained, **model_args)
+    model: ResNet = _create_resnet('resnet20_cifar10', pretrained, **model_args)
+    return model
 
 
 def resnet32():
@@ -171,21 +173,3 @@ def resnet110():
 
 def resnet1202():
     return ResNet(BasicBlock, [200, 200, 200])
-
-
-def test(net):
-    import numpy as np
-    total_params = 0
-
-    for x in filter(lambda p: p.requires_grad, net.parameters()):
-        total_params += np.prod(x.data.numpy().shape)
-    print("Total number of params", total_params)
-    print("Total layers", len(list(filter(lambda p: p.requires_grad and len(p.data.size()) > 1, net.parameters()))))
-
-
-if __name__ == "__main__":
-    for net_name in __all__:
-        if net_name.startswith('resnet'):
-            print(net_name)
-            test(globals()[net_name]())
-            print()

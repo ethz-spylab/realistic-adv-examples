@@ -1,6 +1,9 @@
+import csv
+from dataclasses import asdict, dataclass
 import datetime
 from collections import OrderedDict
 from pathlib import Path
+import random
 from typing import Iterable
 
 import matplotlib.pyplot as plt
@@ -8,6 +11,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 import numpy as np
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 import torchvision.transforms.functional as F
 from pydantic import BaseSettings, Field
 
@@ -73,17 +77,20 @@ class AttackSettings(BaseSettings):
     data_dir: str = Field(default="~/data", description="The directory of the data")
     targeted: bool = Field(default=False, description="Whether the attacks should be targeted")
     steps: int = Field(default=10_000, description="Attack steps")
-    step_size: float = Field(default=0.005, description="Step size")
-    c: float = Field(default=0.01, description="The `c` factor for the confidence loss")
-    n_points: int = Field(default=200, description="The number of points to use for gradient estimation")
-    random_radius: float = Field(default=0.005,
+    step_size: float = Field(default=5e-3, description="Step size")
+    c: float = Field(default=0.2, description="The `c` factor for the confidence loss")
+    n_points: int = Field(default=20, description="The number of points to use for gradient estimation")
+    random_radius: float = Field(default=0.001,
                                  description="The radius of the random points for the gradient estimation")
     eps: float = Field(default=0.5, description="The epsilon of the attack")
     log_dir: str = Field(default="logs", description="Where to log stuff")
     log_images: bool = Field(default=False, description="Whether to log images to disk")
+    est_settings_factor: int = Field(default=1,
+                                     description="How much the settings for the NES attack should be changed")
+    attacks: set[str] = {"wb", "nes"}
 
 
-def init_attack_run(settings: AttackSettings) -> Path:
+def init_attack_run(settings: AttackSettings) -> tuple[Path, "Logger"]:
     base_dir = Path(settings.log_dir)
     run_dir_name = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
     experiment_dir = base_dir / run_dir_name
@@ -91,4 +98,45 @@ def init_attack_run(settings: AttackSettings) -> Path:
     with open(experiment_dir / "config.json", "w") as f:
         f.write(settings.json(sort_keys=True, indent=4))
         f.write("\n")
-    return experiment_dir
+    logger = Logger(experiment_dir / "logs.csv")
+    return experiment_dir, logger
+
+
+@dataclass
+class AttackResult:
+    idx: int
+    original_misclassified: bool
+    distance: float | None = None
+    success: bool | None = None
+    steps: int | None = None
+    attack: str | None = None
+
+
+@dataclass
+class Logger:
+    filename: Path
+    needs_header: bool = True
+
+    def write(self, result: AttackResult) -> None:
+        dict_to_write = asdict(result)
+        with open(self.filename, "a") as f:
+            dw = csv.DictWriter(f, fieldnames=dict_to_write.keys())
+            if self.needs_header:  # first iteration (epoch == 1 can't be used)
+                dw.writeheader()
+                self.needs_header = False
+            dw.writerow(dict_to_write)
+        print(result)
+
+
+def compute_clean_accuracy(model: nn.Module, dl: DataLoader[tuple[torch.Tensor, torch.Tensor]]) -> float:
+    running_accuracy = 0.0
+    for x, y in dl:
+        logits: torch.Tensor = model(x)
+        running_accuracy += (logits.argmax(-1) == y).to(torch.float).mean().item()
+    return running_accuracy / len(dl)
+
+
+def random_seed(seed: int = 42) -> None:
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
