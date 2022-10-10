@@ -80,6 +80,12 @@ def main():
         default=None,
         type=int,
     )
+    parser.add_argument(
+        '--flip-squares',
+        default='1',
+        type=str,
+        help=
+        'Whether the attack should flip squares and not chunks of a 1-d vector')
     args = parser.parse_args()
 
     targeted = True if args.targeted == '1' else False
@@ -135,13 +141,16 @@ def main():
     while exp_out_dir.exists():
         exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon}_{uuid.uuid4().hex}"
     exp_out_dir.mkdir()
+    
+    print(f"Saving results in {exp_out_dir}")
 
     attack = RayS(torch_model,
                   order=order,
                   epsilon=args.epsilon,
                   early_stopping=early_stopping,
                   search=args.search,
-                  line_search_tol=args.line_search_tol)
+                  line_search_tol=args.line_search_tol,
+                  flip_squares=args.flip_squares == '1')
 
     stop_dists = []
     stop_queries = []
