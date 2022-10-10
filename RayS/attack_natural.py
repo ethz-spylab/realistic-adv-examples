@@ -72,7 +72,7 @@ def main():
         help='Tolerance for line search w.r.t. previous iteration')
     parser.add_argument(
         '--out-dir',
-        default='/local/home/edebenedetti/exp-results',
+        default='/local/home/edebenedetti/exp-results/realistic-adv-examples/rays',
         type=str,
     )
     parser.add_argument(
@@ -151,6 +151,7 @@ def main():
     np.random.seed(0)
     seeds = np.random.randint(10000, size=10000)
     count = 0
+    miscliassified = 0
     for i, (xi, yi) in enumerate(test_loader):
         xi, yi = xi.cuda(), yi.cuda()
         if count == args.num:
@@ -158,6 +159,7 @@ def main():
 
         if torch_model.predict_label(xi) != yi:
             count += 1
+            miscliassified += 1
             continue
 
         np.random.seed(seeds[i])
@@ -172,7 +174,7 @@ def main():
         adv, queries, bad_queries, wasted_queries, dist, succ = attack(
             xi, yi, target=target, seed=seeds[i], query_limit=args.query)
 
-        if args.save_img_every is not None and i % args.save_img_every == 0:
+        if args.save_img_every is not None and (i - miscliassified) % args.save_img_every == 0:
             np.save(exp_out_dir / f"{i}_adv.npy", adv[0].cpu().numpy())
             np.save(exp_out_dir / f"{i}.npy", xi[0].cpu().numpy())
 
@@ -206,6 +208,7 @@ def main():
     results_dict = {
         "git_hash": get_git_revision_hash(),
         "args": vars(args),
+        "miscliassified": miscliassified,
         "distortion": np.mean(np.array(stop_dists)),
         "success_rate": np.mean(np.array(asr)),
         "mean_queries": np.mean(np.array(stop_queries)),
