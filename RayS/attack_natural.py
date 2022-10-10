@@ -82,7 +82,7 @@ def main():
     )
     parser.add_argument(
         '--flip-squares',
-        default='1',
+        default='0',
         type=str,
         help=
         'Whether the attack should flip squares and not chunks of a 1-d vector')
@@ -157,6 +157,7 @@ def main():
     stop_bad_queries = []
     stop_wasted_queries = []
     asr = []
+    early_stoppings = []
     np.random.seed(0)
     seeds = np.random.randint(10000, size=10000)
     count = 0
@@ -191,6 +192,7 @@ def main():
             stop_queries.append(queries)
             stop_bad_queries.append(bad_queries)
             stop_wasted_queries.append(wasted_queries)
+            early_stoppings.append(attack.n_early_stopping)
 
             if dist.item() < np.inf:
                 stop_dists.append(dist.item())
@@ -225,7 +227,9 @@ def main():
         "mean_bad_queries": np.mean(np.array(stop_bad_queries)),
         "median_bad_queries": np.median(np.array(stop_bad_queries)),
         "mean_wasted_queries": np.mean(np.array(stop_wasted_queries)),
-        "median_wasted_queries": np.median(np.array(stop_wasted_queries))
+        "median_wasted_queries": np.median(np.array(stop_wasted_queries)),
+        "mean_early_stoppings": np.mean(np.array(early_stoppings)),
+        "median_early_stoppings": np.median(np.array(early_stoppings)),
     }
 
     with open(exp_out_dir / "results.json", 'w') as f:
@@ -235,6 +239,7 @@ def main():
     np.save(exp_out_dir / "queries.npy", np.array(stop_queries))
     np.save(exp_out_dir / "bad_queries.npy", np.array(stop_bad_queries))
     np.save(exp_out_dir / "wasted_queries.npy", np.array(stop_wasted_queries))
+    np.save(exp_out_dir / "early_stoppings.npy", np.array(early_stoppings))
     
     print(f"Saved all the results to {exp_out_dir}")
 

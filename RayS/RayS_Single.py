@@ -30,6 +30,7 @@ class RayS(object):
         self.line_search_tol = line_search_tol
         self.conf_early_stopping = conf_early_stopping
         self.flip_squares = flip_squares
+        self.n_early_stopping = 0
 
     def get_xadv(self, x, v, d, lb=0., rb=1.):
         out = x + d * v
@@ -54,6 +55,7 @@ class RayS(object):
         dist = torch.tensor(np.inf)
         block_level = 0
         block_ind = 0
+        self.n_early_stopping = 0
         
         if self.flip_squares:
             max_block_ind = (2 ** block_level) ** 2
@@ -66,8 +68,6 @@ class RayS(object):
             start, end = self.get_start_end(dim, block_ind, block_size)
 
             if not self.flip_squares:
-                attempt = self.flip_sign(shape, dim, start, end)
-            elif block_level == 0:
                 attempt = self.flip_sign(shape, dim, start, end)
             else:
                 attempt = self.flip_square(block_level, block_ind)
@@ -171,6 +171,7 @@ class RayS(object):
             d_end = d_end_tmp
 
             if self.line_search_tol is not None and 1 - (d_end / self.d_t) >= self.line_search_tol:
+                self.n_early_stopping += 1
                 break
 
         if d_end < self.d_t:
