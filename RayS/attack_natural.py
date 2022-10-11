@@ -16,7 +16,7 @@ from general_torch_model import GeneralTorchModel
 from arch import mnist_model
 from arch import cifar_model
 
-from RayS_Single import RayS
+from RayS_Single import RayS, SafeSideRayS
 
 
 def get_git_revision_hash() -> str:
@@ -55,6 +55,10 @@ def main():
                         default='0',
                         type=str,
                         help='Whether the attack should flip squares and not chunks of a 1-d vector')
+    parser.add_argument('--side',
+                        default='unsafe',
+                        type=str,
+                        help='Whether the attack should happen from the safe side of the boundary')
     args = parser.parse_args()
 
     targeted = True if args.targeted == '1' else False
@@ -111,13 +115,22 @@ def main():
         json.dump(exp_args, f, indent=4)
     
 
-    attack = RayS(torch_model,
-                  order=order,
-                  epsilon=args.epsilon,
-                  early_stopping=early_stopping,
-                  search=args.search,
-                  line_search_tol=args.line_search_tol,
-                  flip_squares=args.flip_squares == '1')
+    if args.side == 'unsafe':
+        attack = RayS(torch_model,
+                    order=order,
+                    epsilon=args.epsilon,
+                    early_stopping=early_stopping,
+                    search=args.search,
+                    line_search_tol=args.line_search_tol,
+                    flip_squares=args.flip_squares == '1')
+    elif args.side == 'safe':
+        attack = SafeSideRayS(torch_model,
+                    order=order,
+                    epsilon=args.epsilon,
+                    early_stopping=early_stopping,
+                    search=args.search,
+                    line_search_tol=args.line_search_tol,
+                    flip_squares=args.flip_squares == '1')
 
     stop_dists = []
     stop_queries = []
