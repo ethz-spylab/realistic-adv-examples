@@ -20,56 +20,27 @@ from RayS_Single import RayS
 
 
 def get_git_revision_hash() -> str:
-    return subprocess.check_output(['git', 'rev-parse',
-                                    'HEAD']).decode('ascii').strip()
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
 
 
 def main():
     parser = argparse.ArgumentParser(description='Hard Label Attacks')
-    parser.add_argument('--dataset',
-                        default='imagenet',
+    parser.add_argument('--dataset', default='imagenet', type=str, help='Dataset')
+    parser.add_argument('--targeted', default='0', type=str, help='targeted or untargeted')
+    parser.add_argument('--norm', default='linf', type=str, help='Norm for attack, linf only')
+    parser.add_argument('--num', default=1000, type=int, help='Number of samples to be attacked from test dataset.')
+    parser.add_argument('--query', default=10000, type=int, help='Maximum queries for the attack')
+    parser.add_argument('--batch', default=1, type=int, help='attack batch size.')
+    parser.add_argument('--epsilon', default=0.05, type=float, help='attack strength')
+    parser.add_argument('--early',
+                        default='1',
                         type=str,
-                        help='Dataset')
-    parser.add_argument('--targeted',
-                        default='0',
-                        type=str,
-                        help='targeted or untargeted')
-    parser.add_argument('--norm',
-                        default='linf',
-                        type=str,
-                        help='Norm for attack, linf only')
-    parser.add_argument(
-        '--num',
-        default=1000,
-        type=int,
-        help='Number of samples to be attacked from test dataset.')
-    parser.add_argument('--query',
-                        default=10000,
-                        type=int,
-                        help='Maximum queries for the attack')
-    parser.add_argument('--batch',
-                        default=1,
-                        type=int,
-                        help='attack batch size.')
-    parser.add_argument('--epsilon',
-                        default=0.05,
+                        help='early stopping (stop attack once the adversarial example is found)')
+    parser.add_argument('--search', default='binary', type=str, help='Type of search to use, binary or line')
+    parser.add_argument('--line-search-tol',
+                        default=None,
                         type=float,
-                        help='attack strength')
-    parser.add_argument(
-        '--early',
-        default='1',
-        type=str,
-        help=
-        'early stopping (stop attack once the adversarial example is found)')
-    parser.add_argument('--search',
-                        default='binary',
-                        type=str,
-                        help='Type of search to use, binary or line')
-    parser.add_argument(
-        '--line-search-tol',
-        default=None,
-        type=float,
-        help='Tolerance for line search w.r.t. previous iteration')
+                        help='Tolerance for line search w.r.t. previous iteration')
     parser.add_argument(
         '--out-dir',
         default='/local/home/edebenedetti/exp-results/realistic-adv-examples/rays',
@@ -80,12 +51,10 @@ def main():
         default=None,
         type=int,
     )
-    parser.add_argument(
-        '--flip-squares',
-        default='0',
-        type=str,
-        help=
-        'Whether the attack should flip squares and not chunks of a 1-d vector')
+    parser.add_argument('--flip-squares',
+                        default='0',
+                        type=str,
+                        help='Whether the attack should flip squares and not chunks of a 1-d vector')
     args = parser.parse_args()
 
     targeted = True if args.targeted == '1' else False
@@ -103,22 +72,15 @@ def main():
         model = torch.nn.DataParallel(model, device_ids=[0])
         model.load_state_dict(torch.load('model/mnist_gpu.pt'))
         test_loader = load_mnist_test_data(args.batch)
-        torch_model = GeneralTorchModel(model,
-                                        n_class=10,
-                                        im_mean=None,
-                                        im_std=None)
+        torch_model = GeneralTorchModel(model, n_class=10, im_mean=None, im_std=None)
     elif args.dataset == 'cifar':
         model = cifar_model.CIFAR10().cuda()
         model = torch.nn.DataParallel(model, device_ids=[0])
         model.load_state_dict(torch.load('model/cifar10_gpu.pt'))
         test_loader = load_cifar10_test_data(args.batch)
-        torch_model = GeneralTorchModel(model,
-                                        n_class=10,
-                                        im_mean=None,
-                                        im_std=None)
+        torch_model = GeneralTorchModel(model, n_class=10, im_mean=None, im_std=None)
     elif args.dataset == 'resnet':
-        model = models.__dict__["resnet50"](
-            weights=ResNet50_Weights.IMAGENET1K_V1).cuda()
+        model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).cuda()
         model = torch.nn.DataParallel(model, device_ids=[0])
         test_loader = load_imagenet_test_data(args.batch)
         torch_model = GeneralTorchModel(model,
@@ -141,7 +103,7 @@ def main():
     while exp_out_dir.exists():
         exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon}_{uuid.uuid4().hex}"
     exp_out_dir.mkdir()
-    
+
     print(f"Saving results in {exp_out_dir}")
 
     attack = RayS(torch_model,
@@ -174,15 +136,17 @@ def main():
 
         np.random.seed(seeds[i])
 
-        target = np.random.randint(torch_model.n_class) * torch.ones(
-            yi.shape, dtype=torch.long).cuda() if targeted else None
+        target = np.random.randint(torch_model.n_class) * torch.ones(yi.shape,
+                                                                     dtype=torch.long).cuda() if targeted else None
         while target and torch.sum(target == yi) > 0:
             print('re-generate target label')
-            target = np.random.randint(torch_model.n_class) * torch.ones(
-                len(xi), dtype=torch.long).cuda()
+            target = np.random.randint(torch_model.n_class) * torch.ones(len(xi), dtype=torch.long).cuda()
 
-        adv, queries, bad_queries, wasted_queries, dist, succ = attack(
-            xi, yi, target=target, seed=seeds[i], query_limit=args.query)
+        adv, queries, bad_queries, wasted_queries, dist, succ = attack(xi,
+                                                                       yi,
+                                                                       target=target,
+                                                                       seed=seeds[i],
+                                                                       query_limit=args.query)
 
         if args.save_img_every is not None and (i - miscliassified) % args.save_img_every == 0:
             np.save(exp_out_dir / f"{i}_adv.npy", adv[0].cpu().numpy())
@@ -207,14 +171,10 @@ def main():
 
         print(
             "index: {:4d} avg dist: {:.4f} avg queries: {:.4f} median queries: {:.4f} avg bad queries: {:.4f} median bad queries: {:.4f} avg wasted queries: {:.4f} median wasted queries: {:.4f} asr: {:.4f} \n"
-            .format(i, np.mean(np.array(stop_dists)),
-                    np.mean(np.array(stop_queries)),
-                    np.median(np.array(stop_queries)),
-                    np.mean(np.array(stop_bad_queries)),
-                    np.median(np.array(stop_bad_queries)),
-                    np.mean(np.array(stop_wasted_queries)),
-                    np.median(np.array(stop_wasted_queries)),
-                    np.mean(np.array(asr))))
+            .format(i, np.mean(np.array(stop_dists)), np.mean(np.array(stop_queries)),
+                    np.median(np.array(stop_queries)), np.mean(np.array(stop_bad_queries)),
+                    np.median(np.array(stop_bad_queries)), np.mean(np.array(stop_wasted_queries)),
+                    np.median(np.array(stop_wasted_queries)), np.mean(np.array(asr))))
 
     results_dict = {
         "git_hash": get_git_revision_hash(),
@@ -240,7 +200,7 @@ def main():
     np.save(exp_out_dir / "bad_queries.npy", np.array(stop_bad_queries))
     np.save(exp_out_dir / "wasted_queries.npy", np.array(stop_wasted_queries))
     np.save(exp_out_dir / "early_stoppings.npy", np.array(early_stoppings))
-    
+
     print(f"Saved all the results to {exp_out_dir}")
 
 

@@ -4,6 +4,7 @@ from pgbar import progress_bar
 
 
 class RayS(object):
+
     def __init__(self, model, epsilon=0.031, order=np.inf):
         self.model = model
         self.ord = order
@@ -39,15 +40,15 @@ class RayS(object):
         stop_queries = self.queries.clone()
         dist = self.d_t.clone()
         self.x_final = self.get_xadv(x, self.sgn_t, self.d_t)
- 
+
         block_level = 0
         block_ind = 0
         for i in range(query_limit):
-            block_num = 2 ** block_level
+            block_num = 2**block_level
             block_size = int(np.ceil(dim / block_num))
             start, end = block_ind * block_size, min(dim, (block_ind + 1) * block_size)
 
-            valid_mask = (self.queries < query_limit) 
+            valid_mask = (self.queries < query_limit)
             attempt = self.sgn_t.clone().view(shape[0], dim)
             attempt[valid_mask.nonzero().flatten(), start:end] *= -1.
             attempt = attempt.view(shape)
@@ -55,7 +56,7 @@ class RayS(object):
             self.binary_search(x, y, target, attempt, valid_mask)
 
             block_ind += 1
-            if block_ind == 2 ** block_level or end == dim:
+            if block_ind == 2**block_level or end == dim:
                 block_level += 1
                 block_ind = 0
 
@@ -67,11 +68,10 @@ class RayS(object):
                 print('out of queries')
                 break
 
-            progress_bar(torch.min(self.queries.float()), query_limit,
-                         'd_t: %.4f | adbd: %.4f | queries: %.4f | rob acc: %.4f | iter: %d'
-                         % (torch.mean(self.d_t), torch.mean(dist), torch.mean(self.queries.float()),
-                            len(working_ind) / len(x), i + 1))
- 
+            progress_bar(
+                torch.min(self.queries.float()), query_limit,
+                'd_t: %.4f | adbd: %.4f | queries: %.4f | rob acc: %.4f | iter: %d' % (torch.mean(
+                    self.d_t), torch.mean(dist), torch.mean(self.queries.float()), len(working_ind) / len(x), i + 1))
 
         stop_queries = torch.clamp(stop_queries, 0, query_limit)
         return self.x_final, stop_queries, dist, (dist <= self.epsilon)

@@ -4,6 +4,7 @@ import torch.nn as nn
 
 
 class GeneralTorchModel(nn.Module):
+
     def __init__(self, model, n_class=10, im_mean=None, im_std=None):
         super(GeneralTorchModel, self).__init__()
         self.model = model
@@ -27,10 +28,10 @@ class GeneralTorchModel(nn.Module):
             processed = image
 
         if self.im_mean is not None and self.im_std is not None:
-            im_mean = torch.tensor(self.im_mean).cuda().view(1, processed.shape[1], 1, 1).repeat(
-                processed.shape[0], 1, 1, 1)
-            im_std = torch.tensor(self.im_std).cuda().view(1, processed.shape[1], 1, 1).repeat(
-                processed.shape[0], 1, 1, 1)
+            im_mean = torch.tensor(self.im_mean).cuda().view(1, processed.shape[1], 1,
+                                                             1).repeat(processed.shape[0], 1, 1, 1)
+            im_std = torch.tensor(self.im_std).cuda().view(1, processed.shape[1], 1,
+                                                           1).repeat(processed.shape[0], 1, 1, 1)
             processed = (processed - im_mean) / im_std
         return processed
 

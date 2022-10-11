@@ -2,6 +2,7 @@ import torch.nn as nn
 
 
 class MNIST(nn.Module):
+
     def __init__(self):
         super(MNIST, self).__init__()
         self.features = self._make_layers()
@@ -26,19 +27,11 @@ class MNIST(nn.Module):
     def _make_layers(self):
         layers = []
         in_channels = 1
-        layers += [nn.Conv2d(in_channels, 32, kernel_size=3),
-                   nn.BatchNorm2d(32),
-                   nn.ReLU()]
-        layers += [nn.Conv2d(32, 32, kernel_size=3),
-                   nn.BatchNorm2d(32),
-                   nn.ReLU()]
+        layers += [nn.Conv2d(in_channels, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU()]
+        layers += [nn.Conv2d(32, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU()]
         layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-        layers += [nn.Conv2d(32, 64, kernel_size=3),
-                   nn.BatchNorm2d(64),
-                   nn.ReLU()]
-        layers += [nn.Conv2d(64, 64, kernel_size=3),
-                   nn.BatchNorm2d(64),
-                   nn.ReLU()]
+        layers += [nn.Conv2d(32, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU()]
+        layers += [nn.Conv2d(64, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU()]
         layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
 
         return nn.Sequential(*layers)

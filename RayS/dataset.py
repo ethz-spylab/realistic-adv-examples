@@ -27,8 +27,7 @@ def load_cifar10_test_data(test_batch_size=1):
 
 def load_imagenet_test_data(test_batch_size=1, folder='/data/imagenet/val'):
     val_dataset = dsets.ImageFolder(
-        folder,
-        transforms.Compose([
+        folder, transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
