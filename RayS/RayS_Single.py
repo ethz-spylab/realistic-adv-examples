@@ -6,22 +6,25 @@ import torch.nn.functional as F
 from torch import nn
 from numpy import testing as npt
 
-class RayS(object):
+from general_torch_model import GeneralTorchModel
+
+
+class RayS:
 
     def __init__(self,
-                 model,
-                 order=np.inf,
-                 epsilon=0.3,
-                 early_stopping=True,
-                 search="binary",
-                 line_search_tol=None,
+                 model: GeneralTorchModel,
+                 order: float = np.inf,
+                 epsilon: float = 0.3,
+                 early_stopping: bool = True,
+                 search: str = "binary",
+                 line_search_tol: float | None = None,
                  conf_early_stopping: float | None = None,
                  flip_squares: bool = False):
         self.model = model
         self.order = order
         self.epsilon = epsilon
         self.sgn_t = None
-        self.d_t = None
+        self.d_t = np.inf
         self.x_final = None
         self.lin_search_rad = 10
         self.pre_set = {1, -1}
@@ -36,7 +39,12 @@ class RayS(object):
         out = x + d * v
         return torch.clamp(out, lb, rb)
 
-    def attack_hard_label(self, x, y, target=None, query_limit=10000, seed=None):
+    def attack_hard_label(self,
+                          x: torch.Tensor,
+                          y: torch.Tensor,
+                          target: torch.Tensor | None = None,
+                          query_limit: int = 10000,
+                          seed: int | None = None):
         """ Attack the original image and return adversarial example
             model: (pytorch model)
             (x, y): original image
@@ -52,15 +60,22 @@ class RayS(object):
         self.d_t = np.inf
         self.sgn_t = torch.sign(torch.ones(shape)).cuda()
         self.x_final = self.get_xadv(x, self.sgn_t, self.d_t)
-        dist = torch.tensor(np.inf)
+        dist = np.inf
         block_level = 0
         block_ind = 0
         self.n_early_stopping = 0
         
-        if self.flip_squares:
-            max_block_ind = (2 ** block_level) ** 2
+        if self.search == "binary":
+            search_fn = lambda attempt: self.binary_search(x, y, target, attempt)
+        elif self.search == "line":
+            search_fn = lambda attempt: self.line_search(x, y, target, attempt)
         else:
-            max_block_ind = 2 ** block_level
+            raise ValueError(f"Search method '{self.search}' not supported")
+
+        if self.flip_squares:
+            max_block_ind = (2**block_level)**2
+        else:
+            max_block_ind = 2**block_level
 
         for i in range(query_limit):
             block_num = 2**block_level
@@ -72,19 +87,21 @@ class RayS(object):
             else:
                 attempt = self.flip_square(block_level, block_ind)
 
-            if self.search == "binary":
-                self.binary_search(x, y, target, attempt)
-            elif self.search == "line":
-                self.line_search(x, y, target, attempt)
+            d_end = search_fn(attempt)
+            if d_end < self.d_t:
+                self.d_t = d_end
+                self.sgn_t = attempt
+                unit_sgn = self.sgn_t / torch.norm(self.sgn_t)
+                self.x_final = self.get_xadv(x, unit_sgn, self.d_t)
 
             block_ind += 1
             if block_ind == max_block_ind or end == dim:
                 block_level += 1
                 block_ind = 0
                 if self.flip_squares:
-                    max_block_ind = (2 ** block_level) ** 2
+                    max_block_ind = (2**block_level)**2
                 else:
-                    max_block_ind = 2 ** block_level
+                    max_block_ind = 2**block_level
 
             dist = torch.norm(self.x_final - x, self.order)
             if self.early_stopping and (dist <= self.epsilon):
@@ -113,11 +130,11 @@ class RayS(object):
 
     def flip_square(self, block_level: int, block_ind: int):
         assert self.sgn_t is not None
-        num_squares_per_side = 2 ** block_level
-        
+        num_squares_per_side = 2**block_level
+
         if self.sgn_t.shape[2] % num_squares_per_side != 0:
             num_squares_per_side = self.sgn_t.shape[2]
-            
+
         attempt = rearrange(self.sgn_t,
                             'b c (h1 h) (w1 w) -> b c (h1 w1) h w',
                             h1=num_squares_per_side,
@@ -130,7 +147,7 @@ class RayS(object):
 
     def search_succ(self, x, y, target):
         self.queries += 1
-        if target:
+        if target is not None:
             success = self.model.predict_label(x) == target
         else:
             success = self.model.predict_label(x) != y
@@ -146,21 +163,26 @@ class RayS(object):
                 break
         return d_end
 
-    def line_search(self, x, y, target, sgn, max_steps=200):
+    def line_search(self,
+                    x: torch.Tensor,
+                    y: torch.Tensor,
+                    target: torch.Tensor | None,
+                    sgn: torch.Tensor,
+                    max_steps=200) -> float:
         sgn_unit = sgn / torch.norm(sgn)
         sgn_norm = torch.norm(sgn)
 
         if np.inf > self.d_t:  # already have current result
             if not self.search_succ(self.get_xadv(x, sgn_unit, self.d_t), y, target):
                 self.wasted_queries += 1
-                return False
+                return np.inf
             d_end = self.d_t
         else:  # init run, try to find boundary distance
             d = self.init_lin_search(x, y, target, sgn)
             if d < np.inf:
                 d_end = d * sgn_norm
             else:
-                return False
+                return np.inf
 
         step_size = d_end / max_steps
         d_beginning = d_end
@@ -173,16 +195,15 @@ class RayS(object):
             if self.line_search_tol is not None and 1 - (d_end / self.d_t) >= self.line_search_tol:
                 self.n_early_stopping += 1
                 break
+            
+        return d_end
 
-        if d_end < self.d_t:
-            self.d_t = d_end
-            self.x_final = self.get_xadv(x, sgn_unit, d_end)
-            self.sgn_t = sgn
-            return True
-        else:
-            return False
-
-    def binary_search(self, x, y, target, sgn, tol=1e-3):
+    def binary_search(self,
+                      x: torch.Tensor,
+                      y: torch.Tensor,
+                      target: torch.Tensor | None,
+                      sgn: torch.Tensor,
+                      tol: float = 1e-3) -> float:
         sgn_unit = sgn / torch.norm(sgn)
         sgn_norm = torch.norm(sgn)
 
@@ -190,14 +211,14 @@ class RayS(object):
         if np.inf > self.d_t:  # already have current result
             if not self.search_succ(self.get_xadv(x, sgn_unit, self.d_t), y, target):
                 self.wasted_queries += 1
-                return False
+                return np.inf
             d_end = self.d_t
         else:  # init run, try to find boundary distance
             d = self.init_lin_search(x, y, target, sgn)
             if d < np.inf:
                 d_end = d * sgn_norm
             else:
-                return False
+                return np.inf
 
         while (d_end - d_start) > tol:
             d_mid = (d_start + d_end) / 2.0
@@ -205,16 +226,104 @@ class RayS(object):
                 d_end = d_mid
             else:
                 d_start = d_mid
-        if d_end < self.d_t:
-            self.d_t = d_end
-            self.x_final = self.get_xadv(x, sgn_unit, d_end)
-            self.sgn_t = sgn
-            return True
-        else:
-            return False
+                
+        return d_end
 
     def __call__(self, data, label, target=None, seed=None, query_limit=10000):
         return self.attack_hard_label(data, label, target=target, seed=seed, query_limit=query_limit)
+
+
+class OtherSideRayS(RayS):
+    
+    def attack_hard_label(self,
+                          x: torch.Tensor,
+                          y: torch.Tensor,
+                          target: torch.Tensor | None = None,
+                          query_limit: int = 10000,
+                          seed: int | None = None):
+        """ Attack the original image and return adversarial example
+            model: (pytorch model)
+            (x, y): original image
+        """
+        shape = list(x.shape)
+        dim = int(np.prod(shape[1:]))
+        if seed is not None:
+            np.random.seed(seed)
+
+        self.queries = 0
+        self.bad_queries = 0
+        self.wasted_queries = 0
+        self.d_t = np.inf
+        self.sgn_t = torch.sign(torch.ones(shape)).cuda()
+        safe_x = self.get_safe_x(x, y, target)
+        
+        self.x_final = self.get_xadv(safe_x, self.sgn_t, self.d_t)
+        
+        dist = torch.Tensor(np.inf)
+        block_level = 0
+        block_ind = 0
+        
+        self.n_early_stopping = 0
+
+        if self.flip_squares:
+            max_block_ind = (2**block_level)**2
+        else:
+            max_block_ind = 2**block_level
+
+        for i in range(query_limit):
+            block_num = 2**block_level
+            block_size = int(np.ceil(dim / block_num))
+            start, end = self.get_start_end(dim, block_ind, block_size)
+
+            if not self.flip_squares:
+                attempt = self.flip_sign(shape, dim, start, end)
+            else:
+                attempt = self.flip_square(block_level, block_ind)
+
+            if self.search == "binary":
+                self.binary_search(safe_x, y, target, attempt)
+            elif self.search == "line":
+                self.line_search(safe_x, y, target, attempt)
+
+            block_ind += 1
+            if block_ind == max_block_ind or end == dim:
+                block_level += 1
+                block_ind = 0
+                if self.flip_squares:
+                    max_block_ind = (2**block_level)**2
+                else:
+                    max_block_ind = 2**block_level
+
+            dist = torch.norm(self.x_final - x, self.order)
+            if self.early_stopping and (dist <= self.epsilon):
+                break
+
+            if self.queries >= query_limit:
+                print('out of queries')
+                break
+
+            if i % 10 == 0:
+                print("Iter %3d d_t %.8f dist %.8f queries %d bad queries %d" %
+                      (i + 1, self.d_t, dist, self.queries, self.bad_queries))
+
+        print("Iter %3d d_t %.6f dist %.6f queries %d bad queries %d" %
+              (i + 1, self.d_t, dist, self.queries, self.bad_queries))
+        return self.x_final, self.queries, self.bad_queries, self.wasted_queries, dist, (dist <= self.epsilon).float()
+    
+    
+    def search_succ_no_count(self, x, y, target):
+        # Use this only to generate the starting image as it does not increment the query count!
+        if target is not None:
+            return self.model.predict_label(x) == target
+        return self.model.predict_label(x) != y
+    
+    
+    def get_safe_x(self, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None, max_attempts=1000):
+        # TODO: for a targeted attack it would be better to start with an image from the target class
+        x_safe = torch.randn_like(x)
+        while not self.search_succ_no_count(x_safe, y, target):
+            x_safe = torch.randn_like(x)
+        return x_safe
 
 
 def test_flip_square():
@@ -226,12 +335,12 @@ def test_flip_square():
     exp_result = torch.ones(1, 1, 8, 8)
     exp_result[:, :, 0:2, 0:2] *= -1
     npt.assert_equal(flipped.numpy(), exp_result.numpy())
-    
+
     flipped = attack.flip_square(2, 2)
     exp_result = torch.ones(1, 1, 8, 8)
     exp_result[:, :, 0:2, 4:6] *= -1
     npt.assert_equal(flipped.numpy(), exp_result.numpy())
-    
+
     flipped = attack.flip_square(2, 4)
     exp_result = torch.ones(1, 1, 8, 8)
     exp_result[:, :, 2:4, 0:2] *= -1

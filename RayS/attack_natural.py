@@ -105,6 +105,11 @@ def main():
     exp_out_dir.mkdir()
 
     print(f"Saving results in {exp_out_dir}")
+    exp_args = vars(args)
+    exp_args['git_hash'] = get_git_revision_hash()
+    with open(exp_out_dir / 'args.json', 'w') as f:
+        json.dump(exp_args, f, indent=4)
+    
 
     attack = RayS(torch_model,
                   order=order,
@@ -177,8 +182,6 @@ def main():
                     np.median(np.array(stop_wasted_queries)), np.mean(np.array(asr))))
 
     results_dict = {
-        "git_hash": get_git_revision_hash(),
-        "args": vars(args),
         "miscliassified": miscliassified,
         "distortion": np.mean(np.array(stop_dists)),
         "success_rate": np.mean(np.array(asr)),
@@ -193,7 +196,7 @@ def main():
     }
 
     with open(exp_out_dir / "results.json", 'w') as f:
-        json.dump(results_dict, f)
+        json.dump(results_dict, f, indent=4)
 
     np.save(exp_out_dir / "distortion.npy", np.array(stop_dists))
     np.save(exp_out_dir / "queries.npy", np.array(stop_queries))
