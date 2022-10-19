@@ -13,6 +13,11 @@ class GeneralTorchModel(nn.Module):
         self.im_mean = im_mean
         self.im_std = im_std
         self.n_class = n_class
+        if self.n_class == 2:
+            print("Using binary predict label function")
+            self.predict_label = self.predict_label_binary
+        else:
+            self.predict_label = self.predict_label_multiclass
 
     def forward(self, image):
         if len(image.size()) != 4:
@@ -23,7 +28,7 @@ class GeneralTorchModel(nn.Module):
 
     def preprocess(self, image):
         if isinstance(image, np.ndarray):
-            processed = torch.from_numpy(image).type(torch.FloatTensor)
+            processed = torch.from_numpy(image).to(torch.float)
         else:
             processed = image
 
@@ -43,8 +48,32 @@ class GeneralTorchModel(nn.Module):
             logits = self.model(image)
             self.num_queries += image.size(0)
         return logits
-
-    def predict_label(self, image):
+ 
+    def predict_label_multiclass(self, image):
         logits = self.predict_prob(image)
         _, predict = torch.max(logits, 1)
         return predict
+    
+    def predict_label_binary(self, image):
+        logits = self.predict_prob(image)
+        predict = torch.round(torch.sigmoid(logits)).to(torch.long)
+        return predict
+
+
+class BinaryTorchModel(GeneralTorchModel):
+    def forward(self, image):
+        if len(image.size()) != 4:
+            image = image.unsqueeze(0)
+        image = self.preprocess(image)
+        logit = self.model(image)
+        
+        return logit
+    
+    def predict_prob(self, image):
+        with torch.no_grad():
+            if len(image.size()) != 4:
+                image = image.unsqueeze(0)
+            image = self.preprocess(image)
+            logit = self.model(image)
+            self.num_queries += image.size(0)
+        return logit

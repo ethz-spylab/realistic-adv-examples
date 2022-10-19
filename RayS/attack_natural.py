@@ -10,10 +10,10 @@ import torch
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 
-from dataset import load_mnist_test_data, load_cifar10_test_data, load_imagenet_test_data
+from dataset import load_mnist_test_data, load_cifar10_test_data, load_imagenet_test_data, load_binary_imagenet_test_data
 from general_torch_model import GeneralTorchModel
 
-from arch import mnist_model
+from arch import mnist_model, binary_resnet50
 from arch import cifar_model
 
 from RayS_Single import RayS, SafeSideRayS
@@ -72,31 +72,31 @@ def main():
         out_dir.mkdir()
 
     if args.dataset == 'mnist':
-        model = mnist_model.MNIST().cuda()
+        model = mnist_model.MNIST().cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
         model.load_state_dict(torch.load('model/mnist_gpu.pt'))
         test_loader = load_mnist_test_data(args.batch)
         torch_model = GeneralTorchModel(model, n_class=10, im_mean=None, im_std=None)
     elif args.dataset == 'cifar':
-        model = cifar_model.CIFAR10().cuda()
+        model = cifar_model.CIFAR10().cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
         model.load_state_dict(torch.load('model/cifar10_gpu.pt'))
         test_loader = load_cifar10_test_data(args.batch)
         torch_model = GeneralTorchModel(model, n_class=10, im_mean=None, im_std=None)
     elif args.dataset == 'resnet':
-        model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).cuda()
+        model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
         test_loader = load_imagenet_test_data(args.batch)
         torch_model = GeneralTorchModel(model,
                                         n_class=1000,
                                         im_mean=[0.485, 0.456, 0.406],
                                         im_std=[0.229, 0.224, 0.225])
-    elif args.dataset == 'inception':
-        model = models.__dict__["inception_v3"](pretrained=True).cuda()
+    elif args.dataset == 'binary_imagenet':
+        model = binary_resnet50.BinaryResNet50.load_from_checkpoint("checkpoints/binary_imagenet.ckpt").model.cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
-        test_loader = load_imagenet_test_data(args.batch)
+        test_loader = load_binary_imagenet_test_data(args.batch)
         torch_model = GeneralTorchModel(model,
-                                        n_class=1000,
+                                        n_class=2,
                                         im_mean=[0.485, 0.456, 0.406],
                                         im_std=[0.229, 0.224, 0.225])
     else:
@@ -131,7 +131,10 @@ def main():
                     search=args.search,
                     line_search_tol=args.line_search_tol,
                     flip_squares=args.flip_squares == '1')
+    else:
+        raise ValueError(f"Invalid attack side: {args.side}")
 
+    
     stop_dists = []
     stop_queries = []
     stop_bad_queries = []
@@ -142,7 +145,15 @@ def main():
     seeds = np.random.randint(10000, size=10000)
     count = 0
     miscliassified = 0
+    negatives = 0
     for i, (xi, yi) in enumerate(test_loader):
+        if torch_model.n_class == 2 and yi.item() == 0:
+            count += 1
+            negatives += 1
+            print("Skipping as item is negative")
+            continue
+        
+        print(f"Sample {i}, class: {yi.item()}")
         xi, yi = xi.cuda(), yi.cuda()
         if count == args.num:
             break
@@ -150,9 +161,10 @@ def main():
         if torch_model.predict_label(xi) != yi:
             count += 1
             miscliassified += 1
+            print("Skipping as item is misclassified")
             continue
 
-        np.random.seed(seeds[i])
+        np.random.seed(seeds[count])
 
         target = np.random.randint(torch_model.n_class) * torch.ones(yi.shape,
                                                                      dtype=torch.long).cuda() if targeted else None
