@@ -74,9 +74,9 @@ class RayS:
 
         max_block_ind = 2**block_level
         if not self.flip_squares:
-            transpose_to_flip = None
+            rotate_to_flip = None
         else:
-            transpose_to_flip = False
+            rotate_to_flip = False
 
         for i in range(query_limit):
             block_num = 2**block_level
@@ -86,9 +86,9 @@ class RayS:
             if not self.flip_squares:
                 attempt = self.flip_sign(shape, dim, start, end)
             else:
-                assert transpose_to_flip is not None
-                attempt = self.flip_sign_alternate(shape, dim, transpose_to_flip, start, end)
-                transpose_to_flip = not transpose_to_flip
+                assert rotate_to_flip is not None
+                attempt = self.flip_sign_alternate(shape, dim, rotate_to_flip, start, end)
+                rotate_to_flip = not rotate_to_flip
 
             d_end = search_fn(attempt)
             if d_end < self.d_t:
@@ -97,7 +97,7 @@ class RayS:
                 unit_sgn = self.sgn_t / torch.norm(self.sgn_t)
                 self.x_final = self.get_xadv(x, unit_sgn, self.d_t)
 
-            if transpose_to_flip is None or not transpose_to_flip:
+            if rotate_to_flip is None or not rotate_to_flip:
                 block_ind += 1
             if block_ind == max_block_ind or end == dim:
                 block_level += 1
@@ -129,14 +129,14 @@ class RayS:
         attempt = attempt.view(shape)
         return attempt
     
-    def flip_sign_alternate(self, shape: list[int], dim: int, transpose: bool, start: int, end: int) -> torch.Tensor:
-        if transpose:
+    def flip_sign_alternate(self, shape: list[int], dim: int, to_rotate: bool, start: int, end: int) -> torch.Tensor:
+        if to_rotate:
             attempt = rotate(self.sgn_t.clone(), 90).view(shape[0], dim)
         else:
             attempt = self.sgn_t.clone().view(shape[0], dim)
         attempt[:, start:end] *= -1.
         attempt = attempt.view(shape)
-        if transpose:
+        if to_rotate:
             attempt = rotate(attempt, 270)
         return attempt
 
@@ -265,10 +265,11 @@ class SafeSideRayS(RayS):
         else:
             raise ValueError(f"Search method '{self.search}' for `OtherSideRayS` not supported")
 
-        if self.flip_squares:
-            max_block_ind = (2**block_level)**2
+        max_block_ind = 2**block_level
+        if not self.flip_squares:
+            rotate_to_flip = None
         else:
-            max_block_ind = 2**block_level
+            rotate_to_flip = False
 
         for i in range(query_limit):
             block_num = 2**block_level
@@ -278,7 +279,9 @@ class SafeSideRayS(RayS):
             if not self.flip_squares:
                 attempt = self.flip_sign(shape, dim, start, end)
             else:
-                attempt = self.flip_square(block_level, block_ind)
+                assert rotate_to_flip is not None
+                attempt = self.flip_sign_alternate(shape, dim, rotate_to_flip, start, end)
+                rotate_to_flip = not rotate_to_flip
 
             attempt_d = search_fn(attempt)
             attempt_unit_sgn = attempt / torch.norm(attempt)
@@ -292,7 +295,8 @@ class SafeSideRayS(RayS):
                 self.x_final = self.get_xadv(x_safe, attempt_unit_sgn, self.d_t)
                 self.best_distance = attempt_distance
 
-            block_ind += 1
+            if rotate_to_flip is None or not rotate_to_flip:
+                block_ind += 1
             if block_ind == max_block_ind or end == dim:
                 block_level += 1
                 block_ind = 0
@@ -404,31 +408,11 @@ class SafeSideRayS(RayS):
             d_minus -= step_size
 
         # Return the direction with the closest boundary
+        distance_multiplier = 1.2
         print(f"{d_plus=}, {d_minus=}")
         if d_plus < d_minus:
-            x_safe = self.get_xadv(x, unit_sgn_plus, d_plus * 2)
+            x_safe = self.get_xadv(x, unit_sgn_plus, d_plus * distance_multiplier)
             return x_safe, d_plus, -unit_sgn_plus
         
-        x_safe = self.get_xadv(x, unit_sgn_minus, d_minus * 2)
+        x_safe = self.get_xadv(x, unit_sgn_minus, d_minus * distance_multiplier)
         return x_safe, d_minus, -unit_sgn_minus
-
-
-def test_flip_square():
-    model = GeneralTorchModel(nn.Identity())
-    attack = RayS(model, flip_squares=True)
-    attack.sgn_t = torch.ones(1, 1, 8, 8)
-
-    flipped = attack.flip_square(2, 0)
-    exp_result = torch.ones(1, 1, 8, 8)
-    exp_result[:, :, 0:2, 0:2] *= -1
-    npt.assert_equal(flipped.numpy(), exp_result.numpy())
-
-    flipped = attack.flip_square(2, 2)
-    exp_result = torch.ones(1, 1, 8, 8)
-    exp_result[:, :, 0:2, 4:6] *= -1
-    npt.assert_equal(flipped.numpy(), exp_result.numpy())
-
-    flipped = attack.flip_square(2, 4)
-    exp_result = torch.ones(1, 1, 8, 8)
-    exp_result[:, :, 2:4, 0:2] *= -1
-    npt.assert_equal(flipped.numpy(), exp_result.numpy())
