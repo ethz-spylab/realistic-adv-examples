@@ -148,18 +148,17 @@ def main():
     negatives = 0
     for i, (xi, yi) in enumerate(test_loader):
         if torch_model.n_class == 2 and yi.item() == 0:
-            count += 1
             negatives += 1
             print("Skipping as item is negative")
             continue
         
         print(f"Sample {i}, class: {yi.item()}")
         xi, yi = xi.cuda(), yi.cuda()
+        
         if count == args.num:
             break
 
         if torch_model.predict_label(xi) != yi:
-            count += 1
             miscliassified += 1
             print("Skipping as item is misclassified")
             continue

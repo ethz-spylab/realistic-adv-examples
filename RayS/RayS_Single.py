@@ -2,9 +2,9 @@ from einops import rearrange
 
 import numpy as np
 import torch
-import torch.nn.functional as F
-from torch import nn
 from numpy import testing as npt
+from torch import nn
+from torchvision.transforms.functional import rotate
 
 from general_torch_model import GeneralTorchModel
 
@@ -72,20 +72,23 @@ class RayS:
         else:
             raise ValueError(f"Search method '{self.search}' not supported")
 
-        if self.flip_squares:
-            max_block_ind = (2**block_level)**2
+        max_block_ind = 2**block_level
+        if not self.flip_squares:
+            transpose_to_flip = None
         else:
-            max_block_ind = 2**block_level
+            transpose_to_flip = False
 
         for i in range(query_limit):
             block_num = 2**block_level
             block_size = int(np.ceil(dim / block_num))
-            start, end = self.get_start_end(dim, block_ind, block_size)
 
+            start, end = self.get_start_end(dim, block_ind, block_size)
             if not self.flip_squares:
                 attempt = self.flip_sign(shape, dim, start, end)
             else:
-                attempt = self.flip_square(block_level, block_ind)
+                assert transpose_to_flip is not None
+                attempt = self.flip_sign_alternate(shape, dim, transpose_to_flip, start, end)
+                transpose_to_flip = not transpose_to_flip
 
             d_end = search_fn(attempt)
             if d_end < self.d_t:
@@ -94,14 +97,12 @@ class RayS:
                 unit_sgn = self.sgn_t / torch.norm(self.sgn_t)
                 self.x_final = self.get_xadv(x, unit_sgn, self.d_t)
 
-            block_ind += 1
+            if transpose_to_flip is None or not transpose_to_flip:
+                block_ind += 1
             if block_ind == max_block_ind or end == dim:
                 block_level += 1
                 block_ind = 0
-                if self.flip_squares:
-                    max_block_ind = (2**block_level)**2
-                else:
-                    max_block_ind = 2**block_level
+                max_block_ind = 2**block_level
 
             dist = torch.norm(self.x_final - x, self.order)
             if self.early_stopping and (dist <= self.epsilon):
@@ -127,23 +128,17 @@ class RayS:
         attempt[:, start:end] *= -1.
         attempt = attempt.view(shape)
         return attempt
-
-    def flip_square(self, block_level: int, block_ind: int):
-        assert self.sgn_t is not None
-        num_squares_per_side = 2**block_level
-
-        if self.sgn_t.shape[2] % num_squares_per_side != 0:
-            num_squares_per_side = self.sgn_t.shape[2]
-
-        attempt = rearrange(self.sgn_t,
-                            'b c (h1 h) (w1 w) -> b c (h1 w1) h w',
-                            h1=num_squares_per_side,
-                            w1=num_squares_per_side)
-        attempt[:, :, block_ind, :, :] *= -1
-        return rearrange(attempt,
-                         'b c (h1 w1) h w -> b c (h1 h) (w1 w)',
-                         h1=num_squares_per_side,
-                         w1=num_squares_per_side)
+    
+    def flip_sign_alternate(self, shape: list[int], dim: int, transpose: bool, start: int, end: int) -> torch.Tensor:
+        if transpose:
+            attempt = rotate(self.sgn_t.clone(), 90).view(shape[0], dim)
+        else:
+            attempt = self.sgn_t.clone().view(shape[0], dim)
+        attempt[:, start:end] *= -1.
+        attempt = attempt.view(shape)
+        if transpose:
+            attempt = rotate(attempt, 270)
+        return attempt
 
     def search_succ(self, x, y, target):
         self.queries += 1
@@ -357,7 +352,7 @@ class SafeSideRayS(RayS):
                 print("step_x_adv_distance: ", step_x_adv_distance.item())
 
             direction_best_distance = step_x_adv_distance
-            temp_d_end += direction_best_distance / 100
+            temp_d_end += direction_best_distance / 10
             d_end = temp_d_end
             i += 1.
 
@@ -397,7 +392,7 @@ class SafeSideRayS(RayS):
         # Check along the positive ones direction
         unit_sgn_plus = sgn / torch.norm(sgn)
         d_plus = torch.norm(sgn)
-        step_size = d_plus / 1000
+        step_size = d_plus / 100
         
         while not self.hits_boundary(self.get_xadv(x, unit_sgn_plus, d_plus), y, target):
             d_plus -= step_size
