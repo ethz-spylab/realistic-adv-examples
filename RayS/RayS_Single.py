@@ -229,13 +229,18 @@ class RayS:
 
 
 class SafeSideRayS(RayS):
+    MULTISTEP_TOLERANCE: float = 0.0
 
     def attack_hard_label(self,
                           x: torch.Tensor,
                           y: torch.Tensor,
                           target: torch.Tensor | None = None,
                           query_limit: int = 100000,
-                          seed: int | None = None):
+                          seed: int | None = None,
+                          x_safe: torch.Tensor | None = None,
+                          queries: int | None = None,
+                          bad_queries: int | None = None,
+                          wasted_queries: int | None = None):
         """ Attack the original image and return adversarial example
             model: (pytorch model)
             (x, y): original image
@@ -245,23 +250,26 @@ class SafeSideRayS(RayS):
         if seed is not None:
             np.random.seed(seed)
 
-        self.queries = 0
-        self.bad_queries = 0
-        self.wasted_queries = 0
+        self.queries = queries or 0
+        self.bad_queries = bad_queries or 0
+        self.wasted_queries = wasted_queries or 0
+        self.d_t = np.inf
+        self.sgn_t = torch.ones_like(x)
 
-        x_safe, self.d_t, self.sgn_t = self.get_safe_x_specular(x, y, target)
-        self.x_safe_distance = torch.norm(x - x_safe, self.order)  # type: ignore
-        self.x_final = self.get_xadv(x_safe, self.sgn_t, self.d_t)
-        self.best_distance = self.x_safe_distance
+        if x_safe is None:
+            x_safe = self.get_safe_x_specular(x, y, target)
+        x_safe_distance = torch.norm(x - x_safe, self.order)  # type: ignore
+        self.x_final = x_safe
+        self.best_distance = x_safe_distance  # type: ignore
         print(f"Initial best distance: {self.best_distance}, queries: {self.queries}, bad_queries: {self.bad_queries}")
 
         dist = np.inf
-        block_level = 1
+        block_level = 0
         block_ind = 0
         self.n_early_stopping = 0
 
         if self.search == "line":
-            search_fn = lambda attempt: self.line_search(x_safe, x, y, target, attempt)
+            search_fn = lambda attempt: self.line_search(x_safe, x, y, target, attempt)  # type: ignore
         else:
             raise ValueError(f"Search method '{self.search}' for `OtherSideRayS` not supported")
 
@@ -287,9 +295,15 @@ class SafeSideRayS(RayS):
             attempt_unit_sgn = attempt / torch.norm(attempt)
             attempt_x_adv = self.get_xadv(x_safe, attempt_unit_sgn, attempt_d)
             attempt_distance = torch.norm(x - attempt_x_adv, self.order)  # type: ignore
-
-            if attempt_distance < self.best_distance:
-                print(f"Updating best distance from {self.best_distance} to {attempt_distance}")
+            print(f"attempt_distance = {attempt_distance:.4f}, best_distance = {self.best_distance:.4f}")
+            
+            if 1 - (attempt_distance / self.best_distance) > self.MULTISTEP_TOLERANCE:
+                print(f"Restarting with new x_safe to one with distance {attempt_distance:.4f} (vs. previous {self.best_distance:.4f})")
+                x_safe = self.get_xadv(x_safe, attempt_unit_sgn, attempt_d)
+                return self.attack_hard_label(x, y, target, query_limit, seed, x_safe, self.queries, self.bad_queries, self.wasted_queries)
+            
+            elif attempt_distance < self.best_distance:
+                print(f"Updating best distance from {self.best_distance:.4f} to {attempt_distance:.4f}")
                 self.d_t = attempt_d
                 self.sgn_t = attempt
                 self.x_final = self.get_xadv(x_safe, attempt_unit_sgn, self.d_t)
@@ -331,11 +345,10 @@ class SafeSideRayS(RayS):
                     x: torch.Tensor,
                     y: torch.Tensor,
                     target: torch.Tensor | None,
-                    sgn: torch.Tensor,
-                    step_size=1e-1) -> float:
+                    sgn: torch.Tensor) -> float:
 
         sgn_unit = sgn / torch.norm(sgn)
-        direction_best_distance = self.x_safe_distance
+        direction_best_distance = torch.norm(x - x_safe, self.order)  # type: ignore
 
         d_end = 0.
         i = 1.
@@ -353,7 +366,7 @@ class SafeSideRayS(RayS):
                 break
 
             if int(i) % 100 == 0:
-                print("step_x_adv_distance: ", step_x_adv_distance.item())
+                print(f"step_x_adv_distance: {step_x_adv_distance.item():.4f}")
 
             direction_best_distance = step_x_adv_distance
             temp_d_end += direction_best_distance / 10
@@ -388,7 +401,7 @@ class SafeSideRayS(RayS):
         return x_safe
 
     def get_safe_x_specular(self, x: torch.Tensor, y: torch.Tensor,
-                            target: torch.Tensor | None) -> tuple[torch.Tensor, float, torch.Tensor]:
+                            target: torch.Tensor | None) -> torch.Tensor:
         if target is not None:
             raise ValueError("Specular initialization does not work for targeted attacks")
         sgn = torch.ones_like(x)
@@ -408,11 +421,11 @@ class SafeSideRayS(RayS):
             d_minus -= step_size
 
         # Return the direction with the closest boundary
-        distance_multiplier = 1.2
-        print(f"{d_plus=}, {d_minus=}")
+        distance_multiplier = 1.5
+        print(f"d_plus={d_plus.item()}, d_minus={d_minus.item()}")
         if d_plus < d_minus:
             x_safe = self.get_xadv(x, unit_sgn_plus, d_plus * distance_multiplier)
-            return x_safe, d_plus, -unit_sgn_plus
+            return x_safe
         
         x_safe = self.get_xadv(x, unit_sgn_minus, d_minus * distance_multiplier)
-        return x_safe, d_minus, -unit_sgn_minus
+        return x_safe
