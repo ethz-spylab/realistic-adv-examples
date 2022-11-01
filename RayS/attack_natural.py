@@ -55,6 +55,10 @@ def main():
                         default='0',
                         type=str,
                         help='Whether the attack should flip squares and not chunks of a 1-d vector')
+    parser.add_argument('--flip-rand-pixels',
+                        default='0',
+                        type=str,
+                        help='Whether the attack should flip random pixels not chunks of a 1-d vector')
     parser.add_argument('--side',
                         default='unsafe',
                         type=str,
@@ -64,6 +68,9 @@ def main():
     targeted = True if args.targeted == '1' else False
     early_stopping = False if args.early == '0' else True
     order = 2 if args.norm == 'l2' else np.inf
+    
+    if args.flip_squares == '1' and args.flip_rand_pixels == '1':
+        raise ValueError("`--flip-squares` cannot be `1` if also `--flip-rand-pixels` is `1`")
 
     print(args)
 
@@ -103,9 +110,9 @@ def main():
         print("Invalid dataset")
         exit(1)
 
-    exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{uuid.uuid4().hex}"
+    exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{args.side}_{uuid.uuid4().hex}"
     while exp_out_dir.exists():
-        exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon}_{uuid.uuid4().hex}"
+        exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{args.side}_{uuid.uuid4().hex}"
     exp_out_dir.mkdir()
 
     print(f"Saving results in {exp_out_dir}")
@@ -146,7 +153,7 @@ def main():
     count = 0
     miscliassified = 0
     negatives = 0
-    for i, (xi, yi) in enumerate(test_loader):
+    for i, (xi, yi) in enumerate(test_loader):        
         if torch_model.n_class == 2 and yi.item() == 0:
             negatives += 1
             print("Skipping as item is negative")

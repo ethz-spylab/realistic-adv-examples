@@ -19,7 +19,8 @@ class RayS:
                  search: str = "binary",
                  line_search_tol: float | None = None,
                  conf_early_stopping: float | None = None,
-                 flip_squares: bool = False):
+                 flip_squares: bool = False,
+                 flip_rand_pixels: bool = False):
         self.model = model
         self.order = order
         self.epsilon = epsilon
@@ -33,6 +34,7 @@ class RayS:
         self.line_search_tol = line_search_tol
         self.conf_early_stopping = conf_early_stopping
         self.flip_squares = flip_squares
+        self.flip_rand_pixels = flip_rand_pixels
         self.n_early_stopping = 0
 
     def get_xadv(self, x, v, d, lb=0., rb=1.):
@@ -83,12 +85,14 @@ class RayS:
             block_size = int(np.ceil(dim / block_num))
 
             start, end = self.get_start_end(dim, block_ind, block_size)
-            if not self.flip_squares:
-                attempt = self.flip_sign(shape, dim, start, end)
-            else:
+            if self.flip_squares:
                 assert rotate_to_flip is not None
                 attempt = self.flip_sign_alternate(shape, dim, rotate_to_flip, start, end)
                 rotate_to_flip = not rotate_to_flip
+            elif self.flip_rand_pixels:
+                attempt = self.flip_random_pixels(shape, dim, start, end)
+            else:
+                attempt = self.flip_sign(shape, dim, start, end)
 
             d_end = search_fn(attempt)
             if d_end < self.d_t:
@@ -139,6 +143,15 @@ class RayS:
         if to_rotate:
             attempt = rotate(attempt, 270)
         return attempt
+    
+    def flip_random_pixels(self, shape: list[int], dim: int, start: int, end: int):
+        attempt = self.sgn_t.clone().view(shape[0], dim)
+        flipping_signs = torch.ones_like(attempt)
+        flipping_signs[:, start:end] *= -1.
+        permuted_indices = torch.randperm(dim, dtype=torch.int, device=attempt.device)
+        permuted_flipping_signs = flipping_signs[:, permuted_indices]
+        attempt *= permuted_flipping_signs
+        return attempt.view(shape)
 
     def search_succ(self, x, y, target):
         self.queries += 1
@@ -230,6 +243,7 @@ class RayS:
 
 class SafeSideRayS(RayS):
     MULTISTEP_TOLERANCE: float = 0.0
+    DISTANCE_WEIGHT: float = 0.0
 
     def attack_hard_label(self,
                           x: torch.Tensor,
@@ -253,25 +267,27 @@ class SafeSideRayS(RayS):
         self.queries = queries or 0
         self.bad_queries = bad_queries or 0
         self.wasted_queries = wasted_queries or 0
-        self.d_t = np.inf
-        self.sgn_t = torch.ones_like(x)
 
         if x_safe is None:
             x_safe = self.get_safe_x_specular(x, y, target)
         x_safe_distance = torch.norm(x - x_safe, self.order)  # type: ignore
+        
         self.x_final = x_safe
         self.best_distance = x_safe_distance  # type: ignore
-        print(f"Initial best distance: {self.best_distance}, queries: {self.queries}, bad_queries: {self.bad_queries}")
-
-        dist = np.inf
-        block_level = 0
-        block_ind = 0
-        self.n_early_stopping = 0
-
+        self.d_t = np.inf
+        self.sgn_t = torch.ones_like(x)
+        
         if self.search == "line":
             search_fn = lambda attempt: self.line_search(x_safe, x, y, target, attempt)  # type: ignore
         else:
             raise ValueError(f"Search method '{self.search}' for `OtherSideRayS` not supported")
+        
+        print(f"Initial best distance: {self.best_distance}, queries: {self.queries}, bad_queries: {self.bad_queries}")
+
+        dist = np.inf
+        block_level = 0
+        block_ind = -1
+        self.n_early_stopping = 0
 
         max_block_ind = 2**block_level
         if not self.flip_squares:
@@ -282,31 +298,39 @@ class SafeSideRayS(RayS):
         for i in range(query_limit):
             block_num = 2**block_level
             block_size = int(np.ceil(dim / block_num))
-            start, end = self.get_start_end(dim, block_ind, block_size)
-
-            if not self.flip_squares:
-                attempt = self.flip_sign(shape, dim, start, end)
+            if block_ind >= 0:
+                start, end = self.get_start_end(dim, block_ind, block_size)
             else:
+                start, end = 0, 0
+
+            if self.flip_squares:
                 assert rotate_to_flip is not None
                 attempt = self.flip_sign_alternate(shape, dim, rotate_to_flip, start, end)
                 rotate_to_flip = not rotate_to_flip
+            elif self.flip_rand_pixels:
+                attempt = self.flip_random_pixels(shape, dim, start, end)
+            else:
+                attempt = self.flip_sign(shape, dim, start, end)
+                
+            distance_vector = x - x_safe
+            weighted_attempt = (1 - self.DISTANCE_WEIGHT) * attempt + self.DISTANCE_WEIGHT * distance_vector
 
-            attempt_d = search_fn(attempt)
-            attempt_unit_sgn = attempt / torch.norm(attempt)
-            attempt_x_adv = self.get_xadv(x_safe, attempt_unit_sgn, attempt_d)
+            attempt_d, boundary_hit = search_fn(weighted_attempt)
+            weighted_attempt_unit_sgn = weighted_attempt / torch.norm(weighted_attempt)
+            attempt_x_adv = self.get_xadv(x_safe, weighted_attempt_unit_sgn, attempt_d)
             attempt_distance = torch.norm(x - attempt_x_adv, self.order)  # type: ignore
+
             print(f"attempt_distance = {attempt_distance:.4f}, best_distance = {self.best_distance:.4f}")
-            
-            if 1 - (attempt_distance / self.best_distance) > self.MULTISTEP_TOLERANCE:
+            """if not boundary_hit and 1 - (attempt_distance / self.best_distance) > self.MULTISTEP_TOLERANCE:
                 print(f"Restarting with new x_safe to one with distance {attempt_distance:.4f} (vs. previous {self.best_distance:.4f})")
-                x_safe = self.get_xadv(x_safe, attempt_unit_sgn, attempt_d)
-                return self.attack_hard_label(x, y, target, query_limit, seed, x_safe, self.queries, self.bad_queries, self.wasted_queries)
+                x_safe = self.get_xadv(x_safe, weighted_attempt_unit_sgn, attempt_d)
+                return self.attack_hard_label(x, y, target, query_limit, seed, x_safe, self.queries, self.bad_queries, self.wasted_queries)"""
             
-            elif attempt_distance < self.best_distance:
+            if attempt_distance < self.best_distance:
                 print(f"Updating best distance from {self.best_distance:.4f} to {attempt_distance:.4f}")
                 self.d_t = attempt_d
                 self.sgn_t = attempt
-                self.x_final = self.get_xadv(x_safe, attempt_unit_sgn, self.d_t)
+                self.x_final = self.get_xadv(x_safe, weighted_attempt_unit_sgn, self.d_t)
                 self.best_distance = attempt_distance
 
             if rotate_to_flip is None or not rotate_to_flip:
@@ -345,35 +369,41 @@ class SafeSideRayS(RayS):
                     x: torch.Tensor,
                     y: torch.Tensor,
                     target: torch.Tensor | None,
-                    sgn: torch.Tensor) -> float:
-
-        sgn_unit = sgn / torch.norm(sgn)
+                    direction: torch.Tensor) -> tuple[float, bool]:
+        
+        direction_unit = direction / torch.norm(direction)
         direction_best_distance = torch.norm(x - x_safe, self.order)  # type: ignore
 
         d_end = 0.
         i = 1.
-        temp_d_end = direction_best_distance / 10
+        temp_d_end = 0.
 
         while True:
-            step_x_adv = self.get_xadv(x_safe, sgn_unit, temp_d_end)
-            if self.hits_boundary(step_x_adv, y, target):
-                print(f"Boundary hit at {i=}")
-                break
-
+            temp_d_end += direction_best_distance / 10
+            step_x_adv = self.get_xadv(x_safe, direction_unit, temp_d_end)
             step_x_adv_distance = torch.norm(x - step_x_adv, self.order)  # type: ignore
+
+            # Stop if we went over the closest point along the given direction
             if step_x_adv_distance >= direction_best_distance:
                 print(f"Distance stopped improving at {i=}, d={temp_d_end.item():.4f}")
-                break
+                return d_end, False
 
+            # Stop if we hit the boundary, and go away from the boundary a little bit to allow for exploration
+            if self.hits_boundary(step_x_adv, y, target):
+                # backtracking_quantity = d_end * 0.50
+                # print(f"Boundary hit at {i=}, backtracking by {backtracking_quantity:.4f} (out of {d_end:.4f})")
+                # d_end -= backtracking_quantity
+                print(f"Boundary hit at {i=}")
+                return d_end, True
+            
+            
             if int(i) % 100 == 0:
                 print(f"step_x_adv_distance: {step_x_adv_distance.item():.4f}")
 
+            # Otherwise, update best results and continue
             direction_best_distance = step_x_adv_distance
-            temp_d_end += direction_best_distance / 10
             d_end = temp_d_end
             i += 1.
-
-        return d_end
 
     def hits_boundary(self, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None):
         # The difference with the analogous method in the parent class is that here we check whether we hit a boundary we should not hit,
