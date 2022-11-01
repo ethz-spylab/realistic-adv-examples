@@ -148,7 +148,7 @@ class RayS:
         attempt = self.sgn_t.clone().view(shape[0], dim)
         flipping_signs = torch.ones_like(attempt)
         flipping_signs[:, start:end] *= -1.
-        permuted_indices = torch.randperm(dim, dtype=torch.int, device=attempt.device)
+        permuted_indices = torch.randperm(dim, dtype=torch.long, device=attempt.device)
         permuted_flipping_signs = flipping_signs[:, permuted_indices]
         attempt *= permuted_flipping_signs
         return attempt.view(shape)

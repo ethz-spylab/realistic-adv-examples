@@ -129,7 +129,8 @@ def main():
                     early_stopping=early_stopping,
                     search=args.search,
                     line_search_tol=args.line_search_tol,
-                    flip_squares=args.flip_squares == '1')
+                    flip_squares=args.flip_squares == '1',
+                    flip_rand_pixels=args.flip_rand_pixels == '1')
     elif args.side == 'safe':
         attack = SafeSideRayS(torch_model,
                     order=order,
@@ -137,7 +138,8 @@ def main():
                     early_stopping=early_stopping,
                     search=args.search,
                     line_search_tol=args.line_search_tol,
-                    flip_squares=args.flip_squares == '1')
+                    flip_squares=args.flip_squares == '1',
+                    flip_rand_pixels=args.flip_rand_pixels == '1')
     else:
         raise ValueError(f"Invalid attack side: {args.side}")
 
