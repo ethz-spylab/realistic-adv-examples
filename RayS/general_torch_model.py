@@ -6,7 +6,7 @@ import torch.nn as nn
 class GeneralTorchModel(nn.Module):
 
     def __init__(self, model, n_class=10, im_mean=None, im_std=None):
-        super(GeneralTorchModel, self).__init__()
+        super().__init__()
         self.model = model
         self.model.eval()
         self.num_queries = 0
@@ -58,22 +58,3 @@ class GeneralTorchModel(nn.Module):
         logits = self.predict_prob(image)
         predict = torch.round(torch.sigmoid(logits)).to(torch.long)
         return predict
-
-
-class BinaryTorchModel(GeneralTorchModel):
-    def forward(self, image):
-        if len(image.size()) != 4:
-            image = image.unsqueeze(0)
-        image = self.preprocess(image)
-        logit = self.model(image)
-        
-        return logit
-    
-    def predict_prob(self, image):
-        with torch.no_grad():
-            if len(image.size()) != 4:
-                image = image.unsqueeze(0)
-            image = self.preprocess(image)
-            logit = self.model(image)
-            self.num_queries += image.size(0)
-        return logit
