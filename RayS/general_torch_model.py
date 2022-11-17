@@ -8,7 +8,7 @@ class GeneralTorchModel(nn.Module):
     def __init__(self, model, n_class=10, im_mean=None, im_std=None):
         super().__init__()
         self.model = model
-        self.model.eval()
+        self.make_model_eval()
         self.num_queries = 0
         self.im_mean = im_mean
         self.im_std = im_std
@@ -18,6 +18,9 @@ class GeneralTorchModel(nn.Module):
             self.predict_label = self.predict_label_binary
         else:
             self.predict_label = self.predict_label_multiclass
+            
+    def make_model_eval(self):
+        self.model.eval()
 
     def forward(self, image):
         if len(image.size()) != 4:

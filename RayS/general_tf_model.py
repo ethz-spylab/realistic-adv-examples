@@ -4,6 +4,9 @@ from general_torch_model import GeneralTorchModel
 
 
 class GeneralTFModel(GeneralTorchModel):
+    
+    def make_model_eval(self):
+        pass
 
     def forward(self, image):
         if len(image.size()) != 4:

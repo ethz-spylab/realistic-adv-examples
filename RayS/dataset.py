@@ -2,10 +2,12 @@ import random
 from pathlib import Path
 from typing import Any, Tuple
 
+import albumentations as A
 import numpy as np
 import torch
 import torchvision.datasets as dsets
 import torchvision.transforms as transforms
+from albumentations.pytorch import ToTensorV2
 from datasets.load import load_dataset
 from torchvision.datasets import ImageNet
 
@@ -74,11 +76,19 @@ def load_binary_imagenet_test_data(test_batch_size=1, data_dir=Path("/data/image
     return val_loader
 
 
-def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagenet")):
-    transform = transforms.Compose([transforms.Resize(224), transforms.CenterCrop(224)])
+def make_dataset_tuples(sample, image_name="image", sample_name="label"):
+    return sample[image_name], sample[sample_name]
 
-    val_dataset = load_dataset("dedeswim/imagenet-nsfw")
-    val_dataset = val_dataset.with_transform(transform)
+
+def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagenet")):
+    transform = A.Compose([A.Resize(224, 224), A.CenterCrop(224, 224), ToTensorV2()])
+
+    def transform_fn(examples):
+        examples["image"] = [transform(image=np.array(image))["image"] for image in examples["image"]]
+        return examples
+
+    val_dataset = load_dataset("dedeswim/imagenet-nsfw", split="train")
+    val_dataset = val_dataset.with_transform(transform_fn)
 
     rand_seed = 42
     torch.manual_seed(rand_seed)

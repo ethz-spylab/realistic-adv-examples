@@ -104,7 +104,6 @@ def main():
         torch_model = GeneralTorchModel(model, n_class=2, im_mean=[0.485, 0.456, 0.406], im_std=[0.229, 0.224, 0.225])
     elif args.dataset == 'imagenet_nsfw':
         model = clip_laion_nsfw.CLIPNSFWDetector("b32", "checkpoints")
-        model = torch.nn.DataParallel(model, device_ids=[0])
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
         torch_model = GeneralTFModel(model,
                                      n_class=2,
@@ -157,7 +156,12 @@ def main():
     count = 0
     miscliassified = 0
     negatives = 0
-    for i, (xi, yi) in enumerate(test_loader):
+    for i, batch in enumerate(test_loader):
+        if isinstance(batch, dict):
+            xi, yi = batch["image"], batch["label"]
+        else:
+            xi, yi = batch
+
         if torch_model.n_class == 2 and yi.item() == 0:
             negatives += 1
             print("Skipping as item is negative")
