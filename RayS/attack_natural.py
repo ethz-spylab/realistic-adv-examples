@@ -10,12 +10,10 @@ import torch
 import torchvision.models as models
 from torchvision.models import ResNet50_Weights
 
-from dataset import load_mnist_test_data, load_cifar10_test_data, load_imagenet_test_data, load_binary_imagenet_test_data
+import dataset
+from general_tf_model import GeneralTFModel
 from general_torch_model import GeneralTorchModel
-
-from arch import mnist_model, binary_resnet50
-from arch import cifar_model
-
+from arch import mnist_model, binary_resnet50, cifar_model, clip_laion_nsfw
 from RayS_Single import RayS, SafeSideRayS
 
 
@@ -68,7 +66,7 @@ def main():
     targeted = True if args.targeted == '1' else False
     early_stopping = False if args.early == '0' else True
     order = 2 if args.norm == 'l2' else np.inf
-    
+
     if args.flip_squares == '1' and args.flip_rand_pixels == '1':
         raise ValueError("`--flip-squares` cannot be `1` if also `--flip-rand-pixels` is `1`")
 
@@ -82,30 +80,36 @@ def main():
         model = mnist_model.MNIST().cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
         model.load_state_dict(torch.load('model/mnist_gpu.pt'))
-        test_loader = load_mnist_test_data(args.batch)
+        test_loader = dataset.load_mnist_test_data(args.batch)
         torch_model = GeneralTorchModel(model, n_class=10, im_mean=None, im_std=None)
     elif args.dataset == 'cifar':
         model = cifar_model.CIFAR10().cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
         model.load_state_dict(torch.load('model/cifar10_gpu.pt'))
-        test_loader = load_cifar10_test_data(args.batch)
+        test_loader = dataset.load_cifar10_test_data(args.batch)
         torch_model = GeneralTorchModel(model, n_class=10, im_mean=None, im_std=None)
     elif args.dataset == 'resnet':
         model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
-        test_loader = load_imagenet_test_data(args.batch)
+        test_loader = dataset.load_imagenet_test_data(args.batch)
         torch_model = GeneralTorchModel(model,
                                         n_class=1000,
                                         im_mean=[0.485, 0.456, 0.406],
                                         im_std=[0.229, 0.224, 0.225])
     elif args.dataset == 'binary_imagenet':
-        model = binary_resnet50.BinaryResNet50.load_from_checkpoint("checkpoints/binary_imagenet.ckpt").model.cuda().eval()
+        model = binary_resnet50.BinaryResNet50.load_from_checkpoint(
+            "checkpoints/binary_imagenet.ckpt").model.cuda().eval()
         model = torch.nn.DataParallel(model, device_ids=[0])
-        test_loader = load_binary_imagenet_test_data(args.batch)
-        torch_model = GeneralTorchModel(model,
-                                        n_class=2,
-                                        im_mean=[0.485, 0.456, 0.406],
-                                        im_std=[0.229, 0.224, 0.225])
+        test_loader = dataset.load_binary_imagenet_test_data(args.batch)
+        torch_model = GeneralTorchModel(model, n_class=2, im_mean=[0.485, 0.456, 0.406], im_std=[0.229, 0.224, 0.225])
+    elif args.dataset == 'imagenet_nsfw':
+        model = clip_laion_nsfw.CLIPNSFWDetector("b32", "checkpoints")
+        model = torch.nn.DataParallel(model, device_ids=[0])
+        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
+        torch_model = GeneralTFModel(model,
+                                     n_class=2,
+                                     im_mean=[0.48145466, 0.4578275, 0.40821073],
+                                     im_std=[0.26862954, 0.26130258, 0.27577711])
     else:
         print("Invalid dataset")
         exit(1)
@@ -120,30 +124,28 @@ def main():
     exp_args['git_hash'] = get_git_revision_hash()
     with open(exp_out_dir / 'args.json', 'w') as f:
         json.dump(exp_args, f, indent=4)
-    
 
     if args.side == 'unsafe':
         attack = RayS(torch_model,
-                    order=order,
-                    epsilon=args.epsilon,
-                    early_stopping=early_stopping,
-                    search=args.search,
-                    line_search_tol=args.line_search_tol,
-                    flip_squares=args.flip_squares == '1',
-                    flip_rand_pixels=args.flip_rand_pixels == '1')
+                      order=order,
+                      epsilon=args.epsilon,
+                      early_stopping=early_stopping,
+                      search=args.search,
+                      line_search_tol=args.line_search_tol,
+                      flip_squares=args.flip_squares == '1',
+                      flip_rand_pixels=args.flip_rand_pixels == '1')
     elif args.side == 'safe':
         attack = SafeSideRayS(torch_model,
-                    order=order,
-                    epsilon=args.epsilon,
-                    early_stopping=early_stopping,
-                    search=args.search,
-                    line_search_tol=args.line_search_tol,
-                    flip_squares=args.flip_squares == '1',
-                    flip_rand_pixels=args.flip_rand_pixels == '1')
+                              order=order,
+                              epsilon=args.epsilon,
+                              early_stopping=early_stopping,
+                              search=args.search,
+                              line_search_tol=args.line_search_tol,
+                              flip_squares=args.flip_squares == '1',
+                              flip_rand_pixels=args.flip_rand_pixels == '1')
     else:
         raise ValueError(f"Invalid attack side: {args.side}")
 
-    
     stop_dists = []
     stop_queries = []
     stop_bad_queries = []
@@ -155,15 +157,15 @@ def main():
     count = 0
     miscliassified = 0
     negatives = 0
-    for i, (xi, yi) in enumerate(test_loader):        
+    for i, (xi, yi) in enumerate(test_loader):
         if torch_model.n_class == 2 and yi.item() == 0:
             negatives += 1
             print("Skipping as item is negative")
             continue
-        
+
         print(f"Sample {i}, class: {yi.item()}")
         xi, yi = xi.cuda(), yi.cuda()
-        
+
         if count == args.num:
             break
 

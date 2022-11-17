@@ -17,8 +17,7 @@ def main(args):
         queries_quantiles[queries] = images_fraction
     with open(args.results_dir / "queries_quantiles.json", "w") as f:
         json.dump(queries_quantiles, f, indent=True)
-    
-    
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()

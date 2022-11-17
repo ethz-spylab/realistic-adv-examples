@@ -48,12 +48,12 @@ class GeneralTorchModel(nn.Module):
             logits = self.model(image)
             self.num_queries += image.size(0)
         return logits
- 
+
     def predict_label_multiclass(self, image):
         logits = self.predict_prob(image)
         _, predict = torch.max(logits, 1)
         return predict
-    
+
     def predict_label_binary(self, image):
         logits = self.predict_prob(image)
         predict = torch.round(torch.sigmoid(logits)).to(torch.long)

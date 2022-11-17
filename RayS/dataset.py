@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torchvision.datasets as dsets
 import torchvision.transforms as transforms
-from datasets.load import load_from_disk
+from datasets.load import load_dataset
 from torchvision.datasets import ImageNet
 
 
@@ -77,7 +77,7 @@ def load_binary_imagenet_test_data(test_batch_size=1, data_dir=Path("/data/image
 def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagenet")):
     transform = transforms.Compose([transforms.Resize(224), transforms.CenterCrop(224)])
 
-    val_dataset = load_from_disk("imagenet_nsfw")
+    val_dataset = load_dataset("dedeswim/imagenet-nsfw")
     val_dataset = val_dataset.with_transform(transform)
 
     rand_seed = 42
