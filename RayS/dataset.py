@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 from albumentations.pytorch import ToTensorV2
 from datasets.load import load_dataset
 from torchvision.datasets import ImageNet
+from transformers import CLIPProcessor
 
 
 def load_mnist_test_data(test_batch_size=1):
@@ -81,14 +82,18 @@ def make_dataset_tuples(sample, image_name="image", sample_name="label"):
 
 
 def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagenet")):
-    transform = A.Compose([A.Resize(224, 224), A.CenterCrop(224, 224), ToTensorV2()])
+    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    im_mean = torch.tensor(processor.feature_extractor.image_mean).view(1, 3, 1, 1) # type: ignore
+    im_std = torch.tensor(processor.feature_extractor.image_std).view(1, 3, 1, 1) # type: ignore
 
-    def transform_fn(examples):
-        examples["image"] = [transform(image=np.array(image))["image"] for image in examples["image"]]
-        return examples
+    def transform(batch):
+        preprocessed_images = processor(images=batch["image"], return_tensors="pt", padding=True)["pixel_values"]
+        unnormalized_images = preprocessed_images * im_std + im_mean
+        batch["image"] = unnormalized_images
+        return batch
 
     val_dataset = load_dataset("dedeswim/imagenet-nsfw", split="train")
-    val_dataset = val_dataset.with_transform(transform_fn)
+    val_dataset = val_dataset.with_transform(transform)
 
     rand_seed = 42
     torch.manual_seed(rand_seed)

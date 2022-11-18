@@ -108,7 +108,8 @@ def main():
         torch_model = GeneralTFModel(model,
                                      n_class=2,
                                      im_mean=[0.48145466, 0.4578275, 0.40821073],
-                                     im_std=[0.26862954, 0.26130258, 0.27577711])
+                                     im_std=[0.26862954, 0.26130258, 0.27577711],
+                                     take_sigmoid=False)
     else:
         print("Invalid dataset")
         exit(1)
@@ -157,21 +158,21 @@ def main():
     miscliassified = 0
     negatives = 0
     for i, batch in enumerate(test_loader):
+        if count == args.num:
+            break
+        
         if isinstance(batch, dict):
             xi, yi = batch["image"], batch["label"]
         else:
             xi, yi = batch
-
+            
+        print(f"Sample {i}, class: {yi.item()}")
+        xi, yi = xi.cuda(), yi.cuda()
+        
         if torch_model.n_class == 2 and yi.item() == 0:
             negatives += 1
             print("Skipping as item is negative")
             continue
-
-        print(f"Sample {i}, class: {yi.item()}")
-        xi, yi = xi.cuda(), yi.cuda()
-
-        if count == args.num:
-            break
 
         if torch_model.predict_label(xi) != yi:
             miscliassified += 1

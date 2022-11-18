@@ -5,20 +5,21 @@ import torch.nn as nn
 
 class GeneralTorchModel(nn.Module):
 
-    def __init__(self, model, n_class=10, im_mean=None, im_std=None):
+    def __init__(self, model, n_class=10, im_mean=None, im_std=None, take_sigmoid=True):
         super().__init__()
         self.model = model
         self.make_model_eval()
         self.num_queries = 0
-        self.im_mean = im_mean
-        self.im_std = im_std
+        self.im_mean = torch.Tensor(im_mean).view(1, 3, 1, 1).cuda() if im_mean is not None else None
+        self.im_std = torch.Tensor(im_std).view(1, 3, 1, 1).cuda() if im_std is not None else None
         self.n_class = n_class
+        self.take_sigmoid = take_sigmoid
         if self.n_class == 2:
             print("Using binary predict label function")
             self.predict_label = self.predict_label_binary
         else:
             self.predict_label = self.predict_label_multiclass
-            
+
     def make_model_eval(self):
         self.model.eval()
 
@@ -36,11 +37,7 @@ class GeneralTorchModel(nn.Module):
             processed = image
 
         if self.im_mean is not None and self.im_std is not None:
-            im_mean = torch.tensor(self.im_mean).cuda().view(1, processed.shape[1], 1,
-                                                             1).repeat(processed.shape[0], 1, 1, 1)
-            im_std = torch.tensor(self.im_std).cuda().view(1, processed.shape[1], 1,
-                                                           1).repeat(processed.shape[0], 1, 1, 1)
-            processed = (processed - im_mean) / im_std
+            processed = (processed - self.im_mean) / self.im_std
         return processed
 
     def predict_prob(self, image):
@@ -59,5 +56,9 @@ class GeneralTorchModel(nn.Module):
 
     def predict_label_binary(self, image):
         logits = self.predict_prob(image)
-        predict = torch.round(torch.sigmoid(logits)).to(torch.long)
+        if self.take_sigmoid:
+            probs = torch.sigmoid(logits)
+        else:
+            probs = logits
+        predict = torch.round(probs).to(torch.long)
         return predict
