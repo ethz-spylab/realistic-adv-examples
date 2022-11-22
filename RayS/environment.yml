@@ -149,7 +149,6 @@ dependencies:
     - astunparse==1.6.3
     - async-timeout==4.0.2
     - attrs==22.1.0
-    - autoattack==0.1
     - autokeras==1.0.20
     - babel==2.11.0
     - backcall==0.2.0
@@ -285,11 +284,9 @@ dependencies:
     - terminado==0.17.0
     - threadpoolctl==3.1.0
     - tifffile==2022.10.10
-    - timm==0.6.11
     - tinycss2==1.2.1
     - tokenizers==0.13.2
     - toml==0.10.2
-    - torchdiffeq==0.2.3
     - torchmetrics==0.10.3
     - tornado==6.2
     - tqdm==4.64.1

@@ -2,12 +2,10 @@ import random
 from pathlib import Path
 from typing import Any, Tuple
 
-import albumentations as A
 import numpy as np
 import torch
 import torchvision.datasets as dsets
 import torchvision.transforms as transforms
-from albumentations.pytorch import ToTensorV2
 from datasets.load import load_dataset
 from torchvision.datasets import ImageNet
 from transformers import CLIPProcessor
