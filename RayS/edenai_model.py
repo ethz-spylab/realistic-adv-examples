@@ -94,7 +94,6 @@ class GoogleNSFWModel(EdenAINSFWModel):
     _PROVIDER = Provider.google
 
     def parse_results(self, result: Dict) -> float:
-        print(result)
         response = ProviderResponse[GoogleResponseLabel](**result)
         assert response.status == ResponseStatus.success
         return max(map(lambda x: x.likelihood, response.items)) / 5
