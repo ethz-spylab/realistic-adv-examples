@@ -4,7 +4,7 @@ from enum import Enum
 import io
 import json
 import os
-from typing import Dict, Generic, List, TypeVar
+from typing import Dict, Generic, List, Type, TypeVar
 
 import requests
 import torch
@@ -14,7 +14,6 @@ from pydantic.generics import GenericModel
 from torchvision.transforms.functional import to_pil_image
 
 load_dotenv()
-
 
 UPLOAD_FORMAT = 'JPEG'
 
@@ -49,8 +48,8 @@ class ResponseItem(GenericModel, Generic[T]):
 class ProviderResponse(GenericModel, Generic[T]):
     status: ResponseStatus = Field(...)
     items: List[ResponseItem[T]]
-    
-    
+
+
 class RequestData(BaseModel):
     providers: str
     attributes_as_list: bool = False
@@ -82,6 +81,18 @@ class EdenAINSFWModel(abc.ABC):
         ...
 
 
+EnumT = TypeVar("EnumT", bound=Enum)
+
+
+def filter_unused_labels(result: List[Dict[str, int]], enum: Type[EnumT]) -> List[Dict[str, int]]:
+    return [item for item in result if item["label"] in set(enum)]
+
+
+def parse_all_unsafe_results(response: ProviderResponse) -> float:
+    assert response.status == ResponseStatus.success
+    return max(map(lambda x: x.likelihood, response.items)) / 5
+
+
 class GoogleResponseLabel(str, Enum):
     Adult = "Adult"
     Spoof = "Spoof"
@@ -95,5 +106,60 @@ class GoogleNSFWModel(EdenAINSFWModel):
 
     def parse_results(self, result: Dict) -> float:
         response = ProviderResponse[GoogleResponseLabel](**result)
+        return parse_all_unsafe_results(response)
+
+
+class ClarifaiResponseLabel(str, Enum):
+    safe = "safe"
+    drug = "drug"
+    explicit = "explicit"
+    suggestive = "suggestive"
+    gore = "gore"
+
+
+class ClarifaiNSFWModel(EdenAINSFWModel):
+    _PROVIDER = Provider.clarifai
+
+    def parse_results(self, result: Dict) -> float:
+        response = ProviderResponse[ClarifaiResponseLabel](**result)
         assert response.status == ResponseStatus.success
-        return max(map(lambda x: x.likelihood, response.items)) / 5
+        labels_dict = {item.label: item.likelihood for item in response.items}
+        return 1 - (labels_dict[ClarifaiResponseLabel.safe] / 5)
+
+
+class MicrosoftResponseLabel(str, Enum):
+    Adult = "Adult"
+    Gore = "Gore"
+    Racy = "Racy"
+
+
+class MicrosoftNSFWModel(EdenAINSFWModel):
+    _PROVIDER = Provider.microsoft
+
+    def parse_results(self, result: Dict) -> float:
+        response = ProviderResponse[MicrosoftResponseLabel](**result)
+        assert response.status == ResponseStatus.success
+        return parse_all_unsafe_results(response)
+
+
+class AmazonResponseLabel(str, Enum):
+    ExplicitNudity = "Explicit Nudity"
+    Suggestive = "Suggestive"
+    Violence = "Violence"
+    VisuallyDisturbing = "Visually Disturbing"
+    RudeGestures = "Rude Gestures"
+    Drugs = "Drugs"
+    Tobacco = "Tobacco"
+    Alcohol = "Alcohol"
+    Gambling = "Gambling"
+    HateSymbols = "Hate Symbols"
+
+
+class AmazonNSFWModel(EdenAINSFWModel):
+    _PROVIDER = Provider.amazon
+
+    def parse_results(self, result: Dict) -> float:
+        result["items"] = filter_unused_labels(result["items"], AmazonResponseLabel)
+        response = ProviderResponse[AmazonResponseLabel](**result)
+        assert response.status == ResponseStatus.success
+        return parse_all_unsafe_results(response)
