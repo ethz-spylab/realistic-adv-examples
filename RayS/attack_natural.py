@@ -57,10 +57,6 @@ def main():
                         default='0',
                         type=str,
                         help='Whether the attack should flip random pixels not chunks of a 1-d vector')
-    parser.add_argument('--side',
-                        default='unsafe',
-                        type=str,
-                        help='Whether the attack should happen from the safe side of the boundary')
     args = parser.parse_args()
 
     targeted = True if args.targeted == '1' else False
@@ -114,9 +110,9 @@ def main():
         print("Invalid dataset")
         exit(1)
 
-    exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{args.side}_{uuid.uuid4().hex}"
+    exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{uuid.uuid4().hex}"
     while exp_out_dir.exists():
-        exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{args.side}_{uuid.uuid4().hex}"
+        exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{uuid.uuid4().hex}"
     exp_out_dir.mkdir()
 
     print(f"Saving results in {exp_out_dir}")
@@ -125,26 +121,14 @@ def main():
     with open(exp_out_dir / 'args.json', 'w') as f:
         json.dump(exp_args, f, indent=4)
 
-    if args.side == 'unsafe':
-        attack = RayS(torch_model,
-                      order=order,
-                      epsilon=args.epsilon,
-                      early_stopping=early_stopping,
-                      search=args.search,
-                      line_search_tol=args.line_search_tol,
-                      flip_squares=args.flip_squares == '1',
-                      flip_rand_pixels=args.flip_rand_pixels == '1')
-    elif args.side == 'safe':
-        attack = SafeSideRayS(torch_model,
-                              order=order,
-                              epsilon=args.epsilon,
-                              early_stopping=early_stopping,
-                              search=args.search,
-                              line_search_tol=args.line_search_tol,
-                              flip_squares=args.flip_squares == '1',
-                              flip_rand_pixels=args.flip_rand_pixels == '1')
-    else:
-        raise ValueError(f"Invalid attack side: {args.side}")
+    attack = RayS(torch_model,
+                  order=order,
+                  epsilon=args.epsilon,
+                  early_stopping=early_stopping,
+                  search=args.search,
+                  line_search_tol=args.line_search_tol,
+                  flip_squares=args.flip_squares == '1',
+                  flip_rand_pixels=args.flip_rand_pixels == '1')
 
     stop_dists = []
     stop_queries = []
@@ -160,15 +144,15 @@ def main():
     for i, batch in enumerate(test_loader):
         if count == args.num:
             break
-        
+
         if isinstance(batch, dict):
             xi, yi = batch["image"], batch["label"]
         else:
             xi, yi = batch
-            
+
         print(f"Sample {i}, class: {yi.item()}")
         xi, yi = xi.cuda(), yi.cuda()
-        
+
         if torch_model.n_class == 2 and yi.item() == 0:
             negatives += 1
             print("Skipping as item is negative")
