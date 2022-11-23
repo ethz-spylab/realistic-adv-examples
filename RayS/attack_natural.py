@@ -5,6 +5,8 @@ import json
 import subprocess
 import uuid
 
+import lovely_tensors as lt
+lt.monkey_patch()
 import numpy as np
 import torch
 import torchvision.models as models
@@ -57,6 +59,10 @@ def main():
                         default='0',
                         type=str,
                         help='Whether the attack should flip random pixels not chunks of a 1-d vector')
+    parser.add_argument('--discrete',
+                        default='0',
+                        type=str,
+                        help='Whether the attack should work in discrete space (i.e., int8)')
     args = parser.parse_args()
 
     targeted = True if args.targeted == '1' else False
@@ -110,9 +116,9 @@ def main():
         print("Invalid dataset")
         exit(1)
 
-    exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{uuid.uuid4().hex}"
+    exp_out_dir = out_dir / f"{args.dataset}_discrete-{args.discrete}_norm-{args.norm}_tagreted-{args.targeted}_early-{args.early}_{args.search}_{args.epsilon:.3f}_{uuid.uuid4().hex}"
     while exp_out_dir.exists():
-        exp_out_dir = out_dir / f"{args.dataset}_{args.norm}_{args.targeted}_{args.early}_{args.search}_{args.epsilon:.3f}_{uuid.uuid4().hex}"
+        exp_out_dir = out_dir / f"{args.dataset}_discrete-{args.discrete}_norm-{args.norm}_tagreted-{args.targeted}_early-{args.early}_{args.search}_{args.epsilon:.3f}_{uuid.uuid4().hex}"
     exp_out_dir.mkdir()
 
     print(f"Saving results in {exp_out_dir}")
@@ -128,7 +134,8 @@ def main():
                   search=args.search,
                   line_search_tol=args.line_search_tol,
                   flip_squares=args.flip_squares == '1',
-                  flip_rand_pixels=args.flip_rand_pixels == '1')
+                  flip_rand_pixels=args.flip_rand_pixels == '1',
+                  discrete_attack=args.discrete == '1')
 
     stop_dists = []
     stop_queries = []

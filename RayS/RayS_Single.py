@@ -39,7 +39,7 @@ class RayS:
         
         if self.discrete_attack:
             self.epsilon = round(self.epsilon * 255)
-            self.lin_search_rad = self.lin_search_rad * 255
+            print(f"Making attack discrete with epsilon = {self.epsilon}")
 
     def get_xadv(self, x, v, d, lb=0., rb=1.):
         if self.discrete_attack:
@@ -66,9 +66,9 @@ class RayS:
         self.bad_queries = 0
         self.wasted_queries = 0
         self.d_t = np.inf
-        self.sgn_t = torch.sign(torch.ones(shape)).cuda()
-        self.x_final = self.get_xadv(x, self.sgn_t, self.d_t)
         dist = np.inf
+        self.sgn_t = torch.ones_like(x)
+        self.x_final = self.get_xadv(x, self.sgn_t, self.d_t)
         block_level = 0
         block_ind = 0
         self.n_early_stopping = 0
@@ -113,7 +113,7 @@ class RayS:
                 block_ind = 0
                 max_block_ind = 2**block_level
 
-            dist = torch.norm(self.x_final - x, self.order)
+            dist = self.d_t
             if self.early_stopping and (dist <= self.epsilon):
                 break
 
@@ -170,7 +170,12 @@ class RayS:
 
     def init_lin_search(self, x, y, target, sgn):
         d_end = np.inf
-        for d in range(1, self.lin_search_rad + 1):
+        start = 1
+        end = self.lin_search_rad
+        if self.discrete_attack:
+            start *= 255
+            end *= 255
+        for d in range(start, end + 1):
             if self.search_succ(self.get_xadv(x, sgn, d), y, target):
                 d_end = d
                 break
@@ -230,9 +235,17 @@ class RayS:
                 d_end = d
             else:
                 return np.inf
+            
+        if not self.discrete_attack:
+            condition = lambda end, start: (end - start) > tol
+        else:
+            condition = lambda end, start: (end - start) > 1
 
-        while (d_end - d_start) > tol:
-            d_mid = (d_start + d_end) / 2.0
+        while condition(d_end, d_start):
+            if not self.discrete_attack:
+                d_mid = (d_start + d_end) / 2.0
+            else:
+                d_mid = math.ceil((d_start + d_end) / 2.0)
             if self.search_succ(self.get_xadv(x, sgn, d_mid), y, target):
                 d_end = d_mid
             else:
