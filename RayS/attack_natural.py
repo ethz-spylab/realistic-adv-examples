@@ -14,7 +14,7 @@ import dataset
 from general_tf_model import GeneralTFModel
 from general_torch_model import GeneralTorchModel
 from arch import mnist_model, binary_resnet50, cifar_model, clip_laion_nsfw
-from RayS_Single import RayS, SafeSideRayS
+from RayS_Single import RayS
 
 
 def get_git_revision_hash() -> str:
