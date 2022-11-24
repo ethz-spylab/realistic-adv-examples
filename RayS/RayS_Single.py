@@ -127,7 +127,7 @@ class RayS:
 
         print("Iter %3d d_t %.6f dist %.6f queries %d bad queries %d" %
               (i + 1, self.d_t, dist, self.queries, self.bad_queries))
-        return self.x_final, self.queries, self.bad_queries, self.wasted_queries, dist, (dist <= self.epsilon).float()
+        return self.x_final, self.queries, self.bad_queries, self.wasted_queries, dist, float(dist <= self.epsilon)
 
     def get_start_end(self, dim: int, block_ind: int, block_size: int) -> tuple[int, int]:
         return block_ind * block_size, min(dim, (block_ind + 1) * block_size)

@@ -194,14 +194,14 @@ def main():
             stop_wasted_queries.append(wasted_queries)
             early_stoppings.append(attack.n_early_stopping)
 
-            if dist.item() < np.inf:
-                stop_dists.append(dist.item())
+            if dist < np.inf:
+                stop_dists.append(dist)
 
         elif early_stopping == False:
-            if dist.item() < np.inf:
-                stop_dists.append(dist.item())
+            if dist < np.inf:
+                stop_dists.append(dist)
 
-        asr.append(succ.item())
+        asr.append(succ)
 
         count += 1
 
