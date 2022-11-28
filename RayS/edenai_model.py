@@ -1,5 +1,4 @@
 import abc
-from dataclasses import dataclass
 from enum import Enum
 import io
 import json
@@ -15,15 +14,13 @@ from torchvision.transforms.functional import to_pil_image
 
 load_dotenv()
 
-UPLOAD_FORMAT = 'JPEG'
+UPLOAD_FORMAT = 'png'
 
 
-def torch_to_binary(image: torch.Tensor) -> io.BytesIO:
+def write_torch_to_buffer(image: torch.Tensor, buf: io.BytesIO) -> None:
     pil_image = to_pil_image(image)
-    buf = io.BytesIO()
     pil_image.save(buf, format=UPLOAD_FORMAT)
     buf.seek(0)
-    return buf
 
 
 class Provider(str, Enum):
@@ -67,9 +64,10 @@ class EdenAINSFWModel(abc.ABC):
         self.device = device
 
     def request_classification(self, image: torch.Tensor) -> torch.Tensor:
-        binary_image = torch_to_binary(image)
-        data = RequestData(providers=self._PROVIDER.value)
-        files = {'file': (f"image.{UPLOAD_FORMAT}", binary_image, f"image/{UPLOAD_FORMAT}")}
+        with io.BytesIO() as buf:
+            write_torch_to_buffer(image, buf)
+            data = RequestData(providers=self._PROVIDER.value)
+            files = {'file': (f"image.{UPLOAD_FORMAT}", buf, f"image/{UPLOAD_FORMAT}")}
         response = requests.post(self._URL, data=data.dict(), files=files, headers=self._HEADERS)
         response.raise_for_status()
         raw_result = json.loads(response.text)[self._PROVIDER]
