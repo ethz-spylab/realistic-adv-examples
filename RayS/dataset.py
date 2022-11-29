@@ -86,7 +86,7 @@ def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagene
 
     def transform(batch):
         preprocessed_images = processor(images=batch["image"], return_tensors="pt", padding=True)["pixel_values"]
-        unnormalized_images = preprocessed_images * im_std + im_mean
+        unnormalized_images = torch.round((preprocessed_images * im_std + im_mean) * 255) / 255
         batch["image"] = unnormalized_images
         return batch
 
@@ -99,6 +99,6 @@ def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagene
     np.random.seed(rand_seed)
     random.seed(rand_seed)
     torch.backends.cudnn.deterministic = True
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=test_batch_size, shuffle=True)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=test_batch_size)
 
     return val_loader

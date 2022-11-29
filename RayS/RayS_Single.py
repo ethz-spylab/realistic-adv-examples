@@ -4,13 +4,13 @@ import numpy as np
 import torch
 from torchvision.transforms.functional import rotate
 
-from general_torch_model import GeneralTorchModel
+from model_wrappers.general_model import ModelWrapper
 
 
 class RayS:
 
     def __init__(self,
-                 model: GeneralTorchModel,
+                 model: ModelWrapper,
                  order: float = np.inf,
                  epsilon: float = 0.3,
                  early_stopping: bool = True,
