@@ -121,7 +121,7 @@ def parse_all_unsafe_results(response: ProviderResponse, default_1: bool = False
 
 
 def filter_items(response: ProviderResponse[ResponseLabelT], to_remove: Set[ResponseLabelT]) -> ProviderResponse[ResponseLabelT]:
-    response.items = [item for item in response.items if item not in to_remove]
+    response.items = [item for item in response.items if item.label not in to_remove]
     return response
 
 
@@ -139,7 +139,8 @@ class GoogleNSFWModel(EdenAINSFWModel[GoogleResponseLabel]):
     _ITEMS_TO_FILTER = {GoogleResponseLabel.Medical, GoogleResponseLabel.Spoof}
 
     def parse_results(self, response: ProviderResponse[GoogleResponseLabel]) -> float:
-        return parse_all_unsafe_results(response, default_1=True)
+        filtered_response = filter_items(response, self._ITEMS_TO_FILTER)
+        return parse_all_unsafe_results(filtered_response, default_1=True)
 
 
 class ClarifaiResponseLabel(ResponseLabel):
