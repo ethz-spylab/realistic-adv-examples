@@ -67,7 +67,7 @@ class RayS:
         self.wasted_queries = 0
         self.d_t = np.inf
         dist = np.inf
-        self.sgn_t = torch.ones_like(x)
+        self.sgn_t = -torch.ones_like(x)
         self.x_final = self.get_xadv(x, self.sgn_t, self.d_t)
         block_level = 0
         block_ind = 0
