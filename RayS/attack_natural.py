@@ -24,7 +24,7 @@ def get_git_revision_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
 
 
-API_KEY_NAME = "EDENAI_TEST_API_KEY"
+API_KEY_NAME = "EDENAI_API_KEY"
 
 
 def main():
@@ -123,7 +123,7 @@ def main():
         api_key = os.environ[API_KEY_NAME]
         inner_model = edenai_model.GoogleNSFWModel(device, api_key)
         model = EdenAIModelWrapper(inner_model, n_class=2).to(device)
-        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
+        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, Path("nsfw_filters_results/google_racy_five_indices.npy"))
     else:
         print("Invalid dataset")
         exit(1)

@@ -1,6 +1,6 @@
 import random
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import torch
@@ -79,7 +79,7 @@ def make_dataset_tuples(sample, image_name="image", sample_name="label"):
     return sample[image_name], sample[sample_name]
 
 
-def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagenet")):
+def load_imagenet_nsfw_test_data(test_batch_size=1, indices_path: Optional[Path] = None):
     processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
     im_mean = torch.tensor(processor.feature_extractor.image_mean).view(1, 3, 1, 1) # type: ignore
     im_std = torch.tensor(processor.feature_extractor.image_std).view(1, 3, 1, 1) # type: ignore
@@ -92,6 +92,9 @@ def load_imagenet_nsfw_test_data(test_batch_size=1, data_dir=Path("/data/imagene
 
     val_dataset = load_dataset("dedeswim/imagenet-nsfw", split="train")
     val_dataset = val_dataset.with_transform(transform)
+    if indices_path is not None:
+        indices = np.load(indices_path)
+        val_dataset = val_dataset.select(indices)
 
     rand_seed = 42
     torch.manual_seed(rand_seed)
