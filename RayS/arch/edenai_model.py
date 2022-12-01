@@ -24,14 +24,14 @@ def torch_to_buffer(image: torch.Tensor, buf: io.BytesIO) -> None:
     pil_image.save(buf, format=UPLOAD_FORMAT, compress_level=0, optimize=False)
     pil_image.save("test.png")
     buf.seek(0)
-    
-    
+
+
 def buffer_to_torch(buf: io.BytesIO, device: torch.device) -> torch.Tensor:
     image = Image.open(buf)
     image.load()
     np_image = (np.asarray(image).astype(np.float32)).transpose(2, 0, 1)
     torch_image = torch.from_numpy(np_image).to(device) / 255
-    assert torch.allclose(torch_image * 255, pil_to_tensor(image).to(device).to(torch.float), atol=1/256)
+    assert torch.allclose(torch_image * 255, pil_to_tensor(image).to(device).to(torch.float), atol=1 / 256)
     return torch_image
 
 
@@ -55,6 +55,7 @@ class Provider(str, Enum):
     microsoft = "microsoft"
     amazon = "amazon"
     clarifai = "clarifai"
+    api4ai = "api4ai"
 
 
 T = TypeVar("T")
@@ -103,11 +104,10 @@ class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
         self.device = device
         if api_key is not None:
             self._API_KEY = api_key
-    
+
     @property
     def _HEADERS(self) -> Dict[str, str]:
-            return {"accept": "application/json", "authorization": f"Bearer {self._API_KEY}"}
-    
+        return {"accept": "application/json", "authorization": f"Bearer {self._API_KEY}"}
 
     def make_request(self, image: torch.Tensor) -> ProviderResponse[ResponseLabelT]:
         if image.ndim != 3:
@@ -136,10 +136,13 @@ class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
     @abc.abstractmethod
     def parse_results(self, response: ProviderResponse[ResponseLabelT]) -> float:
         ...
-        
+
+    def get_response_items_as_dict(self, response: ProviderResponse[ResponseLabelT]) -> Dict[ResponseLabelT, int]:
+        return {item.label: item.likelihood for item in response.items}
+
     def make_model_eval(self):
         pass
-    
+
 
 def parse_all_unsafe_results(response: ProviderResponse, default_1: bool = False) -> float:
     assert response.status == ResponseStatus.success
@@ -149,7 +152,8 @@ def parse_all_unsafe_results(response: ProviderResponse, default_1: bool = False
         return max(map(lambda x: x.likelihood, response.items)) / 5
 
 
-def filter_items(response: ProviderResponse[ResponseLabelT], to_remove: Set[ResponseLabelT]) -> ProviderResponse[ResponseLabelT]:
+def filter_items(response: ProviderResponse[ResponseLabelT],
+                 to_remove: Set[ResponseLabelT]) -> ProviderResponse[ResponseLabelT]:
     response.items = [item for item in response.items if item.label not in to_remove]
     return response
 
@@ -165,7 +169,9 @@ class GoogleResponseLabel(ResponseLabel):
 class GoogleNSFWModel(EdenAINSFWModel[GoogleResponseLabel]):
     _PROVIDER = Provider.google
     _RESPONSE_LABEL_TYPE = GoogleResponseLabel
-    _ITEMS_TO_FILTER = {GoogleResponseLabel.Medical, GoogleResponseLabel.Spoof, GoogleResponseLabel.Gore, GoogleResponseLabel.Adult}
+    _ITEMS_TO_FILTER = {
+        GoogleResponseLabel.Medical, GoogleResponseLabel.Spoof, GoogleResponseLabel.Gore, GoogleResponseLabel.Adult
+    }
 
     def parse_results(self, response: ProviderResponse[GoogleResponseLabel]) -> float:
         filtered_response = filter_items(response, self._ITEMS_TO_FILTER)
@@ -180,7 +186,7 @@ class ClarifaiResponseLabel(ResponseLabel):
     gore = "gore"
 
 
-class ClarifaiNSFWModel(EdenAINSFWModel):
+class ClarifaiNSFWModel(EdenAINSFWModel[ClarifaiResponseLabel]):
     _PROVIDER = Provider.clarifai
     _RESPONSE_LABEL_TYPE = ClarifaiResponseLabel
 
@@ -195,7 +201,7 @@ class MicrosoftResponseLabel(ResponseLabel):
     Racy = "Racy"
 
 
-class MicrosoftNSFWModel(EdenAINSFWModel):
+class MicrosoftNSFWModel(EdenAINSFWModel[MicrosoftResponseLabel]):
     _PROVIDER = Provider.microsoft
     _RESPONSE_LABEL_TYPE = MicrosoftResponseLabel
 
@@ -216,9 +222,23 @@ class AmazonResponseLabel(ResponseLabel):
     HateSymbols = "Hate Symbols"
 
 
-class AmazonNSFWModel(EdenAINSFWModel):
+class AmazonNSFWModel(EdenAINSFWModel[AmazonResponseLabel]):
     _PROVIDER = Provider.amazon
     _RESPONSE_LABEL_TYPE = AmazonResponseLabel
 
     def parse_results(self, response: ProviderResponse[AmazonResponseLabel]) -> float:
         return parse_all_unsafe_results(response)
+
+
+class API4AIResponseLabel(ResponseLabel):
+    nsfw = "nsfw"
+    sfw = "sfw"
+
+
+class API4AINSFWModel(EdenAINSFWModel[API4AIResponseLabel]):
+    _PROVIDER = Provider.api4ai
+    _RESPONSE_LABEL_TYPE = API4AIResponseLabel
+
+    def parse_results(self, response: ProviderResponse[API4AIResponseLabel]) -> float:
+        nsfw_likelihood = self.get_response_items_as_dict(response)[API4AIResponseLabel.nsfw]
+        return (nsfw_likelihood - 1) / 4
