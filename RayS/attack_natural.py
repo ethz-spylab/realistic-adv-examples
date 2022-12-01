@@ -125,7 +125,7 @@ def main():
         inner_model = edenai_model.GoogleNSFWModel(device, api_key)
         model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, Path("nsfw_filters_results/google_racy_five_indices.npy"))
-    elif args.dataset == 'edenai_nsfw':
+    elif args.dataset == 'api4ai_nsfw':
         api_key = os.environ[API_KEY_NAME]
         inner_model = edenai_model.API4AINSFWModel(device, api_key)
         model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
