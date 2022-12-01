@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torchvision.transforms.functional import rotate
 
+from arch.edenai_model import encode_decode
 from model_wrappers.general_model import ModelWrapper
 
 
@@ -42,10 +43,17 @@ class RayS:
             print(f"Making attack discrete with epsilon = {self.epsilon}")
 
     def get_xadv(self, x, v, d, lb=0., rb=1.):
-        if self.discrete_attack:
+        if self.discrete_attack and not np.isinf(d):
+            assert int(d) == d
             d = d / 255
         out = x + d * v
-        return torch.clamp(out, lb, rb)
+        out = torch.clamp(out, lb, rb)
+        assert torch.allclose(out, torch.round(out * 255) / 255)
+        if self.discrete_attack:
+            decoded_out = encode_decode(out)
+            assert torch.allclose(out, decoded_out, atol=1/256)
+            out = decoded_out
+        return out
 
     def attack_hard_label(self,
                           x: torch.Tensor,
@@ -67,7 +75,7 @@ class RayS:
         self.wasted_queries = 0
         self.d_t = np.inf
         dist = np.inf
-        self.sgn_t = -torch.ones_like(x)
+        self.sgn_t = torch.ones_like(x)
         self.x_final = self.get_xadv(x, self.sgn_t, self.d_t)
         block_level = 0
         block_ind = 0
@@ -158,12 +166,12 @@ class RayS:
         attempt *= permuted_flipping_signs
         return attempt.view(shape)
 
-    def search_succ(self, x, y, target):
+    def search_succ(self, x, y, target, verbose=False):
         self.queries += 1
         if target is not None:
-            success = self.model.predict_label(x) == target
+            success = self.model.predict_label(x, verbose) == target
         else:
-            success = self.model.predict_label(x) != y
+            success = self.model.predict_label(x, verbose) != y
         if not success:
             self.bad_queries += 1
         return success
@@ -206,7 +214,7 @@ class RayS:
         d_beginning = d_end
         for i in range(1, max_steps):
             d_end_tmp = d_beginning - step_size * i
-            if not self.search_succ(self.get_xadv(x, sgn, d_end_tmp), y, target):
+            if not self.search_succ(self.get_xadv(x, sgn, d_end_tmp), y, target, verbose=False):
                 break
             d_end = d_end_tmp
 

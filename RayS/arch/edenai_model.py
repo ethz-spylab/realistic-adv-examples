@@ -5,22 +5,49 @@ import json
 import os
 from typing import Dict, Generic, List, Optional, Set, TypeVar
 
+import numpy as np
 import requests
 import torch
 from dotenv import load_dotenv
+from PIL import Image
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
-from torchvision.transforms.functional import to_pil_image
+from torchvision.transforms.functional import to_pil_image, pil_to_tensor
 
 load_dotenv()
 
 UPLOAD_FORMAT = 'png'
 
 
-def write_torch_to_buffer(image: torch.Tensor, buf: io.BytesIO) -> None:
-    pil_image = to_pil_image(image)
-    pil_image.save(buf, format=UPLOAD_FORMAT)
+def torch_to_buffer(image: torch.Tensor, buf: io.BytesIO) -> None:
+    pil_image = Image.fromarray(np.uint8(torch.round(image * 255).cpu().numpy().transpose(1, 2, 0)))
+    pil_image.save(buf, format=UPLOAD_FORMAT, compress_level=0, optimize=False)
+    pil_image.save("test.png")
     buf.seek(0)
+    
+    
+def buffer_to_torch(buf: io.BytesIO, device: torch.device) -> torch.Tensor:
+    image = Image.open(buf)
+    image.load()
+    np_image = (np.asarray(image).astype(np.float32)).transpose(2, 0, 1)
+    torch_image = torch.from_numpy(np_image).to(device) / 255
+    assert torch.allclose(torch_image * 255, pil_to_tensor(image).to(device).to(torch.float), atol=1/256)
+    return torch_image
+
+
+def to_from_pil(image):
+    pil_image = Image.fromarray(np.uint8(torch.round(image[0] * 255).cpu().numpy().transpose(1, 2, 0)))
+    np_image = (np.asarray(pil_image).astype(np.float32)).transpose(2, 0, 1)
+    converted_image = torch.from_numpy(np_image).to(image.device) / 255
+    return converted_image.unsqueeze(0)
+
+
+def encode_decode(image: torch.Tensor) -> torch.Tensor:
+    with io.BytesIO() as buf:
+        torch_to_buffer(image.squeeze(), buf)
+        png_image = buffer_to_torch(buf, image.device).unsqueeze(0)
+    out = png_image
+    return out
 
 
 class Provider(str, Enum):
@@ -88,7 +115,7 @@ class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
         if image.ndim != 3:
             raise ValueError("`make_request` can be called on individual samples only")
         with io.BytesIO() as buf:
-            write_torch_to_buffer(image, buf)
+            torch_to_buffer(image, buf)
             data = RequestData(providers=self._PROVIDER.value)
             files = {'file': (f"image.{UPLOAD_FORMAT}", buf, f"image/{UPLOAD_FORMAT}")}
             http_response = requests.post(self._URL, data=data.dict(), files=files, headers=self._HEADERS)
@@ -99,8 +126,10 @@ class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
         assert response.status == ResponseStatus.success
         return response
 
-    def request_classification(self, image: torch.Tensor) -> torch.Tensor:
+    def request_classification(self, image: torch.Tensor, verbose=False) -> torch.Tensor:
         response = self.make_request(image)
+        if verbose:
+            print(response)
         result = self.parse_results(response)
         return torch.tensor([result], device=self.device)
 
@@ -136,7 +165,7 @@ class GoogleResponseLabel(ResponseLabel):
 class GoogleNSFWModel(EdenAINSFWModel[GoogleResponseLabel]):
     _PROVIDER = Provider.google
     _RESPONSE_LABEL_TYPE = GoogleResponseLabel
-    _ITEMS_TO_FILTER = {GoogleResponseLabel.Medical, GoogleResponseLabel.Spoof}
+    _ITEMS_TO_FILTER = {GoogleResponseLabel.Medical, GoogleResponseLabel.Spoof, GoogleResponseLabel.Gore, GoogleResponseLabel.Adult}
 
     def parse_results(self, response: ProviderResponse[GoogleResponseLabel]) -> float:
         filtered_response = filter_items(response, self._ITEMS_TO_FILTER)

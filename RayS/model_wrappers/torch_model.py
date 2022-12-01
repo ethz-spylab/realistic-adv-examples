@@ -26,7 +26,7 @@ class TorchModelWrapper(ModelWrapper):
             processed = (image - self.im_mean) / self.im_std
         return processed
 
-    def predict_prob(self, image):
+    def predict_prob(self, image, verbose=False):
         with torch.no_grad():
             if len(image.size()) != 4:
                 image = image.unsqueeze(0)

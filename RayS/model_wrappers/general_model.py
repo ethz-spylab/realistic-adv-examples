@@ -27,15 +27,15 @@ class ModelWrapper(nn.Module):
         ...
 
     @abc.abstractmethod
-    def predict_prob(self, image: torch.Tensor) -> torch.Tensor:
+    def predict_prob(self, image: torch.Tensor, verbose=False) -> torch.Tensor:
         ...
 
-    def predict_label_multiclass(self, image: torch.Tensor) -> torch.Tensor:
+    def predict_label_multiclass(self, image: torch.Tensor, verbose=False) -> torch.Tensor:
         logits = self.predict_prob(image)
         _, predict = torch.max(logits, 1)
         return predict
 
-    def predict_label_binary(self, image):
+    def predict_label_binary(self, image, verbose=False):
         logits = self.predict_prob(image)
         if self.take_sigmoid:
             probs = torch.sigmoid(logits)

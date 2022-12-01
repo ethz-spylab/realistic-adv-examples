@@ -22,7 +22,7 @@ class TFModelWrapper(ModelWrapper):
         logits = self.model(image_tf).numpy()
         return torch.from_numpy(logits).cuda()
 
-    def predict_prob(self, image):
+    def predict_prob(self, image, verbose=False):
         if len(image.size()) != 4:
             image = image.unsqueeze(0)
         image = self.preprocess(image)

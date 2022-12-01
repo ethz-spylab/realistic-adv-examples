@@ -67,6 +67,7 @@ def main():
                         default='0',
                         type=str,
                         help='Whether the attack should work in discrete space (i.e., int8)')
+    parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
     args = parser.parse_args()
     load_dotenv()
 
@@ -122,7 +123,7 @@ def main():
     elif args.dataset == 'google_nsfw':
         api_key = os.environ[API_KEY_NAME]
         inner_model = edenai_model.GoogleNSFWModel(device, api_key)
-        model = EdenAIModelWrapper(inner_model, n_class=2).to(device)
+        model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, Path("nsfw_filters_results/google_racy_five_indices.npy"))
     else:
         print("Invalid dataset")
