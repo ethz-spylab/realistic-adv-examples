@@ -3,6 +3,7 @@ from enum import Enum
 import io
 import json
 import os
+import warnings
 from typing import Dict, Generic, List, Optional, Set, TypeVar
 
 import numpy as np
@@ -98,6 +99,7 @@ class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
     _URL: str = "https://api.edenai.run/v2/image/explicit_content"
     _API_KEY: str = os.environ['EDENAI_TEST_API_KEY']
     _RESPONSE_LABEL_TYPE: type[ResponseLabelT]
+    _MAX_TRIALS = 10
 
     def __init__(self, device: torch.device, api_key: Optional[str] = None) -> None:
         super().__init__()
@@ -109,7 +111,7 @@ class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
     def _HEADERS(self) -> Dict[str, str]:
         return {"accept": "application/json", "authorization": f"Bearer {self._API_KEY}"}
 
-    def make_request(self, image: torch.Tensor) -> ProviderResponse[ResponseLabelT]:
+    def make_request(self, image: torch.Tensor, trials=0) -> ProviderResponse[ResponseLabelT]:
         if image.ndim != 3:
             image = image.squeeze()
         if image.ndim != 3:
@@ -121,6 +123,12 @@ class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
             http_response = requests.post(self._URL, data=data.dict(), files=files, headers=self._HEADERS)
         http_response.raise_for_status()
         raw_response = json.loads(http_response.text)[self._PROVIDER]
+        if raw_response["status"] != "success":
+            if trials < self._MAX_TRIALS:
+                warnings.warn(RuntimeWarning(f"The request failed {trials + 1} times, retrying. Response: {raw_response}"))
+                return self.make_request(image, trials + 1)
+            else:
+                raise RuntimeError(f"The request failed too many times: {raw_response}")
         raw_response["items"] = self._RESPONSE_LABEL_TYPE.filter_unused_labels(raw_response["items"])
         response = ProviderResponse[self._RESPONSE_LABEL_TYPE](**raw_response)  # type: ignore
         assert response.status == ResponseStatus.success
