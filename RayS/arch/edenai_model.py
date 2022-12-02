@@ -283,7 +283,7 @@ class LAIONNSFWModel(EdenAINSFWModel[LAIONResponseLabel]):
         
     def make_request(self, image: torch.Tensor, trials=0) -> ProviderResponse[LAIONResponseLabel]:
         if self.apply_preprocessing:
-            image = encode_decode(image, format='jpeg')
+            image = encode_decode(image, format='png')
             image = self.transform(image)
         else:
             image = encode_decode(image, format='png')
