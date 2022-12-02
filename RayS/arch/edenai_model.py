@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from PIL import Image
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
+from torchvision import transforms
 from torchvision.transforms.functional import pil_to_tensor
 
 from arch.clip_laion_nsfw import CLIPNSFWDetector
@@ -23,15 +24,18 @@ load_dotenv()
 UPLOAD_FORMAT = 'png'
 
 
-def torch_to_buffer(image: torch.Tensor, buf: io.BytesIO) -> None:
+def torch_to_buffer(image: torch.Tensor, buf: io.BytesIO, format=UPLOAD_FORMAT) -> None:
     pil_image = Image.fromarray(np.uint8(torch.round(image * 255).cpu().numpy().transpose(1, 2, 0)))
-    pil_image.save(buf, format=UPLOAD_FORMAT, compress_level=0, optimize=False)
-    pil_image.save("test.png")
+    if format == 'png':
+        pil_image.save(buf, format=format, compress_level=0, optimize=False)
+    else:
+        pil_image.save(buf, format=format)
+    # pil_image.save("test.png")
     buf.seek(0)
 
 
-def buffer_to_torch(buf: io.BytesIO, device: torch.device) -> torch.Tensor:
-    image = Image.open(buf)
+def buffer_to_torch(buf: io.BytesIO, device: torch.device, format=UPLOAD_FORMAT) -> torch.Tensor:
+    image = Image.open(buf, formats=[format])
     image.load()
     np_image = (np.asarray(image).astype(np.float32)).transpose(2, 0, 1)
     torch_image = torch.from_numpy(np_image).to(device) / 255
@@ -46,10 +50,10 @@ def to_from_pil(image):
     return converted_image.unsqueeze(0)
 
 
-def encode_decode(image: torch.Tensor) -> torch.Tensor:
+def encode_decode(image: torch.Tensor, format=UPLOAD_FORMAT) -> torch.Tensor:
     with io.BytesIO() as buf:
-        torch_to_buffer(image.squeeze(), buf)
-        png_image = buffer_to_torch(buf, image.device).unsqueeze(0)
+        torch_to_buffer(image.squeeze(), buf, format)
+        png_image = buffer_to_torch(buf, image.device, format).unsqueeze(0)
     out = png_image
     return out
 
@@ -267,14 +271,22 @@ class LAIONNSFWModel(EdenAINSFWModel[LAIONResponseLabel]):
     _MEAN_LIST = [0.48145466, 0.4578275, 0.40821073]
     _STD_LIST = [0.26862954, 0.26130258, 0.27577711]
     
-    def __init__(self, device: torch.device, api_key: Optional[str] = None) -> None:
+    def __init__(self, device: torch.device, api_key: Optional[str] = None, strong_preprocessing=True) -> None:
         super().__init__(device, api_key)
         self.model = CLIPNSFWDetector()
         self.mean = torch.Tensor(self._MEAN_LIST).view(1, 3, 1, 1).to(device)
         self.std = torch.Tensor(self._STD_LIST).view(1, 3, 1, 1).to(device)
+        self.apply_preprocessing = strong_preprocessing
+        self.transform = transforms.Compose(
+            [transforms.Resize(256), transforms.CenterCrop(224)]
+        )
         
     def make_request(self, image: torch.Tensor, trials=0) -> ProviderResponse[LAIONResponseLabel]:
-        image = encode_decode(image)
+        if self.apply_preprocessing:
+            image = encode_decode(image, format='jpeg')
+            image = self.transform(image)
+        else:
+            image = encode_decode(image, format='png')
         image = (image - self.mean) / self.std
         image_tf = tf.constant(image.cpu())
         likelihood = round(self.model(image_tf).numpy().item() * 5)

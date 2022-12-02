@@ -67,6 +67,10 @@ def main():
                         default='0',
                         type=str,
                         help='Whether the attack should work in discrete space (i.e., int8)')
+    parser.add_argument('--strong-preprocessing',
+                        default='0',
+                        type=str,
+                        help='Whether strong preprocessing (i.e., JPEG, Resize, Crop) should be applied before feeding the image to the classifier')
     parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
     args = parser.parse_args()
     load_dotenv()
@@ -132,7 +136,7 @@ def main():
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, Path("nsfw_filters_results/api4ai_nsfw_five_indices.npy"))
     elif args.dataset == 'laion_nsfw_mock':
         api_key = os.environ[API_KEY_NAME]
-        inner_model = edenai_model.LAIONNSFWModel(device, api_key)
+        inner_model = edenai_model.LAIONNSFWModel(device, api_key, strong_preprocessing=args.strong_preprocessing == '1')
         model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
     else:
