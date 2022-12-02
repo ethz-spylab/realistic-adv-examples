@@ -186,6 +186,7 @@ class RayS:
         for d in range(start, end + 1):
             if self.search_succ(self.get_xadv(x, sgn, d), y, target):
                 d_end = d
+                print("Found initial perturbation")
                 break
         return d_end
 

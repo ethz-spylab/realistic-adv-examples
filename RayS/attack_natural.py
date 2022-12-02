@@ -130,6 +130,11 @@ def main():
         inner_model = edenai_model.API4AINSFWModel(device, api_key)
         model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, Path("nsfw_filters_results/api4ai_nsfw_five_indices.npy"))
+    elif args.dataset == 'laion_nsfw_mock':
+        api_key = os.environ[API_KEY_NAME]
+        inner_model = edenai_model.LAIONNSFWModel(device, api_key)
+        model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
+        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
     else:
         print("Invalid dataset")
         exit(1)

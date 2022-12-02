@@ -8,12 +8,15 @@ from typing import Dict, Generic, List, Optional, Set, TypeVar
 
 import numpy as np
 import requests
+import tensorflow as tf
 import torch
 from dotenv import load_dotenv
 from PIL import Image
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
-from torchvision.transforms.functional import to_pil_image, pil_to_tensor
+from torchvision.transforms.functional import pil_to_tensor
+
+from arch.clip_laion_nsfw import CLIPNSFWDetector
 
 load_dotenv()
 
@@ -57,6 +60,7 @@ class Provider(str, Enum):
     amazon = "amazon"
     clarifai = "clarifai"
     api4ai = "api4ai"
+    laion = "laion"
 
 
 T = TypeVar("T")
@@ -250,3 +254,33 @@ class API4AINSFWModel(EdenAINSFWModel[API4AIResponseLabel]):
     def parse_results(self, response: ProviderResponse[API4AIResponseLabel]) -> float:
         nsfw_likelihood = self.get_response_items_as_dict(response)[API4AIResponseLabel.nsfw]
         return (nsfw_likelihood - 1) / 4
+
+
+class LAIONResponseLabel(ResponseLabel):
+    nsfw = "nsfw"
+
+    
+class LAIONNSFWModel(EdenAINSFWModel[LAIONResponseLabel]):
+    _PROVIDER = Provider.laion
+    _RESPONSE_LABEL_TYPE = LAIONResponseLabel
+
+    _MEAN_LIST = [0.48145466, 0.4578275, 0.40821073]
+    _STD_LIST = [0.26862954, 0.26130258, 0.27577711]
+    
+    def __init__(self, device: torch.device, api_key: Optional[str] = None) -> None:
+        super().__init__(device, api_key)
+        self.model = CLIPNSFWDetector()
+        self.mean = torch.Tensor(self._MEAN_LIST).view(1, 3, 1, 1).to(device)
+        self.std = torch.Tensor(self._STD_LIST).view(1, 3, 1, 1).to(device)
+        
+    def make_request(self, image: torch.Tensor, trials=0) -> ProviderResponse[LAIONResponseLabel]:
+        image = encode_decode(image)
+        image = (image - self.mean) / self.std
+        image_tf = tf.constant(image.cpu())
+        likelihood = round(self.model(image_tf).numpy().item() * 5)
+        response_item = ResponseItem(label=LAIONResponseLabel.nsfw, likelihood=likelihood)
+        return ProviderResponse[LAIONResponseLabel](status=ResponseStatus.success, items=[response_item])
+    
+    def parse_results(self, response: ProviderResponse[LAIONResponseLabel]) -> float:
+        nsfw_likelihood = self.get_response_items_as_dict(response)[LAIONResponseLabel.nsfw]
+        return nsfw_likelihood / 5
