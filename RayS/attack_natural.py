@@ -134,6 +134,11 @@ def main():
         inner_model = edenai_model.API4AINSFWModel(device, api_key)
         model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, Path("nsfw_filters_results/api4ai_nsfw_five_indices.npy"))
+    elif args.dataset == 'amazon_nsfw':
+        api_key = os.environ[API_KEY_NAME]
+        inner_model = edenai_model.AmazonNSFWModel(device, api_key)
+        model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
+        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, Path("nsfw_filters_results/amazon_suggestive_five_indices.npy"))
     elif args.dataset == 'laion_nsfw_mock':
         api_key = os.environ[API_KEY_NAME]
         inner_model = edenai_model.LAIONNSFWModel(device, api_key, strong_preprocessing=args.strong_preprocessing == '1')
@@ -168,6 +173,8 @@ def main():
     stop_queries = []
     stop_bad_queries = []
     stop_wasted_queries = []
+    failed_attacks_dists = []
+    failed_attacks_bad_queries = []
     asr = []
     early_stoppings = []
     np.random.seed(0)
@@ -222,10 +229,12 @@ def main():
 
             if dist < np.inf:
                 stop_dists.append(dist)
-
         elif early_stopping == False:
             if dist < np.inf:
                 stop_dists.append(dist)
+        else:
+            failed_attacks_dists.append(dist)
+            failed_attacks_bad_queries.append(stop_bad_queries)
 
         asr.append(succ)
 
@@ -260,6 +269,8 @@ def main():
     np.save(exp_out_dir / "bad_queries.npy", np.array(stop_bad_queries))
     np.save(exp_out_dir / "wasted_queries.npy", np.array(stop_wasted_queries))
     np.save(exp_out_dir / "early_stoppings.npy", np.array(early_stoppings))
+    np.save(exp_out_dir / "failed_distortion.npy", np.array(failed_attacks_dists))
+    np.save(exp_out_dir / "failed_bad_queries.npy", np.array(failed_attacks_bad_queries))
 
     print(f"Saved all the results to {exp_out_dir}")
 

@@ -18,6 +18,9 @@ class EdenAIModelWrapper(ModelWrapper):
     
     def predict_prob(self, image: torch.Tensor, verbose=False) -> torch.Tensor:
         prob = self.model.request_classification(image, verbose)
+        self.num_queries += image.size(0)
+        if self.num_queries % 1000 == 0:
+            print(f"Ran {self.num_queries} queries on EdenAI")
         return prob
     
     def predict_label_binary(self, image, verbose=False):

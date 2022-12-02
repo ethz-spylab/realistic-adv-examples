@@ -241,8 +241,13 @@ class AmazonResponseLabel(ResponseLabel):
 class AmazonNSFWModel(EdenAINSFWModel[AmazonResponseLabel]):
     _PROVIDER = Provider.amazon
     _RESPONSE_LABEL_TYPE = AmazonResponseLabel
+    _ITEMS_TO_FILTER = set(AmazonResponseLabel) - {AmazonResponseLabel.Suggestive}
+    _NEUTRAL_RESPONSE_ITEM = ResponseItem[AmazonResponseLabel](label=AmazonResponseLabel.Suggestive, likelihood=0)
 
     def parse_results(self, response: ProviderResponse[AmazonResponseLabel]) -> float:
+        filtered_response = filter_items(response, self._ITEMS_TO_FILTER)
+        if len(filtered_response.items) == 0:
+            filtered_response.items = [self._NEUTRAL_RESPONSE_ITEM]
         return parse_all_unsafe_results(response)
 
 
