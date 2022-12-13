@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
 
@@ -8,9 +8,9 @@ class DummyAttackPhase(AttackPhase):
 
 
 def test_queries_counter():
-    counter = QueriesCounter()
+    counter = QueriesCounter(10)
     phase = DummyAttackPhase.test
-    success = np.array([True, True, False, False, True])
+    success = torch.tensor([True, True, False, False, True])
 
     updated_counter = counter.increase(phase, success)
 
@@ -18,3 +18,14 @@ def test_queries_counter():
     assert updated_counter.unsafe_queries[phase] == 2
     assert updated_counter.total_queries == 5
     assert updated_counter.total_unsafe_queries == 2
+    assert not updated_counter.is_out_of_queries()
+    
+
+def test_queries_counter_out_of_queries():
+    counter = QueriesCounter(5)
+    phase = DummyAttackPhase.test
+    success = torch.tensor([True, True, False, False, True])
+
+    updated_counter = counter.increase(phase, success)
+
+    assert updated_counter.is_out_of_queries()

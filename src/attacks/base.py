@@ -145,7 +145,7 @@ class DirectionAttack(BaseAttack, abc.ABC):
                     y: torch.Tensor,
                     target: torch.Tensor | None,
                     direction: torch.Tensor,
-                    best_distance: torch.Tensor,
+                    best_distance: float,
                     queries_counter: QueriesCounter,
                     max_steps=200) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)

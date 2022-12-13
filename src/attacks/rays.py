@@ -30,7 +30,7 @@ class RayS(DirectionAttack):
             x: torch.Tensor,
             y: torch.Tensor,
             target: torch.Tensor | None = None,
-            query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float]]:
+            query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
         """ Attack the original image and return adversarial example
             model: (pytorch model)
             (x, y): original image
@@ -103,8 +103,8 @@ class RayS(DirectionAttack):
             # Stop if the attack was successful or if we're out of queries
             if self.early_stopping and (best_distance <= self.epsilon):
                 break
-            if queries_counter.is_out_of_queries():
-                print('out of queries')
+            if updated_queries_counter.is_out_of_queries():
+                print('Out of queries')
                 break
 
             i += 1
@@ -126,7 +126,7 @@ class RayS(DirectionAttack):
                  x: torch.Tensor,
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
-                 query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float]]:
+                 query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
         return self.attack_hard_label(model, x, label, target, query_limit)
 
 

@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from src.attacks.queries_counter import QueriesCounter
 from src.setup import setup_attack, setup_model_and_data, setup_out_dir
 
+load_dotenv()
+
 
 def aggregate_queries_counters_list(q_list: list[QueriesCounter]) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
     aggregated_queries = {}
@@ -69,8 +71,16 @@ class AttackResults:
               f"asr: {np.mean(np.array(self.asr)):.4f} \n")
 
     def get_results_dict(self) -> dict[str, float]:
-        results_dict = {"asr": self.asr, "distortion": np.mean(self.distances)}
+        results_dict = {
+            "asr": self.asr,
+            "distortion": np.mean(self.distances),
+            "mean_queries": np.mean(self._get_overall_queries()),
+            "median_queries": np.median(self._get_overall_queries()),
+            "mean_unsafe_queries": np.mean(self._get_overall_unsafe_queries()),
+            "median_unsafe_queries": np.median(self._get_overall_unsafe_queries()),
+        }
         aggregated_queries, aggregated_unsafe_queries = aggregate_queries_counters_list(self.queries_counters)
+
         for stat, stat_fn in (("mean", np.mean), ("median", np.median)):
             for phase, queries_list in aggregated_queries.items():
                 results_dict[f"{stat}_queries_{phase}"] = stat_fn(queries_list)
@@ -84,14 +94,15 @@ class AttackResults:
     def save_results(self, out_dir: Path):
         with open(out_dir / "aggregated_results.json", 'w') as f:
             json.dump(self.get_results_dict(), f, indent=4)
-        with open(out_dir / "full_results.json", 'w') as f:
-            json.dump(self.__dict__, f, indent=4)
+        # with open(out_dir / "full_results.json", 'w') as f:
+        #     json.dump(dataclasses.asdict(self), f, indent=4)
         np.save(out_dir / "distances.npy", np.array(self.distances))
         np.save(out_dir / "queries.npy", np.array(self._get_overall_queries()))
         np.save(out_dir / "unsafe_queries.npy", np.array(self._get_overall_unsafe_queries()))
         np.save(out_dir / "failed_distances.npy", np.array(self.failed_distances))
         np.save(out_dir / "failed_queries.npy", np.array(self._get_overall_failed_queries()))
         np.save(out_dir / "failed_unsafe_queries.npy", np.array(self._get_overall_failed_unsafe_queries()))
+        print(f"Saved results to {out_dir}.")
 
     @property
     def asr(self) -> float:
@@ -117,7 +128,7 @@ def main():
     parser.add_argument('--targeted', default='0', type=str, help='targeted or untargeted')
     parser.add_argument('--norm', default='linf', type=str, help='Norm for attack, linf only')
     parser.add_argument('--num', default=1000, type=int, help='Number of samples to be attacked from test dataset.')
-    parser.add_argument('--query', default=10000, type=int, help='Maximum queries for the attack')
+    parser.add_argument('--max-queries', default=10000, type=int, help='Maximum queries for the attack')
     parser.add_argument('--batch', default=1, type=int, help='attack batch size.')
     parser.add_argument('--epsilon', default=0.05, type=float, help='attack strength')
     parser.add_argument('--early',
@@ -131,7 +142,7 @@ def main():
                         help='Tolerance for line search w.r.t. previous iteration')
     parser.add_argument(
         '--out-dir',
-        default='/local/home/edebenedetti/exp-results/realistic-adv-examples/rays',
+        default='/local/home/edebenedetti/exp-results/realistic-adv-examples/',
         type=str,
     )
     parser.add_argument(
@@ -158,7 +169,6 @@ def main():
                         'should be applied before feeding the image to the classifier')
     parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
     args = parser.parse_args()
-    load_dotenv()
 
     targeted = True if args.targeted == '1' else False
     early_stopping = False if args.early == '0' else True
@@ -210,13 +220,13 @@ def main():
             print('re-generate target label')
             target = np.random.randint(model.n_class) * torch.ones(len(xi), dtype=torch.long).to(device)
 
-        adv, queries_counter, dist, succ, extra_results = attack(model, xi, yi, target, args.limit)
+        adv, queries_counter, dist, succ, extra_results = attack(model, xi, yi, target, args.max_queries)
 
         if args.save_img_every is not None and count % args.save_img_every == 0:
             np.save(exp_out_dir / f"{i}_adv.npy", adv[0].cpu().numpy())
             np.save(exp_out_dir / f"{i}.npy", xi[0].cpu().numpy())
 
-        if succ or early_stopping:
+        if succ or not early_stopping:
             attack_results = attack_results.update_with_success(dist, queries_counter, extra_results)
         else:
             attack_results = attack_results.update_with_failure(dist, queries_counter, extra_results)

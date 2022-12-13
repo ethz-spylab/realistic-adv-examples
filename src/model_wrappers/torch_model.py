@@ -11,8 +11,8 @@ class TorchModelWrapper(ModelWrapper):
                  im_mean: MeanStdType = None,
                  im_std: MeanStdType = None,
                  take_sigmoid: bool = True):
-        self._model = model
         super().__init__(n_class, im_mean, im_std, take_sigmoid)
+        self._model = model
 
     def make_model_eval(self):
         self._model.eval()

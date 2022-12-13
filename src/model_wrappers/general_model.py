@@ -13,7 +13,6 @@ class ModelWrapper(nn.Module):
                  im_std: MeanStdType = None,
                  take_sigmoid: bool = True):
         super().__init__()
-        self.make_model_eval()
         self.num_queries = 0
         self.im_mean = torch.Tensor(im_mean).view(1, 3, 1, 1).cuda() if im_mean is not None else None
         self.im_std = torch.Tensor(im_std).view(1, 3, 1, 1).cuda() if im_std is not None else None

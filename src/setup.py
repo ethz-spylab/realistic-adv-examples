@@ -6,6 +6,7 @@ from argparse import Namespace
 from pathlib import Path
 
 import torch
+from dotenv import load_dotenv
 from foolbox.distances import l2, linf
 from torch.utils import data
 from torchvision import models as models
@@ -18,6 +19,7 @@ from src.attacks.base import BaseAttack, Bounds, SearchMode
 from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper
 
 API_KEY_NAME = "EDENAI_API_KEY"
+load_dotenv()
 
 DEFAULT_BOUNDS = Bounds(0, 1)
 
@@ -25,7 +27,7 @@ DISTANCES = {"linf": linf, "l2": l2}
 
 
 def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWrapper, data.DataLoader]:
-    if args.dataset == 'resnet':
+    if args.dataset == 'resnet_imagenet':
         inner_model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).to(device).eval()
         inner_model = torch.nn.DataParallel(inner_model, device_ids=[0])
         test_loader = dataset.load_imagenet_test_data(args.batch)
@@ -74,12 +76,19 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
     else:
         raise ValueError("Invalid model")
+    
+    model.make_model_eval()
 
     return model, test_loader
 
 
 def setup_attack(args: Namespace) -> BaseAttack:
-    base_attack_kwargs = {"distance": DISTANCES[args.norm], "discrete": args.discrete == '1', "bounds": Bounds()}
+    base_attack_kwargs = {
+        "epsilon": args.epsilon,
+        "distance": DISTANCES[args.norm],
+        "discrete": args.discrete == '1',
+        "bounds": Bounds()
+    }
     if args.attack == "rays":
         attack_kwargs = {
             "early_stopping": args.early == '1',
