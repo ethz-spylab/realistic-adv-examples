@@ -7,7 +7,6 @@ PRETRAINED_URL_NAMES = {"b32": "base-patch32", "l14": "large-patch14"}
 
 
 class CLIPNSFWDetector(tf.keras.Model):
-
     def __init__(self, model: str = "b32", checkpoints_dir: str = "checkpoints"):
         super().__init__()
         checkpoint_path = BASE_CHECKPOINT_PATH.format(checkpoints_dir=checkpoints_dir, model=model)

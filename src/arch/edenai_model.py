@@ -1,9 +1,9 @@
 import abc
-from enum import Enum
 import io
 import json
 import os
 import warnings
+from enum import Enum
 from typing import Dict, Generic, List, Optional, Set, TypeVar
 
 import requests
@@ -15,7 +15,7 @@ from pydantic.generics import GenericModel
 from torchvision import transforms
 
 from src.arch.clip_laion_nsfw import CLIPNSFWDetector
-from src.image_utils import encode_decode, torch_to_buffer, UPLOAD_FORMAT
+from src.image_utils import UPLOAD_FORMAT, encode_decode, torch_to_buffer
 
 load_dotenv()
 

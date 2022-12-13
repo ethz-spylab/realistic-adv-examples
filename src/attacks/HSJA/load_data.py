@@ -1,15 +1,15 @@
 from __future__ import absolute_import, division, print_function
-from pathlib import Path
-import random
-import numpy as np
 
+import random
+from pathlib import Path
+
+import numpy as np
 from datasets.load import load_dataset
 from keras.utils import to_categorical
 from transformers import CLIPProcessor
 
 
 class ImageData():
-
     def __init__(self, dataset_name):
         if dataset_name == 'mnist':
             from keras.datasets import mnist
@@ -24,6 +24,7 @@ class ImageData():
 
         elif dataset_name == 'cifar10':
             from keras.datasets import cifar10
+
             # Load CIFAR10 Dataset
             (x_train, y_train), (x_val, y_val) = cifar10.load_data()
 
@@ -116,6 +117,7 @@ def split_data(x, y, model, num_classes=10, split_rate=0.8, sample_per_class=100
 
 if __name__ == '__main__':
     import argparse
+
     from build_model import ImageModel
     parser = argparse.ArgumentParser()
 

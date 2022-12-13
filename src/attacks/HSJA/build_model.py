@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division, print_function
+
 import abc
 import math
 
@@ -115,7 +116,6 @@ class KerasImageModel(ImageModel):
 
 
 class KerasV2ImageModel(ImageModel):
-
     def __init__(self, model: tf.keras.Model, binary: bool, mean: tuple[float, float, float] | None,
                  std: tuple[float, float, float] | None) -> None:
         super().__init__()
@@ -135,7 +135,6 @@ class KerasV2ImageModel(ImageModel):
 
 
 class TorchImageModel(ImageModel):
-
     def __init__(self, model: nn.Module, device: torch.device, mean: tuple[float, float, float] | None,
                  std: tuple[float, float, float] | None) -> None:
         super().__init__()

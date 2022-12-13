@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.attacks.queries_counter import QueriesCounter, AttackPhase
+from src.attacks.queries_counter import AttackPhase, QueriesCounter
 
 
 class HSJAttackPhase(AttackPhase):

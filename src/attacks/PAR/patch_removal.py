@@ -1,18 +1,18 @@
-import torch
-from torchvision import transforms, models
-import numpy as np
 import copy
 import sys
+
 import matplotlib
+import numpy as np
+import torch
+from torchvision import models, transforms
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from src.dataset import load_binary_imagenet_test_data, BinaryImageNet
+from src.dataset import BinaryImageNet, load_binary_imagenet_test_data
 
 
 class Model(object):
-
     def __init__(self):
         self.model = models.resnet50(pretrained=True)
         self.model.eval()
@@ -61,7 +61,6 @@ def translate(index, patch_num):
 
 
 class PatchAttack(object):
-
     def __init__(self, model):
         self.model = model
 

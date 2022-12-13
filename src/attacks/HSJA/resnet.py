@@ -10,12 +10,12 @@ https://arxiv.org/pdf/1603.05027.pdf
 """
 
 from __future__ import print_function
+
 import keras
-from keras.layers import Dense, Conv2D, BatchNormalization, Activation
-from keras.layers import AveragePooling2D, Input, Flatten
+from keras.layers import Activation, AveragePooling2D, BatchNormalization, Conv2D, Dense, Flatten, Input
+from keras.models import Model
 from keras.preprocessing.image import ImageDataGenerator
 from keras.regularizers import l2
-from keras.models import Model
 
 
 def lr_schedule(epoch):

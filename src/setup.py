@@ -6,16 +6,16 @@ from argparse import Namespace
 from pathlib import Path
 
 import torch
-from foolbox.distances import linf, l2
+from foolbox.distances import l2, linf
 from torch.utils import data
 from torchvision import models as models
 from torchvision.models import ResNet50_Weights
 
-from attacks import RayS
-from attacks.base import BaseAttack, Bounds, SearchMode
 from src import dataset
 from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model
-from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TorchModelWrapper, TFModelWrapper
+from src.attacks import RayS
+from src.attacks.base import BaseAttack, Bounds, SearchMode
+from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper
 
 API_KEY_NAME = "EDENAI_API_KEY"
 
@@ -31,20 +31,20 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
         test_loader = dataset.load_imagenet_test_data(args.batch)
         model = TorchModelWrapper(inner_model,
                                   n_class=1000,
-                                  im_mean=[0.485, 0.456, 0.406],
-                                  im_std=[0.229, 0.224, 0.225])
+                                  im_mean=(0.485, 0.456, 0.406),
+                                  im_std=(0.229, 0.224, 0.225))
     elif args.dataset == 'binary_imagenet':
         inner_model = binary_resnet50.BinaryResNet50.load_from_checkpoint("checkpoints/binary_imagenet.ckpt").model.to(
             device).eval()
         inner_model = torch.nn.DataParallel(inner_model, device_ids=[0])
         test_loader = dataset.load_binary_imagenet_test_data(args.batch)
-        model = TorchModelWrapper(inner_model, n_class=2, im_mean=[0.485, 0.456, 0.406], im_std=[0.229, 0.224, 0.225])
+        model = TorchModelWrapper(inner_model, n_class=2, im_mean=(0.485, 0.456, 0.406), im_std=(0.229, 0.224, 0.225))
     elif args.dataset == 'imagenet_nsfw':
         inner_model = clip_laion_nsfw.CLIPNSFWDetector("b32", "checkpoints")
         model = TFModelWrapper(inner_model,
                                n_class=2,
-                               im_mean=[0.48145466, 0.4578275, 0.40821073],
-                               im_std=[0.26862954, 0.26130258, 0.27577711],
+                               im_mean=(0.48145466, 0.4578275, 0.40821073),
+                               im_std=(0.26862954, 0.26130258, 0.27577711),
                                take_sigmoid=False)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
     elif args.dataset == 'google_nsfw':

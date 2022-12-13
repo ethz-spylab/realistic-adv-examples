@@ -2,13 +2,12 @@ from typing import Any
 
 import torch
 import torch.nn.functional as F
+from pytorch_lightning import LightningModule
 from torch import nn
 from torchvision import models
-from pytorch_lightning import LightningModule
 
 
 class BinaryResNet50(LightningModule):
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)

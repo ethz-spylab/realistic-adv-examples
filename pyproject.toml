@@ -1,6 +1,10 @@
 [tool.yapf]
 column_limit = 120
 
+[tool.isort]
+py_version=39
+line_length = 120
+
 [tool.ruff]
 line-length = 120
 ignore = [

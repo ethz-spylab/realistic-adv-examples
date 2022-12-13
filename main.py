@@ -7,10 +7,8 @@ import numpy as np
 import torch
 from dotenv import load_dotenv
 
-import setup
-from attacks.queries_counter import QueriesCounter
-from setup import setup_out_dir
-from src.setup import setup_model_and_data
+from src.attacks.queries_counter import QueriesCounter
+from src.setup import setup_attack, setup_model_and_data, setup_out_dir
 
 
 def aggregate_queries_counters_list(q_list: list[QueriesCounter]) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
@@ -153,14 +151,11 @@ def main():
                         default='0',
                         type=str,
                         help='Whether the attack should work in discrete space (i.e., int8)')
-    parser.add_argument(
-        '--strong-preprocessing',
-        default='0',
-        type=str,
-        help=
-        'Whether strong preprocessing (i.e., JPEG, Resize, Crop) '
-        'should be applied before feeding the image to the classifier'
-    )
+    parser.add_argument('--strong-preprocessing',
+                        default='0',
+                        type=str,
+                        help='Whether strong preprocessing (i.e., JPEG, Resize, Crop) '
+                        'should be applied before feeding the image to the classifier')
     parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
     args = parser.parse_args()
     load_dotenv()
@@ -177,7 +172,7 @@ def main():
 
     model, test_loader = setup_model_and_data(args, device)
     exp_out_dir = setup_out_dir(args)
-    attack = setup.setup_attack(args)
+    attack = setup_attack(args)
     attack_results = AttackResults()
 
     seeds = np.random.randint(10000, size=10000)

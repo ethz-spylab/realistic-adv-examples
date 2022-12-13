@@ -1,0 +1,11 @@
+autokeras
+dotenv
+foolbox
+numpy
+pydantic
+pytorch_lightning
+requests
+tensorflow
+torch
+torchvision
+transformers

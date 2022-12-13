@@ -1,14 +1,14 @@
 import abc
+import math
 from enum import Enum
 from typing import NamedTuple
 
-import math
 import numpy as np
 import torch
 from foolbox.distances import LpDistance
 
+from src.attacks.queries_counter import AttackPhase, QueriesCounter
 from src.image_utils import encode_decode
-from src.attacks.queries_counter import QueriesCounter, AttackPhase
 from src.model_wrappers import ModelWrapper
 
 
@@ -18,7 +18,6 @@ class Bounds(NamedTuple):
 
 
 class BaseAttack(abc.ABC):
-
     def __init__(self, distance: LpDistance, bounds: Bounds, discrete: bool):
         self.discrete = discrete
         self.bounds = bounds

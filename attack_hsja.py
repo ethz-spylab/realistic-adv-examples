@@ -1,12 +1,13 @@
 from __future__ import absolute_import, division, print_function
 
-from build_model import KerasImageModel, KerasV2ImageModel
-from load_data import ImageData, split_data
-from hsja import hsja
-import numpy as np
-import os
 import argparse
+import os
+
+import numpy as np
 import scipy
+from build_model import KerasImageModel, KerasV2ImageModel
+from hsja import hsja
+from load_data import ImageData, split_data
 
 KERAS_MODELS = {"resnet"}
 KERAS_DATASETS = {"cifar10", "cifar100", "mnist"}
