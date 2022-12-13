@@ -1,56 +1,11 @@
-[tool.poetry]
-name = "realistic-adv-examples"
-version = "0.0.1"
-description = ""
-authors = ["Edoardo Debenedetti <edoardo.debenedetti@inf.ethz.ch>"]
-license = "MIT"
-
-[tool.poetry.dependencies]
-python = "^3.8"
-torch = { version = "^1.12.1", source="torch" }
-torchvision = { version = "^0.13", source="torch" }
-
-[tool.poetry.dev-dependencies]
-yapf = { version = "^0.32.0", source = "pypi" }
-mypy = { version = "^0.971", source = "pypi" }
-pylint = { version = "^2.14.5", source = "pypi" }
-pytest = { version = "^7.1.2", source = "pypi" }
-isort = { version = "^5.10.1", source = "pypi" }
-
-[[tool.poetry.source]]
-name = "torch"
-url = "https://download.pytorch.org/whl/cu113"
-default = false
-secondary = true
-
-[tool.isort]
-profile = "google"
-src_paths = ["src", "test"]
-
-[tool.pylint.messages_control]
-max-line-length = 120
-disable = [
-    "invalid-name",
-    "missing-docstring",
-    "too-many-arguments",
-]
-
-[tool.pylama]
-format = "pylint"
-skip = "*/.tox/*,*/.env/*"
-linters = "pycodestyle,mccabe"
-ignore = "E731"
-
-[tool.pylama.linter.pycodestyle]
-max_line_length = 120
-
 [tool.yapf]
-based_on_style = "google"
 column_limit = 120
 
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.ruff]
+line-length = 120
+ignore = [
+    "E731"
+]
 
 [tool.pyright]
 include = ["src"]
