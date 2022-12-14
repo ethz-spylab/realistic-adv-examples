@@ -256,7 +256,8 @@ class LAIONNSFWModel(EdenAINSFWModel[LAIONResponseLabel]):
         image = (image - self.mean) / self.std
         image_tf = tf.constant(image.cpu())
         likelihood = round(self.model(image_tf).numpy().item() * 5)
-        response_item = ResponseItem(label=LAIONResponseLabel.nsfw, likelihood=likelihood)
+        response_item: ResponseItem[LAIONResponseLabel] = ResponseItem(label=LAIONResponseLabel.nsfw,
+                                                                       likelihood=likelihood)
         return ProviderResponse[LAIONResponseLabel](status=ResponseStatus.success, items=[response_item])
 
     def parse_results(self, response: ProviderResponse[LAIONResponseLabel]) -> float:

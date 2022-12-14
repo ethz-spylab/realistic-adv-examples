@@ -1,6 +1,10 @@
-import numpy as np
+import math
+import torch
+from foolbox.distances import LpDistance
 
+from src.attacks.base import PerturbationAttack, Bounds
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
+from src.model_wrappers import ModelWrapper
 
 
 class HSJAttackPhase(AttackPhase):
@@ -10,19 +14,51 @@ class HSJAttackPhase(AttackPhase):
     initialization = "initialization"
 
 
-def hsja(model,
-         sample,
-         clip_max=1,
-         clip_min=0,
-         constraint='l2',
-         num_iterations=40,
-         gamma=1.0,
-         target_label=None,
-         target_image=None,
-         stepsize_search='geometric_progression',
-         max_num_evals=1e4,
-         init_num_evals=100,
-         verbose=True):
+class HSJA(PerturbationAttack):
+
+    def __init__(self,
+                 distance: LpDistance,
+                 bounds: Bounds,
+                 discrete: bool,
+                 num_iterations: int | None,
+                 gamma: float = 1.0,
+                 stepsize_search: str = "geometric_progression",
+                 max_num_evals: int = 1e4,
+                 init_num_evals: int = 100):
+        super().__init__(distance, bounds, discrete)
+        self.init_num_evals = init_num_evals
+        self.max_num_evals = max_num_evals
+        self.stepsize_search = stepsize_search
+        self.gamma = gamma
+        self.num_iterations = num_iterations
+        self.constraint = 'l2' if distance.p == 2 else 'linf'
+
+    def __call__(self,
+                 model: ModelWrapper,
+                 x: torch.Tensor,
+                 label: torch.Tensor,
+                 target: torch.Tensor | None = None,
+                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
+        return hsja(model, x, self.bounds.upper, self.bounds.lower, self.constraint, self.num_iterations, self.gamma,
+                    target, None, query_limit, self.stepsize_search, self.max_num_evals, self.init_num_evals)
+
+    ...
+
+
+def hsja(model: ModelWrapper,
+         sample: torch.Tensor,
+         clip_max: float = 1,
+         clip_min: float = 0,
+         constraint: str = 'l2',
+         num_iterations: int = 40,
+         gamma: float = 1.0,
+         target_label: torch.Tensor | None = None,
+         target_image: torch.Tensor | None = None,
+         max_queries: int | None = None,
+         stepsize_search: str = 'geometric_progression',
+         max_num_evals: int = 1e4,
+         init_num_evals: int = 100,
+         verbose: bool = True) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
     """
     Main algorithm for HopSkipJumpAttack.
 
@@ -33,23 +69,23 @@ def hsja(model,
         clip_min: lower bound of the image.
         constraint: choose between [l2, linf].
         num_iterations: number of iterations.
-        gamma: used to set binary search threshold theta. The binary search 
-        threshold theta is gamma / d^{3/2} for l2 attack and gamma / d^2 for 
+        gamma: used to set binary search threshold theta. The binary search
+        threshold theta is gamma / d^{3/2} for l2 attack and gamma / d^2 for
         linf attack.
         target_label: integer or None for nontargeted attack.
-        target_image: an array with the same size as sample, or None. 
+        target_image: an array with the same size as sample, or None.
         stepsize_search: choose between 'geometric_progression', 'grid_search'.
-        max_num_evals: maximum number of evaluations for estimating gradient (for each iteration). 
-        This is not the total number of model evaluations for the entire algorithm, you need to 
-        set a counter of model evaluations by yourself to get that. To increase the total number 
-        of model evaluations, set a larger num_iterations. 
+        max_num_evals: maximum number of evaluations for estimating gradient (for each iteration).
+        This is not the total number of model evaluations for the entire algorithm, you need to
+        set a counter of model evaluations by yourself to get that. To increase the total number
+        of model evaluations, set a larger num_iterations.
         init_num_evals: initial number of evaluations for estimating gradient.
-        
+
         Output:
         perturbed image.
         """
     # Set parameters
-    original_label = np.argmax(model.predict(sample))
+    original_label = model.predict_label(sample)
     params = {
         'clip_max': clip_max,
         'clip_min': clip_min,
@@ -60,7 +96,7 @@ def hsja(model,
         'constraint': constraint,
         'num_iterations': num_iterations,
         'gamma': gamma,
-        'd': int(np.prod(sample.shape)),
+        'd': int(math.prod(sample.shape)),
         'stepsize_search': stepsize_search,
         'max_num_evals': max_num_evals,
         'init_num_evals': init_num_evals,
@@ -69,34 +105,34 @@ def hsja(model,
 
     # Set binary search threshold.
     if params['constraint'] == 'l2':
-        params['theta'] = params['gamma'] / (np.sqrt(params['d']) * params['d'])
+        params['theta'] = params['gamma'] / (math.sqrt(params['d']) * params['d'])
     else:
         params['theta'] = params['gamma'] / (params['d']**2)
 
-    queries_counter = QueriesCounter()
+    queries_counter = QueriesCounter(max_queries)
 
     # Initialize.
     perturbed, queries_counter = initialize(model, sample, params, queries_counter)
 
     # Project the initialization to the boundary.
-    perturbed, dist_post_update, queries_counter = binary_search_batch(sample, np.expand_dims(perturbed, 0), model,
+    perturbed, dist_post_update, queries_counter = binary_search_batch(sample, torch.unsqueeze(perturbed, 0), model,
                                                                        params, queries_counter)
     dist = compute_distance(perturbed, sample, constraint)
 
-    for j in np.arange(params['num_iterations']):
+    for j in range(params['num_iterations']):
         params['cur_iter'] = j + 1
 
         # Choose delta.
         delta = select_delta(params, dist_post_update)
 
         # Choose number of evaluations.
-        num_evals = int(params['init_num_evals'] * np.sqrt(j + 1))
+        num_evals = int(params['init_num_evals'] * math.sqrt(j + 1))
         num_evals = int(min([num_evals, params['max_num_evals']]))
 
         # approximate gradient.
         gradf, queries_counter = approximate_gradient(model, perturbed, num_evals, delta, params, queries_counter)
         if params['constraint'] == 'linf':
-            update = np.sign(gradf)
+            update = torch.sign(gradf)
         else:
             update = gradf
 
@@ -115,14 +151,14 @@ def hsja(model,
 
         elif params['stepsize_search'] == 'grid_search':
             # Grid search for stepsize.
-            epsilons = np.logspace(-4, 0, num=20, endpoint=True) * dist
+            epsilons = torch.logspace(-4, 0, steps=20) * dist
             epsilons_shape = [20] + len(params['shape']) * [1]
             perturbeds = perturbed + epsilons.reshape(epsilons_shape) * update
             perturbeds = clip_image(perturbeds, params['clip_min'], params['clip_max'])
             idx_perturbed, queries_counter = decision_function(model, perturbeds, params, queries_counter,
                                                                HSJAttackPhase.step_size_search)
 
-            if np.sum(idx_perturbed) > 0:
+            if torch.sum(idx_perturbed) > 0:
                 # Select the perturbation that yields the minimum distance # after binary search.
                 perturbed, dist_post_update, queries_counter = binary_search_batch(sample, perturbeds[idx_perturbed],
                                                                                    model, params, queries_counter)
@@ -132,50 +168,56 @@ def hsja(model,
         if verbose:
             print('iteration: {:d}, {:s} distance {:.4E}'.format(j + 1, constraint, dist))
 
-    return perturbed
+        if queries_counter.is_out_of_queries():
+            print("Out of queries")
+            break
+
+    return perturbed, queries_counter, dist.item(), queries_counter.is_out_of_queries(), {}
 
 
-def decision_function(model, images, params, queries_counter: QueriesCounter,
-                      attack_phase: HSJAttackPhase) -> tuple[np.ndarray, QueriesCounter]:
+def decision_function(model: ModelWrapper, images: torch.Tensor, params, queries_counter: QueriesCounter,
+                      attack_phase: HSJAttackPhase) -> tuple[torch.Tensor, QueriesCounter]:
     """
     Decision function output 1 on the desired side of the boundary,
     0 otherwise.
     """
     images = clip_image(images, params['clip_min'], params['clip_max'])
-    prob = model.predict(images)
+    label = model.predict_label(images)
     if params['target_label'] is None:
-        success = np.argmax(prob, axis=1) != params['original_label']
+        success = label != params['original_label']
     else:
-        success = np.argmax(prob, axis=1) == params['target_label']
+        success = label == params['target_label']
 
-    return success, queries_counter.increase(attack_phase, safe=success)
+    return success, queries_counter.increase(attack_phase, safe=success)  # type: ignore
 
 
-def clip_image(image, clip_min, clip_max):
+def clip_image(image: torch.Tensor, clip_min: float, clip_max: float):
     # Clip an image, or an image batch, with upper and lower threshold.
-    return np.minimum(np.maximum(clip_min, image), clip_max)
+    return torch.minimum(torch.maximum(image, clip_min), clip_max)
 
 
-def compute_distance(x_ori, x_pert, constraint='l2'):
+def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, constraint: str = 'l2') -> torch.Tensor:
     # Compute the distance between two images.
     if constraint == 'l2':
-        return np.linalg.norm(x_ori - x_pert)
+        return torch.linalg.norm(x_ori - x_pert)
     elif constraint == 'linf':
-        return np.max(abs(x_ori - x_pert))
+        return torch.max(abs(x_ori - x_pert))
 
 
-def approximate_gradient(model, sample, num_evals, delta, params,
-                         queries_counter: QueriesCounter) -> tuple[np.ndarray, QueriesCounter]:
+def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta, params,
+                         queries_counter: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
     clip_max, clip_min = params['clip_max'], params['clip_min']
 
     # Generate random vectors.
     noise_shape = [num_evals] + list(params['shape'])
     if params['constraint'] == 'l2':
-        rv = np.random.randn(*noise_shape)
+        rv = torch.randn(*noise_shape, device=sample.device)
     elif params['constraint'] == 'linf':
-        rv = np.random.uniform(low=-1, high=1, size=noise_shape)
+        rv = torch.empty(*noise_shape, device=sample.device).uniform_(-1, 1)
+    else:
+        raise ValueError(f'Unknown constraint {params["constraint"]}.')
 
-    rv = rv / np.sqrt(np.sum(rv**2, axis=(1, 2, 3), keepdims=True))
+    rv = rv / torch.sqrt(torch.sum(rv**2, dim=(1, 2, 3), keepdim=True))
     perturbed = sample + delta * rv
     perturbed = clip_image(perturbed, clip_min, clip_max)
     rv = (perturbed - sample) / delta
@@ -184,24 +226,24 @@ def approximate_gradient(model, sample, num_evals, delta, params,
     decisions, updated_queries_counter = decision_function(model, perturbed, params, queries_counter,
                                                            HSJAttackPhase.gradient_estimation)
     decision_shape = [len(decisions)] + [1] * len(params['shape'])
-    fval = 2 * decisions.astype(float).reshape(decision_shape) - 1.0
+    fval = 2 * decisions.to(float).reshape(decision_shape) - 1.0
 
     # Baseline subtraction (when fval differs)
-    if np.mean(fval) == 1.0:  # label changes.
-        gradf = np.mean(rv, axis=0)
-    elif np.mean(fval) == -1.0:  # label not change.
-        gradf = -np.mean(rv, axis=0)
+    if torch.mean(fval) == 1.0:  # label changes.
+        gradf = torch.mean(rv, dim=0)
+    elif torch.mean(fval) == -1.0:  # label not change.
+        gradf = -torch.mean(rv, dim=0)
     else:
-        fval -= np.mean(fval)
-        gradf = np.mean(fval * rv, axis=0)
+        fval -= torch.mean(fval)
+        gradf = torch.mean(fval * rv, dim=0)
 
     # Get the gradient direction.
-    gradf = gradf / np.linalg.norm(gradf)
+    gradf = gradf / torch.linalg.norm(gradf)
 
     return gradf, updated_queries_counter
 
 
-def project(original_image, perturbed_images, alphas, params):
+def project(original_image: torch.Tensor, perturbed_images: torch.Tensor, alphas: torch.Tensor, params):
     alphas_shape = [len(alphas)] + [1] * len(params['shape'])
     alphas = alphas.reshape(alphas_shape)
     if params['constraint'] == 'l2':
@@ -211,28 +253,30 @@ def project(original_image, perturbed_images, alphas, params):
         return out_images
 
 
-def binary_search_batch(original_image, perturbed_images, model, params,
-                        queries_counter: QueriesCounter) -> tuple[np.ndarray, float, QueriesCounter]:
+def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Tensor, model: ModelWrapper, params,
+                        queries_counter: QueriesCounter) -> tuple[torch.Tensor, float, QueriesCounter]:
     """ Binary search to approach the boundary."""
 
     # Compute distance between each of perturbed image and original image.
-    dists_post_update = np.array([
+    dists_post_update = torch.Tensor([
         compute_distance(original_image, perturbed_image, params['constraint']) for perturbed_image in perturbed_images
     ])
 
+    highs: torch.Tensor
+    lows: torch.Tensor
     # Choose upper thresholds in binary searchs based on constraint.
     if params['constraint'] == 'linf':
         highs = dists_post_update
         # Stopping criteria.
-        thresholds = np.minimum(dists_post_update * params['theta'], params['theta'])
+        thresholds = torch.minimum(dists_post_update * params['theta'], params['theta'])
     else:
-        highs = np.ones(len(perturbed_images))
+        highs = torch.ones(len(perturbed_images))
         thresholds = params['theta']
 
-    lows = np.zeros(len(perturbed_images))
+    lows = torch.zeros(len(perturbed_images))
 
     # Call recursive function.
-    while np.max((highs - lows) / thresholds) > 1:
+    while torch.max((highs - lows) / thresholds) > 1:
         # projection to mids.
         mids = (highs + lows) / 2.0
         mid_images = project(original_image, perturbed_images, mids, params)
@@ -240,15 +284,16 @@ def binary_search_batch(original_image, perturbed_images, model, params,
         # Update highs and lows based on model decisions.
         decisions, queries_counter = decision_function(model, mid_images, params, queries_counter,
                                                        HSJAttackPhase.binary_search)
-        lows = np.where(decisions == 0, mids, lows)
-        highs = np.where(decisions == 1, mids, highs)
+        lows = torch.where(decisions == 0, mids, lows)  # type: ignore
+        highs = torch.where(decisions == 1, mids, highs)  # type: ignore
 
     out_images = project(original_image, perturbed_images, highs, params)
 
     # Compute distance of the output image to select the best choice.
     # (only used when stepsize_search is grid_search.)
-    dists = np.array([compute_distance(original_image, out_image, params['constraint']) for out_image in out_images])
-    idx = np.argmin(dists)
+    dists = torch.Tensor(
+        [compute_distance(original_image, out_image, params['constraint']) for out_image in out_images])
+    idx = torch.argmin(dists)
 
     dist = dists_post_update[idx]
     out_image = out_images[idx]
@@ -256,8 +301,9 @@ def binary_search_batch(original_image, perturbed_images, model, params,
     return out_image, dist, queries_counter
 
 
-def initialize(model, sample, params, queries_counter: QueriesCounter) -> tuple[np.ndarray, QueriesCounter]:
-    """ 
+def initialize(model: ModelWrapper, sample: torch.Tensor, params,
+               queries_counter: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
+    """
     Efficient Implementation of BlendedUniformNoiseAttack in Foolbox.
     """
     success = 0
@@ -266,7 +312,8 @@ def initialize(model, sample, params, queries_counter: QueriesCounter) -> tuple[
     if params['target_image'] is None:
         # Find a misclassified random noise.
         while True:
-            random_noise = np.random.uniform(params['clip_min'], params['clip_max'], size=params['shape'])
+            random_noise = torch.empty(*params['shape'],
+                                       device=sample.device).uniform_(params['clip_min'], params['clip_max'])
             success_array, queries_counter = decision_function(model, random_noise[None], params, queries_counter,
                                                                HSJAttackPhase.initialization)
             success = success_array[0]
@@ -298,17 +345,17 @@ def initialize(model, sample, params, queries_counter: QueriesCounter) -> tuple[
     return initialization, queries_counter
 
 
-def geometric_progression_for_stepsize(x, update, dist, model, params,
+def geometric_progression_for_stepsize(x: torch.Tensor, update: torch.Tensor, dist: float, model: ModelWrapper, params,
                                        queries_counter: QueriesCounter) -> tuple[float, QueriesCounter]:
     """
     Geometric progression to search for stepsize.
     Keep decreasing stepsize by half until reaching
     the desired side of the boundary,
     """
-    epsilon = dist / np.sqrt(params['cur_iter'])
+    epsilon = dist / math.sqrt(params['cur_iter'])
 
-    def phi(epsilon, phi_queries_counter) -> tuple[np.ndarray, QueriesCounter]:
-        new = x + epsilon * update
+    def phi(eps: float, phi_queries_counter: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
+        new: torch.Tensor = x + eps * update  # type: ignore
         success, updated_phi_queries_counter = decision_function(model, new[None], params, phi_queries_counter,
                                                                  HSJAttackPhase.step_size_search)
         return success, updated_phi_queries_counter
@@ -321,8 +368,8 @@ def geometric_progression_for_stepsize(x, update, dist, model, params,
     return epsilon, queries_counter
 
 
-def select_delta(params, dist_post_update):
-    """ 
+def select_delta(params, dist_post_update: float) -> float:
+    """
     Choose the delta at the scale of distance
     between x and perturbed sample.
 
@@ -331,8 +378,10 @@ def select_delta(params, dist_post_update):
         delta = 0.1 * (params['clip_max'] - params['clip_min'])
     else:
         if params['constraint'] == 'l2':
-            delta = np.sqrt(params['d']) * params['theta'] * dist_post_update
+            delta = math.sqrt(params['d']) * params['theta'] * dist_post_update
         elif params['constraint'] == 'linf':
             delta = params['d'] * params['theta'] * dist_post_update
+        else:
+            raise ValueError(f"Unknown constraint {params['constraint']}")
 
     return delta
