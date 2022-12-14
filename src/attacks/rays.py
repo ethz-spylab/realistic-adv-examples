@@ -11,6 +11,7 @@ from src.model_wrappers import ModelWrapper
 
 
 class RayS(DirectionAttack):
+
     def __init__(self, epsilon: float, distance: LpDistance, bounds: Bounds, discrete: bool, early_stopping: bool,
                  search: SearchMode, line_search_tol: float | None, flip_squares: bool, flip_rand_pixels: bool):
         super().__init__(distance, bounds, discrete, line_search_tol)
@@ -24,13 +25,12 @@ class RayS(DirectionAttack):
             self.epsilon = round(self.epsilon * 255)
             print(f"Making attack discrete with epsilon = {self.epsilon}")
 
-    def attack_hard_label(
-            self,
-            model: ModelWrapper,
-            x: torch.Tensor,
-            y: torch.Tensor,
-            target: torch.Tensor | None = None,
-            query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
+    def attack_hard_label(self,
+                          model: ModelWrapper,
+                          x: torch.Tensor,
+                          y: torch.Tensor,
+                          target: torch.Tensor | None = None,
+                          query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
         """ Attack the original image and return adversarial example
             model: (pytorch model)
             (x, y): original image

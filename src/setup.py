@@ -76,7 +76,7 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
     else:
         raise ValueError("Invalid model")
-    
+
     model.make_model_eval()
 
     return model, test_loader

@@ -19,7 +19,7 @@ def test_queries_counter():
     assert updated_counter.total_queries == 5
     assert updated_counter.total_unsafe_queries == 2
     assert not updated_counter.is_out_of_queries()
-    
+
 
 def test_queries_counter_out_of_queries():
     counter = QueriesCounter(5)

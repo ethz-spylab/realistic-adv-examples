@@ -14,12 +14,12 @@ load_dotenv()
 
 
 def aggregate_queries_counters_list(q_list: list[QueriesCounter]) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
-    aggregated_queries = {}
+    aggregated_queries: dict[str, list[int]] = {}
     for safe_queries in [q.queries for q in q_list]:
         for phase, n_queries in safe_queries.items():
             aggregated_queries[phase] = aggregated_queries.get(phase, []) + [n_queries]
 
-    aggregated_unsafe_queries = {}
+    aggregated_unsafe_queries: dict[str, list[int]] = {}
     for unsafe_queries in [q.unsafe_queries for q in q_list]:
         for phase, n_queries in unsafe_queries.items():
             aggregated_unsafe_queries[phase] = aggregated_unsafe_queries.get(phase, []) + [n_queries]
@@ -63,31 +63,31 @@ class AttackResults:
                                    failed_extra_results=self.failed_extra_results + [extra_results])
 
     def log_results(self, idx: int):
-        print(f"index: {idx:4d} avg dist: {np.mean(self.distances):.4f} "
-              f"avg queries: {np.mean(self._get_overall_queries()):.4f} "
-              f"median queries: {np.median(self._get_overall_queries()):.4f} "
-              f"avg bad queries: {np.mean(self._get_overall_unsafe_queries()):.4f} "
-              f"median bad queries: {np.median(self._get_overall_unsafe_queries()):.4f} "
+        print(f"index: {idx:4d} avg dist: {np.mean(np.array(self.distances)):.4f} "
+              f"avg queries: {np.mean(np.array(self._get_overall_queries())):.4f} "
+              f"median queries: {np.median(np.array(self._get_overall_queries())):.4f} "
+              f"avg bad queries: {np.mean(np.array(self._get_overall_unsafe_queries())):.4f} "
+              f"median bad queries: {np.median(np.array(self._get_overall_unsafe_queries())):.4f} "
               f"asr: {np.mean(np.array(self.asr)):.4f} \n")
 
     def get_results_dict(self) -> dict[str, float]:
         results_dict = {
             "asr": self.asr,
-            "distortion": np.mean(self.distances),
-            "mean_queries": np.mean(self._get_overall_queries()),
-            "median_queries": np.median(self._get_overall_queries()),
-            "mean_unsafe_queries": np.mean(self._get_overall_unsafe_queries()),
-            "median_unsafe_queries": np.median(self._get_overall_unsafe_queries()),
+            "distortion": np.mean(np.array(self.distances)),
+            "mean_queries": np.mean(np.array(self._get_overall_queries())),
+            "median_queries": np.median(np.array(self._get_overall_queries())),
+            "mean_unsafe_queries": np.mean(np.array(self._get_overall_unsafe_queries())),
+            "median_unsafe_queries": np.median(np.array(self._get_overall_unsafe_queries())),
         }
         aggregated_queries, aggregated_unsafe_queries = aggregate_queries_counters_list(self.queries_counters)
 
         for stat, stat_fn in (("mean", np.mean), ("median", np.median)):
             for phase, queries_list in aggregated_queries.items():
-                results_dict[f"{stat}_queries_{phase}"] = stat_fn(queries_list)
+                results_dict[f"{stat}_queries_{phase}"] = stat_fn(np.array(queries_list))
             for phase, queries_list in aggregated_unsafe_queries.items():
-                results_dict[f"{stat}_unsafe_queries_{phase}"] = stat_fn(queries_list)
+                results_dict[f"{stat}_unsafe_queries_{phase}"] = stat_fn(np.array(queries_list))
             for key, value_list in aggregate_extra_results(self.extra_results).items():
-                results_dict[f"{stat}_{key}"] = stat_fn(value_list)
+                results_dict[f"{stat}_{key}"] = stat_fn(np.array(value_list))
 
         return results_dict
 

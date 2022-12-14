@@ -18,6 +18,7 @@ class Bounds(NamedTuple):
 
 
 class BaseAttack(abc.ABC):
+
     def __init__(self, distance: LpDistance, bounds: Bounds, discrete: bool):
         self.discrete = discrete
         self.bounds = bounds
@@ -39,7 +40,7 @@ class BaseAttack(abc.ABC):
                  x: torch.Tensor,
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float]]:
+                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
         ...
 
 
@@ -197,7 +198,19 @@ class DirectionAttack(BaseAttack, abc.ABC):
 
 
 class PerturbationAttack(BaseAttack, abc.ABC):
-    ...
+
+    def get_x_adv(self, x: torch.Tensor, delta: torch.Tensor) -> torch.Tensor:
+        if self.discrete:
+            assert torch.round(delta) == delta
+            delta = delta / 255
+        out: torch.Tensor = x + delta  # type: ignore
+        out = torch.clamp(out, self.bounds.lower, self.bounds.upper)
+        if self.discrete:
+            assert torch.allclose(out, torch.round(out * 255) / 255)  # type: ignore
+            decoded_out = encode_decode(out)
+            assert torch.allclose(out, decoded_out, atol=1 / 256)
+            out = decoded_out
+        return out
 
 
 class SearchMode(str, Enum):

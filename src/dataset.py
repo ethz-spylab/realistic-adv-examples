@@ -71,7 +71,7 @@ def load_binary_imagenet_test_data(test_batch_size=1, data_dir=Path("/data/image
     np.random.seed(rand_seed)
     random.seed(rand_seed)
     torch.backends.cudnn.deterministic = True
-    val_loader = data.DataLoader(val_dataset, batch_size=test_batch_size, shuffle=True)
+    val_loader: data.DataLoader = data.DataLoader(val_dataset, batch_size=test_batch_size, shuffle=True)
 
     return val_loader
 
