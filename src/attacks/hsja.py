@@ -15,15 +15,14 @@ class HSJAttackPhase(AttackPhase):
 
 
 class HSJA(PerturbationAttack):
-
     def __init__(self,
                  distance: LpDistance,
                  bounds: Bounds,
                  discrete: bool,
-                 num_iterations: int | None,
+                 num_iterations: int,
                  gamma: float = 1.0,
                  stepsize_search: str = "geometric_progression",
-                 max_num_evals: int = 1e4,
+                 max_num_evals: int = int(1e4),
                  init_num_evals: int = 100):
         super().__init__(distance, bounds, discrete)
         self.init_num_evals = init_num_evals
@@ -56,7 +55,7 @@ def hsja(model: ModelWrapper,
          target_image: torch.Tensor | None = None,
          max_queries: int | None = None,
          stepsize_search: str = 'geometric_progression',
-         max_num_evals: int = 1e4,
+         max_num_evals: int = int(1e4),
          init_num_evals: int = 100,
          verbose: bool = True) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
     """
@@ -172,7 +171,7 @@ def hsja(model: ModelWrapper,
             print("Out of queries")
             break
 
-    return perturbed, queries_counter, dist.item(), queries_counter.is_out_of_queries(), {}
+    return perturbed, queries_counter, dist, queries_counter.is_out_of_queries(), {}
 
 
 def decision_function(model: ModelWrapper, images: torch.Tensor, params, queries_counter: QueriesCounter,
@@ -191,17 +190,19 @@ def decision_function(model: ModelWrapper, images: torch.Tensor, params, queries
     return success, queries_counter.increase(attack_phase, safe=success)  # type: ignore
 
 
-def clip_image(image: torch.Tensor, clip_min: float, clip_max: float):
+def clip_image(image: torch.Tensor, clip_min: float | torch.Tensor, clip_max: float | torch.Tensor):
     # Clip an image, or an image batch, with upper and lower threshold.
-    return torch.minimum(torch.maximum(image, clip_min), clip_max)
+    return torch.minimum(torch.maximum(image, clip_min), clip_max)  # type: ignore
 
 
-def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, constraint: str = 'l2') -> torch.Tensor:
+def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, constraint: str = 'l2') -> float:
     # Compute the distance between two images.
     if constraint == 'l2':
-        return torch.linalg.norm(x_ori - x_pert)
+        return torch.linalg.norm(x_ori - x_pert).item()
     elif constraint == 'linf':
-        return torch.max(abs(x_ori - x_pert))
+        return torch.max(abs(x_ori - x_pert)).item()
+    else:
+        raise ValueError(f'Unknown constraint {constraint}.')
 
 
 def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta, params,
@@ -226,7 +227,7 @@ def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: i
     decisions, updated_queries_counter = decision_function(model, perturbed, params, queries_counter,
                                                            HSJAttackPhase.gradient_estimation)
     decision_shape = [len(decisions)] + [1] * len(params['shape'])
-    fval = 2 * decisions.to(float).reshape(decision_shape) - 1.0
+    fval = 2 * decisions.to(torch.float).reshape(decision_shape) - 1.0
 
     # Baseline subtraction (when fval differs)
     if torch.mean(fval) == 1.0:  # label changes.
@@ -243,7 +244,7 @@ def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: i
     return gradf, updated_queries_counter
 
 
-def project(original_image: torch.Tensor, perturbed_images: torch.Tensor, alphas: torch.Tensor, params):
+def project(original_image: torch.Tensor, perturbed_images: torch.Tensor, alphas: torch.Tensor, params) -> torch.Tensor:
     alphas_shape = [len(alphas)] + [1] * len(params['shape'])
     alphas = alphas.reshape(alphas_shape)
     if params['constraint'] == 'l2':
@@ -251,6 +252,8 @@ def project(original_image: torch.Tensor, perturbed_images: torch.Tensor, alphas
     elif params['constraint'] == 'linf':
         out_images = clip_image(perturbed_images, original_image - alphas, original_image + alphas)
         return out_images
+    else:
+        raise ValueError(f'Unknown constraint {params["constraint"]}.')
 
 
 def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Tensor, model: ModelWrapper, params,
@@ -295,7 +298,7 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
         [compute_distance(original_image, out_image, params['constraint']) for out_image in out_images])
     idx = torch.argmin(dists)
 
-    dist = dists_post_update[idx]
+    dist = dists_post_update[idx].item()
     out_image = out_images[idx]
 
     return out_image, dist, queries_counter

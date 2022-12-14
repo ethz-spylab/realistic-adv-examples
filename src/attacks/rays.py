@@ -11,7 +11,6 @@ from src.model_wrappers import ModelWrapper
 
 
 class RayS(DirectionAttack):
-
     def __init__(self, epsilon: float, distance: LpDistance, bounds: Bounds, discrete: bool, early_stopping: bool,
                  search: SearchMode, line_search_tol: float | None, flip_squares: bool, flip_rand_pixels: bool):
         super().__init__(distance, bounds, discrete, line_search_tol)

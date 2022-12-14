@@ -8,21 +8,21 @@ from torchvision import models
 
 
 class BinaryResNet50(LightningModule):
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
         fc_in_size = self.model.fc.in_features
         self.model.fc = nn.Linear(in_features=fc_in_size, out_features=1)
 
-    def forward(self, x) -> Any:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self.model(x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
-    def training_step(self, train_batch, batch_idx):
+    def training_step(self, train_batch: tuple[torch.Tensor, torch.Tensor],
+                      batch_idx: int) -> torch.Tensor:  # type: ignore
         x, y = train_batch
         y_hat = self.model(x)
         loss = F.binary_cross_entropy_with_logits(y_hat.flatten(), y)
@@ -31,7 +31,7 @@ class BinaryResNet50(LightningModule):
         self.log('train_acc', accuracy, sync_dist=True, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
-    def validation_step(self, val_batch, batch_idx):
+    def validation_step(self, val_batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:  # type: ignore
         x, y = val_batch
         y_hat = self.model(x)
         loss = F.binary_cross_entropy_with_logits(y_hat.flatten(), y)

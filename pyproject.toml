@@ -12,18 +12,17 @@ ignore = [
 ]
 
 [tool.pyright]
-include = ["src"]
+include = ["src", "tests"]
 exclude = []
 ignore = []
 defineConstant = {}
-venv = "~/.pyenv/versions/torch/"
 
 reportMissingImports = true
 reportMissingTypeStubs = false
 reportUnknownVariableType = false
 reportUnknownMemberType = false
 reportUnknownArgumentType = false
-reportIncompatibleMethodOverride = false
+reportIncompatibleMethodOverride = true
 
 pythonVersion = "3.10"
 pythonPlatform = "Linux"

@@ -5,7 +5,6 @@ from src.model_wrappers.general_model import MeanStdType, ModelWrapper
 
 
 class TorchModelWrapper(ModelWrapper):
-
     def __init__(self,
                  model: nn.Module,
                  n_class: int = 10,
@@ -18,7 +17,7 @@ class TorchModelWrapper(ModelWrapper):
     def make_model_eval(self):
         self._model.eval()
 
-    def forward(self, image: torch.Tensor) -> torch.Tensor:
+    def forward(self, image: torch.Tensor) -> torch.Tensor:  # type: ignore
         if len(image.size()) != 4:
             image = image.unsqueeze(0)
         image = self.preprocess(image)

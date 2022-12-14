@@ -18,7 +18,6 @@ class Bounds(NamedTuple):
 
 
 class BaseAttack(abc.ABC):
-
     def __init__(self, distance: LpDistance, bounds: Bounds, discrete: bool):
         self.discrete = discrete
         self.bounds = bounds
@@ -198,7 +197,6 @@ class DirectionAttack(BaseAttack, abc.ABC):
 
 
 class PerturbationAttack(BaseAttack, abc.ABC):
-
     def get_x_adv(self, x: torch.Tensor, delta: torch.Tensor) -> torch.Tensor:
         if self.discrete:
             assert torch.round(delta) == delta

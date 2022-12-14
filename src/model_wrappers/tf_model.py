@@ -5,7 +5,6 @@ from src.model_wrappers.general_model import MeanStdType, ModelWrapper
 
 
 class TFModelWrapper(ModelWrapper):
-
     def __init__(self,
                  model: tf.keras.Model,
                  n_class: int = 10,
@@ -21,14 +20,14 @@ class TFModelWrapper(ModelWrapper):
             processed = (image - self.im_mean) / self.im_std
         return processed
 
-    def forward(self, image):
+    def forward(self, image: torch.Tensor) -> torch.Tensor:  # type: ignore
         if len(image.size()) != 4:
             image = image.unsqueeze(0)
         image_tf = tf.constant(image.cpu())
         logits = self._model(image_tf).numpy()
         return torch.from_numpy(logits).cuda()
 
-    def _predict_prob(self, image, verbose=False):
+    def _predict_prob(self, image: torch.Tensor, verbose=False) -> torch.Tensor:
         if len(image.size()) != 4:
             image = image.unsqueeze(0)
         image = self.preprocess(image)

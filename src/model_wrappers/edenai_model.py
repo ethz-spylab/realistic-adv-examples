@@ -5,7 +5,6 @@ from src.model_wrappers.general_model import MeanStdType, ModelWrapper
 
 
 class EdenAIModelWrapper(ModelWrapper):
-
     def __init__(self,
                  model: EdenAINSFWModel,
                  n_class=10,
@@ -17,7 +16,7 @@ class EdenAIModelWrapper(ModelWrapper):
         self.threshold = threshold
         super().__init__(n_class, im_mean, im_std, take_sigmoid)
 
-    def forward(self, image: torch.Tensor) -> torch.Tensor:
+    def forward(self, image: torch.Tensor) -> torch.Tensor:  # type: ignore
         return self._predict_prob(image)
 
     def preprocess(self, image: torch.Tensor) -> torch.Tensor:
@@ -35,5 +34,5 @@ class EdenAIModelWrapper(ModelWrapper):
         predict = torch.gt(logits, self.threshold).to(torch.long)
         return predict
 
-    def predict_label_multiclass(self, _: torch.Tensor, verbose=False) -> torch.Tensor:
+    def predict_label_multiclass(self, image: torch.Tensor, verbose=False) -> torch.Tensor:
         raise NotImplementedError("Multi-class classification not implemented for EdenAI models")

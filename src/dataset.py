@@ -46,7 +46,7 @@ def load_imagenet_test_data(test_batch_size=1, folder='/data/imagenet/val') -> d
     torch.cuda.manual_seed(rand_seed)
     np.random.seed(rand_seed)
     random.seed(rand_seed)
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = True  # type: ignore
     val_loader = data.DataLoader(val_dataset, batch_size=test_batch_size, shuffle=True)
 
     return val_loader
@@ -70,7 +70,7 @@ def load_binary_imagenet_test_data(test_batch_size=1, data_dir=Path("/data/image
     torch.cuda.manual_seed(rand_seed)
     np.random.seed(rand_seed)
     random.seed(rand_seed)
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = True  # type: ignore
     val_loader: data.DataLoader = data.DataLoader(val_dataset, batch_size=test_batch_size, shuffle=True)
 
     return val_loader
@@ -92,18 +92,18 @@ def load_imagenet_nsfw_test_data(test_batch_size=1, indices_path: Optional[Path]
         return batch
 
     val_dataset = load_dataset("dedeswim/imagenet-nsfw", split="train")
-    val_dataset = val_dataset.with_transform(transform)
+    val_dataset = val_dataset.with_transform(transform)  # type: ignore
     if indices_path is not None:
         print(f"Filtering datasets keeping indices in {indices_path}")
         indices = np.load(indices_path)
-        val_dataset = val_dataset.select(indices)
+        val_dataset = val_dataset.select(indices)  # type: ignore
 
     rand_seed = 42
     torch.manual_seed(rand_seed)
     torch.cuda.manual_seed(rand_seed)
     np.random.seed(rand_seed)
     random.seed(rand_seed)
-    torch.backends.cudnn.deterministic = True
-    val_loader = data.DataLoader(val_dataset, batch_size=test_batch_size)
+    torch.backends.cudnn.deterministic = True  # type: ignore
+    val_loader = data.DataLoader(val_dataset, batch_size=test_batch_size)  # type: ignore
 
     return val_loader
