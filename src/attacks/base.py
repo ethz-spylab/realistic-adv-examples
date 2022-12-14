@@ -66,7 +66,7 @@ class DirectionAttack(BaseAttack, abc.ABC):
             raise ValueError("Search works only on batched inputs of batch size 1.")
 
     def get_x_adv(self, x: torch.Tensor, v: torch.Tensor, d: float) -> torch.Tensor:
-        if self.discrete:
+        if self.discrete and not np.isinf(d):
             assert int(d) == d
             d = d / 255
         out: torch.Tensor = x + d * v  # type: ignore
