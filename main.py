@@ -70,7 +70,7 @@ class AttackResults:
               f"median bad queries: {np.median(np.array(self._get_overall_unsafe_queries())):.4f} "
               f"asr: {np.mean(np.array(self.asr)):.4f} \n")
 
-    def get_results_dict(self) -> dict[str, float]:
+    def get_aggregated_results_dict(self) -> dict[str, float]:
         results_dict = {
             "asr": self.asr,
             "distortion": np.mean(np.array(self.distances)),
@@ -93,16 +93,34 @@ class AttackResults:
 
     def save_results(self, out_dir: Path):
         with open(out_dir / "aggregated_results.json", 'w') as f:
-            json.dump(self.get_results_dict(), f, indent=4)
-        # with open(out_dir / "full_results.json", 'w') as f:
-        #     json.dump(dataclasses.asdict(self), f, indent=4)
+            json.dump(self.get_aggregated_results_dict(), f, indent=4)
+        with open(out_dir / "full_results.json", 'w') as f:
+            json.dump(self.get_full_results_dict(), f, indent=4)
         np.save(out_dir / "distances.npy", np.array(self.distances))
         np.save(out_dir / "queries.npy", np.array(self._get_overall_queries()))
         np.save(out_dir / "unsafe_queries.npy", np.array(self._get_overall_unsafe_queries()))
         np.save(out_dir / "failed_distances.npy", np.array(self.failed_distances))
         np.save(out_dir / "failed_queries.npy", np.array(self._get_overall_failed_queries()))
         np.save(out_dir / "failed_unsafe_queries.npy", np.array(self._get_overall_failed_unsafe_queries()))
-        print(f"Saved results to {out_dir}.")
+        print(f"Saved results to {out_dir}")
+
+    def get_full_results_dict(self) -> dict[str, float | list[float]]:
+        d = {
+            "successes": self.successes,
+            "distances": self.distances,
+            "failures": self.failures,
+            "failed_distances": self.failed_distances,
+        }
+        
+        aggregated_queries, aggregated_unsafe_queries = aggregate_queries_counters_list(self.queries_counters)
+        for phase, queries_list in aggregated_queries.items():
+            d[f"queries_{phase}"] = queries_list
+        for phase, queries_list in aggregated_unsafe_queries.items():
+            d[f"unsafe_queries_{phase}"] = queries_list
+        for key, value_list in aggregate_extra_results(self.extra_results).items():
+            d[f"{key}"] = value_list
+
+        return d
 
     @property
     def asr(self) -> float:
