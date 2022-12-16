@@ -13,8 +13,8 @@ from torchvision import models as models
 from torchvision.models import ResNet50_Weights
 
 from src import dataset
-from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model
-from src.attacks import RayS
+from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, resnet50_cifar10
+from src.attacks import RayS, HSJA
 from src.attacks.base import BaseAttack, Bounds, SearchMode
 from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper
 
@@ -27,7 +27,17 @@ DISTANCES = {"linf": linf, "l2": l2}
 
 
 def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWrapper, data.DataLoader]:
-    if args.dataset == 'resnet_imagenet':
+    if args.dataset == 'resnet_cifar10':
+        input_size = 32
+        num_classes = 10
+        channel = 3
+        inner_model = resnet50_cifar10.resnet_v2(input_shape=(input_size, input_size, channel),
+                                                 depth=20,
+                                                 num_classes=num_classes)
+        inner_model.load_weights("checkpoints/resnet_cifar10.hdf5")
+        test_loader = dataset.load_cifar10_test_data(args.batch)
+        model = TFModelWrapper(inner_model, n_class=10, channels_last=True)
+    elif args.dataset == 'resnet_imagenet':
         inner_model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).to(device).eval()
         inner_model = torch.nn.DataParallel(inner_model, device_ids=[0])
         test_loader = dataset.load_imagenet_test_data(args.batch)
@@ -90,14 +100,25 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "bounds": Bounds()
     }
     if args.attack == "rays":
+        if args.rays_flip_squares == '1' and args.rays_flip_rand_pixels == '1':
+            raise ValueError("`--flip-squares` cannot be `1` if also `--flip-rand-pixels` is `1`")
         attack_kwargs = {
             "early_stopping": args.early == '1',
             "search": SearchMode(args.search),
             "line_search_tol": args.line_search_tol,
-            "flip_squares": args.flip_squares == '1',
-            "flip_rand_pixels": args.flip_rand_pixels == '1'
+            "flip_squares": args.rays_flip_squares == '1',
+            "flip_rand_pixels": args.rays_flip_rand_pixels == '1'
         }
         return RayS(**base_attack_kwargs, **attack_kwargs)
+    if args.attack == "hsja":
+        attack_kwargs = {
+            "num_iterations": args.hsja_num_iterations,
+            "stepsize_search": args.hsja_stepsize_search,
+            "max_num_evals": args.hsja_max_num_evals,
+            "init_num_evals": args.hsja_init_num_evals,
+            "gamma": args.hsja_gamma,
+        }
+        return HSJA(**base_attack_kwargs, **attack_kwargs)
     else:
         raise ValueError(f"Invalid attack: `{args.attack}`")
 

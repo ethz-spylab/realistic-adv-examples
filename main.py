@@ -47,7 +47,7 @@ class AttackResults:
     failed_extra_results: list[dict[str, float]] = dataclasses.field(default_factory=list)
 
     def update_with_success(self, distance: float, queries_counter: QueriesCounter,
-                            extra_results: dict[str, float]) -> "AttackResults":
+                            extra_results: dict[str, float | int]) -> "AttackResults":
         return dataclasses.replace(self,
                                    successes=self.successes + 1,
                                    distances=self.distances + [distance],
@@ -121,60 +121,9 @@ class AttackResults:
         return list(map(lambda counter: counter.total_unsafe_queries, self.failed_queries_counters))
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Hard Label Attacks')
-    parser.add_argument('--attack', default='rays', type=str, help='The attack to run')
-    parser.add_argument('--dataset', default='imagenet', type=str, help='Dataset')
-    parser.add_argument('--targeted', default='0', type=str, help='targeted or untargeted')
-    parser.add_argument('--norm', default='linf', type=str, help='Norm for attack, linf only')
-    parser.add_argument('--num', default=1000, type=int, help='Number of samples to be attacked from test dataset.')
-    parser.add_argument('--max-queries', default=10000, type=int, help='Maximum queries for the attack')
-    parser.add_argument('--batch', default=1, type=int, help='attack batch size.')
-    parser.add_argument('--epsilon', default=0.05, type=float, help='attack strength')
-    parser.add_argument('--early',
-                        default='1',
-                        type=str,
-                        help='early stopping (stop attack once the adversarial example is found)')
-    parser.add_argument('--search', default='binary', type=str, help='Type of search to use, binary or line')
-    parser.add_argument('--line-search-tol',
-                        default=None,
-                        type=float,
-                        help='Tolerance for line search w.r.t. previous iteration')
-    parser.add_argument(
-        '--out-dir',
-        default='/local/home/edebenedetti/exp-results/realistic-adv-examples/',
-        type=str,
-    )
-    parser.add_argument(
-        '--save-img-every',
-        default=None,
-        type=int,
-    )
-    parser.add_argument('--flip-squares',
-                        default='0',
-                        type=str,
-                        help='Whether the attack should flip squares and not chunks of a 1-d vector')
-    parser.add_argument('--flip-rand-pixels',
-                        default='0',
-                        type=str,
-                        help='Whether the attack should flip random pixels not chunks of a 1-d vector')
-    parser.add_argument('--discrete',
-                        default='0',
-                        type=str,
-                        help='Whether the attack should work in discrete space (i.e., int8)')
-    parser.add_argument('--strong-preprocessing',
-                        default='0',
-                        type=str,
-                        help='Whether strong preprocessing (i.e., JPEG, Resize, Crop) '
-                        'should be applied before feeding the image to the classifier')
-    parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
-    args = parser.parse_args()
-
+def main(args):
     targeted = True if args.targeted == '1' else False
     early_stopping = False if args.early == '0' else True
-
-    if args.flip_squares == '1' and args.flip_rand_pixels == '1':
-        raise ValueError("`--flip-squares` cannot be `1` if also `--flip-rand-pixels` is `1`")
 
     print(args)
 
@@ -238,4 +187,62 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Hard Label Attacks')
+    parser.add_argument('--attack', default='rays', type=str, help='The attack to run')
+    parser.add_argument('--dataset', default='imagenet', type=str, help='Dataset')
+    parser.add_argument('--targeted', default='0', type=str, help='targeted or untargeted')
+    parser.add_argument('--norm', default='linf', type=str, help='Norm for attack, linf only')
+    parser.add_argument('--num', default=1000, type=int, help='Number of samples to be attacked from test dataset.')
+    parser.add_argument('--max-queries', default=None, type=int, help='Maximum queries for the attack')
+    parser.add_argument('--batch', default=1, type=int, help='attack batch size.')
+    parser.add_argument('--epsilon', default=0.05, type=float, help='attack strength')
+    parser.add_argument('--early',
+                        default='1',
+                        type=str,
+                        help='early stopping (stop attack once the adversarial example is found)')
+    parser.add_argument('--search', default='binary', type=str, help='Type of search to use, binary or line')
+    parser.add_argument('--line-search-tol',
+                        default=None,
+                        type=float,
+                        help='Tolerance for line search w.r.t. previous iteration')
+    parser.add_argument(
+        '--out-dir',
+        default='/local/home/edebenedetti/exp-results/realistic-adv-examples/',
+        type=str,
+    )
+    parser.add_argument(
+        '--save-img-every',
+        default=None,
+        type=int,
+    )
+    parser.add_argument('--strong-preprocessing',
+                        default='0',
+                        type=str,
+                        help='Whether strong preprocessing (i.e., JPEG, Resize, Crop) '
+                        'should be applied before feeding the image to the classifier')
+    parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
+    parser.add_argument('--discrete',
+                        default='0',
+                        type=str,
+                        help='Whether the attack should work in discrete space (i.e., int8)')
+    parser.add_argument('--rays-flip-squares',
+                        default='0',
+                        type=str,
+                        help='Whether the attack should flip squares and not chunks of a 1-d vector')
+    parser.add_argument('--rays-flip-rand-pixels',
+                        default='0',
+                        type=str,
+                        help='Whether the attack should flip random pixels not chunks of a 1-d vector')
+    parser.add_argument('--hsja-num-iterations', default=64, type=int, help='Number of iterations for HSJA')
+    parser.add_argument('--hsja-stepsize-search',
+                        default='geometric_progression',
+                        type=str,
+                        help='Stepsize search for HSJA')
+    parser.add_argument('--hsja-max-num-evals', default=1e4, type=int, help='Max number of evaluations for HSJA')
+    parser.add_argument('--hsja-init-num-evals', default=100, type=int, help='Max number of evaluations for HSJA')
+    parser.add_argument('--hsja-gamma',
+                        default=1.0,
+                        type=float,
+                        help='gamma parameter for HSJA (used for the binary search threshold)')
+    _args = parser.parse_args()
+    main(_args)

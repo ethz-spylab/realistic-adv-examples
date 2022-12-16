@@ -16,6 +16,7 @@ class HSJAttackPhase(AttackPhase):
 
 class HSJA(PerturbationAttack):
     def __init__(self,
+                 epsilon: float | None,
                  distance: LpDistance,
                  bounds: Bounds,
                  discrete: bool,
@@ -24,7 +25,7 @@ class HSJA(PerturbationAttack):
                  stepsize_search: str = "geometric_progression",
                  max_num_evals: int = int(1e4),
                  init_num_evals: int = 100):
-        super().__init__(distance, bounds, discrete)
+        super().__init__(epsilon, distance, bounds, discrete)
         self.init_num_evals = init_num_evals
         self.max_num_evals = max_num_evals
         self.stepsize_search = stepsize_search
@@ -37,15 +38,17 @@ class HSJA(PerturbationAttack):
                  x: torch.Tensor,
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
-        return hsja(model, x, self.bounds.upper, self.bounds.lower, self.constraint, self.num_iterations, self.gamma,
-                    target, None, query_limit, self.stepsize_search, self.max_num_evals, self.init_num_evals)
+                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+        return hsja(model, x, label, self.bounds.upper, self.bounds.lower, self.constraint, self.num_iterations,
+                    self.gamma, target, None, query_limit, self.stepsize_search, self.max_num_evals,
+                    self.init_num_evals)
 
     ...
 
 
 def hsja(model: ModelWrapper,
          sample: torch.Tensor,
+         original_label: torch.Tensor,
          clip_max: float = 1,
          clip_min: float = 0,
          constraint: str = 'l2',
@@ -57,7 +60,7 @@ def hsja(model: ModelWrapper,
          stepsize_search: str = 'geometric_progression',
          max_num_evals: int = int(1e4),
          init_num_evals: int = 100,
-         verbose: bool = True) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
+         verbose: bool = True) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
     """
     Main algorithm for HopSkipJumpAttack.
 
@@ -83,8 +86,9 @@ def hsja(model: ModelWrapper,
         Output:
         perturbed image.
         """
-    # Set parameters
-    original_label = model.predict_label(sample)
+    # The attack works on a single image.
+    sample = sample[0]
+
     params = {
         'clip_max': clip_max,
         'clip_min': clip_min,
@@ -107,6 +111,7 @@ def hsja(model: ModelWrapper,
         params['theta'] = params['gamma'] / (math.sqrt(params['d']) * params['d'])
     else:
         params['theta'] = params['gamma'] / (params['d']**2)
+    params['theta'] = torch.tensor([params['theta']], device=sample.device)
 
     queries_counter = QueriesCounter(max_queries)
 
@@ -147,7 +152,6 @@ def hsja(model: ModelWrapper,
             # Binary search to return to the boundary.
             perturbed, dist_post_update, queries_counter = binary_search_batch(sample, perturbed[None], model, params,
                                                                                queries_counter)
-
         elif params['stepsize_search'] == 'grid_search':
             # Grid search for stepsize.
             epsilons = torch.logspace(-4, 0, steps=20) * dist
@@ -165,13 +169,14 @@ def hsja(model: ModelWrapper,
         # compute new distance.
         dist = compute_distance(perturbed, sample, constraint)
         if verbose:
-            print('iteration: {:d}, {:s} distance {:.4E}'.format(j + 1, constraint, dist))
+            print('iteration: {:d}, {:s} distance {:.4E}, total queries {:.4f} total unsafe queries {:.4f}'.format(
+                j + 1, constraint, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
 
         if queries_counter.is_out_of_queries():
             print("Out of queries")
             break
 
-    return perturbed, queries_counter, dist, queries_counter.is_out_of_queries(), {}
+    return perturbed, queries_counter, dist, not queries_counter.is_out_of_queries(), {}
 
 
 def decision_function(model: ModelWrapper, images: torch.Tensor, params, queries_counter: QueriesCounter,
@@ -190,15 +195,15 @@ def decision_function(model: ModelWrapper, images: torch.Tensor, params, queries
     return success, queries_counter.increase(attack_phase, safe=success)  # type: ignore
 
 
-def clip_image(image: torch.Tensor, clip_min: float | torch.Tensor, clip_max: float | torch.Tensor):
+def clip_image(image: torch.Tensor, clip_min: float | torch.Tensor, clip_max: float | torch.Tensor) -> torch.Tensor:
     # Clip an image, or an image batch, with upper and lower threshold.
-    return torch.minimum(torch.maximum(image, clip_min), clip_max)  # type: ignore
+    return torch.clamp(image, clip_min, clip_max)  # type: ignore
 
 
 def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, constraint: str = 'l2') -> float:
     # Compute the distance between two images.
     if constraint == 'l2':
-        return torch.linalg.norm(x_ori - x_pert).item()
+        return torch.linalg.norm((x_ori - x_pert), dim=None).item()
     elif constraint == 'linf':
         return torch.max(abs(x_ori - x_pert)).item()
     else:
@@ -239,7 +244,7 @@ def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: i
         gradf = torch.mean(fval * rv, dim=0)
 
     # Get the gradient direction.
-    gradf = gradf / torch.linalg.norm(gradf)
+    gradf = gradf / torch.linalg.norm(gradf, dim=None)
 
     return gradf, updated_queries_counter
 
@@ -261,9 +266,10 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
     """ Binary search to approach the boundary."""
 
     # Compute distance between each of perturbed image and original image.
-    dists_post_update = torch.Tensor([
+    dists_post_update = torch.tensor([
         compute_distance(original_image, perturbed_image, params['constraint']) for perturbed_image in perturbed_images
-    ])
+    ],
+                                     device=original_image.device)
 
     highs: torch.Tensor
     lows: torch.Tensor
@@ -273,10 +279,13 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
         # Stopping criteria.
         thresholds = torch.minimum(dists_post_update * params['theta'], params['theta'])
     else:
-        highs = torch.ones(len(perturbed_images))
+        highs = torch.ones(len(perturbed_images), device=original_image.device)
         thresholds = params['theta']
 
-    lows = torch.zeros(len(perturbed_images))
+    lows = torch.zeros(len(perturbed_images), device=original_image.device)
+
+    # use this variable to check when mids stays constant and the BS has converged
+    old_mids = highs
 
     # Call recursive function.
     while torch.max((highs - lows) / thresholds) > 1:
@@ -290,11 +299,18 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
         lows = torch.where(decisions == 0, mids, lows)  # type: ignore
         highs = torch.where(decisions == 1, mids, highs)  # type: ignore
 
+        # check of there is no more progress due to numerical imprecision
+        reached_numerical_precision = (old_mids == mids).all()
+        old_mids = mids
+
+        if reached_numerical_precision:
+            break
+
     out_images = project(original_image, perturbed_images, highs, params)
 
     # Compute distance of the output image to select the best choice.
     # (only used when stepsize_search is grid_search.)
-    dists = torch.Tensor(
+    dists = torch.tensor(
         [compute_distance(original_image, out_image, params['constraint']) for out_image in out_images])
     idx = torch.argmin(dists)
 

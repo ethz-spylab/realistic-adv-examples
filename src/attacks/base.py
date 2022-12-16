@@ -18,7 +18,8 @@ class Bounds(NamedTuple):
 
 
 class BaseAttack(abc.ABC):
-    def __init__(self, distance: LpDistance, bounds: Bounds, discrete: bool):
+    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool):
+        self.epsilon = epsilon
         self.discrete = discrete
         self.bounds = bounds
         self.distance = distance
@@ -39,7 +40,7 @@ class BaseAttack(abc.ABC):
                  x: torch.Tensor,
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, int]]:
+                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
         ...
 
 
@@ -56,8 +57,9 @@ class DirectionAttack(BaseAttack, abc.ABC):
     init_line_search_radius = 10
     n_early_stopping = 0
 
-    def __init__(self, distance: LpDistance, bounds: Bounds, discrete: bool, line_search_tol: float | None):
-        super().__init__(distance, bounds, discrete)
+    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
+                 line_search_tol: float | None):
+        super().__init__(epsilon, distance, bounds, discrete)
         self.line_search_tol = line_search_tol
 
     @staticmethod

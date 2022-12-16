@@ -26,7 +26,7 @@ def load_mnist_test_data(test_batch_size=1) -> data.DataLoader:
 
 def load_cifar10_test_data(test_batch_size=1) -> data.DataLoader:
     # CIFAR10 Dataset
-    test_dataset = dsets.CIFAR10('./data/cifar10-py', download=True, train=False, transform=transforms.ToTensor())
+    test_dataset = dsets.CIFAR10('/data', download=True, train=False, transform=transforms.ToTensor())
     test_loader = data.DataLoader(dataset=test_dataset, batch_size=test_batch_size, shuffle=False)
 
     return test_loader

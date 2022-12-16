@@ -21,8 +21,8 @@ class BinaryResNet50(LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
-    def training_step(self, train_batch: tuple[torch.Tensor, torch.Tensor],
-                      batch_idx: int) -> torch.Tensor:  # type: ignore
+    def training_step(  # type: ignore
+            self, train_batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         x, y = train_batch
         y_hat = self.model(x)
         loss = F.binary_cross_entropy_with_logits(y_hat.flatten(), y)

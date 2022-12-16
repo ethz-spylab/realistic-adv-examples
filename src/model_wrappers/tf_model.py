@@ -10,12 +10,17 @@ class TFModelWrapper(ModelWrapper):
                  n_class: int = 10,
                  im_mean: MeanStdType = None,
                  im_std: MeanStdType = None,
-                 take_sigmoid: bool = True):
+                 take_sigmoid: bool = True,
+                 channels_last: bool = False):
         self._model = model
         super().__init__(n_class, im_mean, im_std, take_sigmoid)
+        self.channels_last = channels_last
 
     def preprocess(self, image: torch.Tensor) -> torch.Tensor:
-        processed = image
+        if self.channels_last:
+            processed = image.permute(0, 2, 3, 1)
+        else:
+            processed = image
         if self.im_mean is not None and self.im_std is not None:
             processed = (image - self.im_mean) / self.im_std
         return processed
