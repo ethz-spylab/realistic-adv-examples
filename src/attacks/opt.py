@@ -31,12 +31,11 @@ class OPT(DirectionAttack):
                  distance: LpDistance,
                  bounds: Bounds,
                  discrete: bool,
-                 line_search_tol: float | None,
                  max_iter: int,
                  alpha: float,
                  beta: float,
                  substract_steps: int = 0):
-        super().__init__(epsilon, distance, bounds, discrete, line_search_tol)
+        super().__init__(epsilon, distance, bounds, discrete)
         self.query_limit = max_iter - substract_steps
         self.num_directions = 100 if distance == l2 else 500
         # TODO: we may need a better way for controlling number of queries
