@@ -6,7 +6,7 @@ import torch
 from foolbox.distances import LpDistance
 
 from src.attacks.base import Bounds
-from src.attacks.opt import normalize, OPT, OPTAttackPhase
+from src.attacks.opt import OPT, OPTAttackPhase, normalize
 from src.attacks.queries_counter import QueriesCounter
 from src.model_wrappers import ModelWrapper
 
@@ -14,7 +14,6 @@ start_learning_rate = 1.0
 
 
 class SignOPT(OPT):
-
     def __init__(
         self,
         epsilon: float | None,

@@ -5,7 +5,6 @@ from src.model_wrappers.general_model import MeanStdType, ModelWrapper
 
 
 class EdenAIModelWrapper(ModelWrapper):
-
     def __init__(self,
                  model: EdenAINSFWModel,
                  n_class=10,

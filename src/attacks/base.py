@@ -17,7 +17,6 @@ class Bounds(NamedTuple):
 
 
 class BaseAttack(abc.ABC):
-
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool):
         self.epsilon = epsilon
         self.discrete = discrete
@@ -63,7 +62,6 @@ class DirectionAttack(BaseAttack, abc.ABC):
     """
     Base class for attacks which optimize a direction instead of the perturbation directly
     """
-
     def get_x_adv(self, x: torch.Tensor, v: torch.Tensor, d: float) -> torch.Tensor:
         if self.discrete and not np.isinf(d):
             assert int(d) == d
@@ -74,7 +72,6 @@ class DirectionAttack(BaseAttack, abc.ABC):
 
 
 class PerturbationAttack(BaseAttack, abc.ABC):
-
     def get_x_adv(self, x: torch.Tensor, delta: torch.Tensor) -> torch.Tensor:
         if self.discrete:
             assert torch.round(delta) == delta

@@ -14,7 +14,7 @@ from torchvision.models import ResNet50_Weights
 
 from src import dataset
 from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, resnet50_cifar10
-from src.attacks import RayS, HSJA, OPT, SignOPT
+from src.attacks import HSJA, OPT, RayS, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
 from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper
 

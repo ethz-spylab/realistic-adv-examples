@@ -1,8 +1,9 @@
 import math
+
 import torch
 from foolbox.distances import LpDistance
 
-from src.attacks.base import PerturbationAttack, Bounds
+from src.attacks.base import Bounds, PerturbationAttack
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
 from src.model_wrappers import ModelWrapper
 
@@ -15,7 +16,6 @@ class HSJAttackPhase(AttackPhase):
 
 
 class HSJA(PerturbationAttack):
-
     def __init__(self,
                  epsilon: float | None,
                  distance: LpDistance,

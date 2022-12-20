@@ -7,7 +7,6 @@ MeanStdType = tuple[float, float, float] | None
 
 
 class ModelWrapper(nn.Module, metaclass=abc.ABCMeta):
-
     def __init__(self,
                  n_class: int = 10,
                  im_mean: MeanStdType = None,

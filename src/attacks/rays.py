@@ -6,9 +6,7 @@ import torch
 from foolbox.distances import LpDistance
 from torchvision.transforms.functional import rotate
 
-from attacks.base import DirectionAttackPhase
-
-from src.attacks.base import Bounds, DirectionAttack, SearchMode
+from src.attacks.base import Bounds, DirectionAttack, DirectionAttackPhase, SearchMode
 from src.attacks.queries_counter import QueriesCounter
 from src.model_wrappers import ModelWrapper
 

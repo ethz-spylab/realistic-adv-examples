@@ -8,7 +8,6 @@ from torchvision import models
 
 
 class BinaryResNet50(LightningModule):
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
