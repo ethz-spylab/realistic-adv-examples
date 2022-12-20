@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from attacks.queries_counter import QueriesCounter
+from src.attacks.queries_counter import QueriesCounter
 
 
 @dataclasses.dataclass

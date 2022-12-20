@@ -2,9 +2,9 @@ import numpy as np
 import torch
 from foolbox.distances import LpDistance, l2
 
-from attacks.base import DirectionAttack, Bounds
-from attacks.queries_counter import QueriesCounter, AttackPhase
-from model_wrappers import ModelWrapper
+from src.attacks.base import DirectionAttack, Bounds
+from src.attacks.queries_counter import QueriesCounter, AttackPhase
+from src.model_wrappers import ModelWrapper
 
 
 class OPTAttackPhase(AttackPhase):

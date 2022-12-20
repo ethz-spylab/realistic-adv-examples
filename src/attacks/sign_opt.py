@@ -5,10 +5,10 @@ import numpy as np
 import torch
 from foolbox.distances import LpDistance
 
-from attacks.base import Bounds
-from attacks.opt import normalize, OPT, OPTAttackPhase
-from attacks.queries_counter import QueriesCounter
-from model_wrappers import ModelWrapper
+from src.attacks.base import Bounds
+from src.attacks.opt import normalize, OPT, OPTAttackPhase
+from src.attacks.queries_counter import QueriesCounter
+from src.model_wrappers import ModelWrapper
 
 start_learning_rate = 1.0
 

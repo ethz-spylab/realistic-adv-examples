@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from dotenv import load_dotenv
 
-from attack_results import AttackResults
+from src.attack_results import AttackResults
 from src.setup import setup_attack, setup_model_and_data, setup_out_dir
 
 load_dotenv()
