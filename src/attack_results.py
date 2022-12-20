@@ -36,6 +36,7 @@ class AttackResults:
 
     def log_results(self, idx: int):
         print(f"index: {idx:4d} avg dist: {np.mean(np.array(self.distances)):.4f} "
+              f"median dist: {np.median(np.array(self.distances)):.4f} "
               f"avg queries: {np.mean(np.array(self._get_overall_queries())):.4f} "
               f"median queries: {np.median(np.array(self._get_overall_queries())):.4f} "
               f"avg bad queries: {np.mean(np.array(self._get_overall_unsafe_queries())):.4f} "

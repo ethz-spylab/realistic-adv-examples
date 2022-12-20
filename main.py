@@ -1,5 +1,8 @@
 import argparse
 
+import lovely_tensors as lt
+lt.monkey_patch()
+
 import numpy as np
 import torch
 from dotenv import load_dotenv

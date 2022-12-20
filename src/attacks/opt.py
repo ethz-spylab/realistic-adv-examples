@@ -10,6 +10,7 @@ from src.model_wrappers import ModelWrapper
 class OPTAttackPhase(AttackPhase):
     direction_search = "direction_search"
     binary_search = "binary_search"
+    direction_probing = "direction_probing"
     gradient_estimation = "gradient_estimation"
 
 
@@ -36,11 +37,10 @@ class OPT(DirectionAttack):
                  beta: float,
                  substract_steps: int = 0):
         super().__init__(epsilon, distance, bounds, discrete)
-        self.query_limit = max_iter - substract_steps
         self.num_directions = 100 if distance == l2 else 500
         # TODO: we may need a better way for controlling number of queries
         # Can't exactly set max query for line search / binary search
-        self.iterations = self.query_limit - self.num_directions
+        self.iterations = max_iter
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
 
@@ -246,7 +246,6 @@ class OPT(DirectionAttack):
             if diff <= lbd_hi - lbd_lo:
                 break
             diff = lbd_hi - lbd_lo
-
         return lbd_hi, queries_counter
 
     def fine_grained_binary_search(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, theta: torch.Tensor,
@@ -255,7 +254,7 @@ class OPT(DirectionAttack):
         if initial_lbd > current_best:
             x_adv = self.get_x_adv(x, theta, current_best)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, None, queries_counter,
-                                                                     OPTAttackPhase.binary_search)
+                                                                     OPTAttackPhase.direction_probing)
             if not success.item():
                 return float('inf'), queries_counter
             lbd = current_best

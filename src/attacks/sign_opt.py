@@ -31,7 +31,6 @@ class SignOPT(OPT):
         super().__init__(epsilon, distance, bounds, discrete, max_iter, alpha, beta, substract_steps)
         self.num_grad_queries = num_grad_queries  # Num queries for grad estimate (default: 200)
         self.num_directions = 100
-        self.iterations = int(np.ceil((self.query_limit - self.num_directions) / self.num_grad_queries))
         self.momentum = momentum  # (default: 0)
         if grad_batch_size is not None:
             self.grad_batch_size = min(grad_batch_size, self.num_grad_queries)
@@ -71,7 +70,7 @@ class SignOPT(OPT):
             theta = torch.randn_like(x)
             success, queries_counter = self.is_correct_boundary_side(model, x + theta, y, None, queries_counter,
                                                                      OPTAttackPhase.direction_search)
-            if not success.item():
+            if success.item():
                 theta, initial_lbd = normalize(theta)
                 lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd, g_theta,
                                                                        queries_counter)
@@ -83,6 +82,8 @@ class SignOPT(OPT):
         if g_theta == float("inf"):
             print("Failed to find a good initial direction.")
             return x, queries_counter, float("inf"), False, {}
+        else:
+            assert best_theta is not None
 
         if self.verbose:
             print("==========> Found best distortion %.4f "
@@ -94,8 +95,16 @@ class SignOPT(OPT):
         best_pert = gg * xg
         vg = torch.zeros_like(xg)
         alpha, beta = self.alpha, self.beta
+
         for i in range(self.iterations):
-            sign_gradient, queries_counter = self.sign_grad_v2(model, x, y, None, xg, gg, queries_counter, h=beta)
+            sign_gradient, queries_counter = self.sign_grad_v2(model,
+                                                               x.squeeze(0),
+                                                               y,
+                                                               None,
+                                                               xg.squeeze(0),
+                                                               initial_lbd=gg,
+                                                               queries_counter=queries_counter,
+                                                               h=beta)
 
             # Line search
             min_theta = xg
@@ -120,7 +129,7 @@ class SignOPT(OPT):
                     min_theta = new_theta
                     min_g2 = new_g2
                     if self.momentum > 0:
-                        min_vg = new_vg
+                        min_vg = new_vg  # type: ignore
                 else:
                     break
 
@@ -177,7 +186,7 @@ class SignOPT(OPT):
 
         x_adv = self.get_x_adv(x, xg, gg)
 
-        return x_adv, queries_counter, gg, not queries_counter.is_out_of_queries(), {}
+        return x_adv, queries_counter, gg.item(), not queries_counter.is_out_of_queries(), {}
 
     def sign_grad_v2(self,
                      model,
@@ -196,7 +205,7 @@ class SignOPT(OPT):
         num_batches = int(np.ceil(self.num_grad_queries / self.grad_batch_size))
         assert num_batches * self.grad_batch_size == self.num_grad_queries
         x = x.unsqueeze(0)
-        x_temp = x + initial_lbd * theta
+        x_temp = self.get_x_adv(x, theta, initial_lbd)
 
         for _ in range(num_batches):
             u = torch.randn((self.grad_batch_size, ) + theta.shape, dtype=theta.dtype, device=x.device)
@@ -206,16 +215,16 @@ class SignOPT(OPT):
             new_theta: torch.Tensor = theta + h * u  # type: ignore
             new_theta, _ = normalize(new_theta, batch=True)
 
-            x = self.get_x_adv(x, new_theta, initial_lbd)
-            u = x - x_temp
-            out, queries_counter = self.is_correct_boundary_side(model, x, y, target, queries_counter,
+            x_ = self.get_x_adv(x, new_theta, initial_lbd)
+            u = x_ - x_temp
+            out, queries_counter = self.is_correct_boundary_side(model, x_, y, target, queries_counter,
                                                                  OPTAttackPhase.gradient_estimation)
             if target is not None:
                 # Targeted case
-                sign_v[out == y] = -1
+                sign_v[out] = -1
             else:
                 # Untargeted case
-                sign_v[out != y] = -1
+                sign_v[out] = -1
 
             sign_grad += (u.sign() * sign_v).sum(0)
 
