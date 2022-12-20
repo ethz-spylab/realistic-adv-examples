@@ -15,6 +15,7 @@ class HSJAttackPhase(AttackPhase):
 
 
 class HSJA(PerturbationAttack):
+
     def __init__(self,
                  epsilon: float | None,
                  distance: LpDistance,

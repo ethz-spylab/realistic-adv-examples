@@ -122,7 +122,7 @@ if __name__ == "__main__":
                         default='0',
                         type=str,
                         help='Whether the attack should flip random pixels not chunks of a 1-d vector')
-    parser.add_argument('--hsja-num-iterations', default=64, type=int, help='Number of iterations for HSJA')
+    parser.add_argument('--max-iter', default=64, type=int, help='Number of iterations for HSJA')
     parser.add_argument('--hsja-stepsize-search',
                         default='geometric_progression',
                         type=str,
@@ -133,5 +133,16 @@ if __name__ == "__main__":
                         default=1.0,
                         type=float,
                         help='gamma parameter for HSJA (used for the binary search threshold)')
+    parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
+    parser.add_argument('--opt-beta', default=0.001, type=float, help='beta parameter for OPT and Sign OPT')
+    parser.add_argument('--sign-opt-num-grad-queries',
+                        default=200,
+                        type=int,
+                        help='Number of gradient queries for Sign OPT')
+    parser.add_argument('--sign-opt-grad-bs',
+                        default=100,
+                        type=int,
+                        help='Batch size for gradient queries for Sign OPT')
+    parser.add_argument('--sign-opt-momentum', default=0., type=float, help='Momentum for Sign OPT')
     _args = parser.parse_args()
     main(_args)

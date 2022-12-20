@@ -14,7 +14,7 @@ from torchvision.models import ResNet50_Weights
 
 from src import dataset
 from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, resnet50_cifar10
-from src.attacks import RayS, HSJA
+from src.attacks import RayS, HSJA, OPT, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
 from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper
 
@@ -112,13 +112,26 @@ def setup_attack(args: Namespace) -> BaseAttack:
         return RayS(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "hsja":
         attack_kwargs = {
-            "num_iterations": args.hsja_num_iterations,
+            "num_iterations": args.max_iter,
             "stepsize_search": args.hsja_stepsize_search,
             "max_num_evals": args.hsja_max_num_evals,
             "init_num_evals": args.hsja_init_num_evals,
             "gamma": args.hsja_gamma,
         }
         return HSJA(**base_attack_kwargs, **attack_kwargs)
+    if args.attack == "opt":
+        attack_kwargs = {"max_iter": args.max_iter, "alpha": args.opt_alpha, "beta": args.opt_beta}
+        return OPT(**base_attack_kwargs, **attack_kwargs)
+    if args.attack == "sign_opt":
+        attack_kwargs = {
+            "max_iter": args.max_iter,
+            "alpha": args.opt_alpha,
+            "beta": args.opt_beta,
+            "num_grad_queries": args.sign_opt_num_grad_queries,
+            "grad_batch_size": args.sign_opt_grad_bs,
+            "momentum": args.sign_opt_momentum
+        }
+        return SignOPT(**base_attack_kwargs, **attack_kwargs)
     else:
         raise ValueError(f"Invalid attack: `{args.attack}`")
 
