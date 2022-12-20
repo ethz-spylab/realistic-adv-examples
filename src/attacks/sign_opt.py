@@ -20,7 +20,6 @@ class SignOPT(OPT):
         distance: LpDistance,
         bounds: Bounds,
         discrete: bool,
-        line_search_tol: float | None,
         max_iter: int,
         alpha: float,
         beta: float,
@@ -29,7 +28,7 @@ class SignOPT(OPT):
         substract_steps: int = 0,
         grad_batch_size: int | None = None,
     ):
-        super().__init__(epsilon, distance, bounds, discrete, line_search_tol, max_iter, alpha, beta, substract_steps)
+        super().__init__(epsilon, distance, bounds, discrete, max_iter, alpha, beta, substract_steps)
         self.num_grad_queries = num_grad_queries  # Num queries for grad estimate (default: 200)
         self.num_directions = 100
         self.iterations = int(np.ceil((self.query_limit - self.num_directions) / self.num_grad_queries))
