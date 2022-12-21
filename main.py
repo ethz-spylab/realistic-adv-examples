@@ -31,6 +31,7 @@ def main(args):
     count = 0
     misclassified = 0
     negatives = 0
+    
     for i, batch in enumerate(test_loader):
         if count == args.num:
             break
@@ -74,8 +75,9 @@ def main(args):
 
         count += 1
         attack_results.log_results(i)
-
-    attack_results.save_results(exp_out_dir)
+        attack_results.save_results(exp_out_dir)
+    
+    attack_results.save_results(exp_out_dir, verbose=True)
 
 
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ class AttackResults:
 
         return results_dict
 
-    def save_results(self, out_dir: Path):
+    def save_results(self, out_dir: Path, verbose: bool = False):
         with open(out_dir / "aggregated_results.json", 'w') as f:
             json.dump(self.get_aggregated_results_dict(), f, indent=4)
         with open(out_dir / "full_results.json", 'w') as f:
@@ -75,7 +75,8 @@ class AttackResults:
         np.save(out_dir / "failed_distances.npy", np.array(self.failed_distances))
         np.save(out_dir / "failed_queries.npy", np.array(self._get_overall_failed_queries()))
         np.save(out_dir / "failed_unsafe_queries.npy", np.array(self._get_overall_failed_unsafe_queries()))
-        print(f"Saved results to {out_dir}")
+        if verbose:
+            print(f"Saved results to {out_dir}")
 
     def get_full_results_dict(self) -> dict[str, float | list[float]]:
         d = {

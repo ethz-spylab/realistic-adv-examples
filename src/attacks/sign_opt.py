@@ -217,14 +217,9 @@ class SignOPT(OPT):
 
             x_ = self.get_x_adv(x, new_theta, initial_lbd)
             u = x_ - x_temp
-            out, queries_counter = self.is_correct_boundary_side(model, x_, y, target, queries_counter,
+            success, queries_counter = self.is_correct_boundary_side(model, x_, y, target, queries_counter,
                                                                  OPTAttackPhase.gradient_estimation)
-            if target is not None:
-                # Targeted case
-                sign_v[out] = -1
-            else:
-                # Untargeted case
-                sign_v[out] = -1
+            sign_v[success] = -1
 
             sign_grad += (u.sign() * sign_v).sum(0)
 
