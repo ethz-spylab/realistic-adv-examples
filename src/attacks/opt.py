@@ -69,7 +69,7 @@ class OPT(DirectionAttack):
                     best_theta, g_theta = theta, lbd
                     self.log(f"---> Found distortion {g_theta:.4f}")
 
-        if np.isinf(g_theta):
+        if g_theta == float("inf"):
             # TODO: is this just trying the exact same again?
             best_theta, g_theta = None, float("inf")
             self.log(f"Searching for the initial direction on {self.num_directions} random directions")
@@ -88,12 +88,13 @@ class OPT(DirectionAttack):
 
         if g_theta == float("inf"):
             self.log("Couldn't find valid initial, failed")
-            return x
+            return x, queries_counter, float("inf"), False, {}
 
         self.log(f"====> Found best distortion {g_theta:.4f} using {queries_counter.total_queries} "
                  f"queries and {queries_counter.total_unsafe_queries} extra queries")
 
         g1 = 1.0
+        assert best_theta is not None
         theta, g2 = best_theta, g_theta
         for i in range(self.iterations):
             q = 10
@@ -182,9 +183,9 @@ class OPT(DirectionAttack):
 
             prev_best_theta = best_theta.clone()
 
-        target = model.predict_label(self.get_x_adv(x, prev_best_theta, g_theta))
+        target = model.predict_label(self.get_x_adv(x, prev_best_theta, g_theta)).item()
 
-        self.log(f"\nAdversarial example found: distortion {g_theta:.4f} target {target} queries "
+        self.log(f"\nAdversarial example found: distortion {g_theta:.4f} predicted class {target} queries "
                  f"{queries_counter.total_queries}, unsafe queries: {queries_counter.total_unsafe_queries}")
 
         distance: float = (x + g_theta * prev_best_theta - x).norm().item()
