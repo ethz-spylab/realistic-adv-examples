@@ -117,6 +117,7 @@ def setup_attack(args: Namespace) -> BaseAttack:
             "max_num_evals": args.hsja_max_num_evals,
             "init_num_evals": args.hsja_init_num_evals,
             "gamma": args.hsja_gamma,
+            "fixed_delta": args.hsja_delta,
         }
         return HSJA(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "opt":

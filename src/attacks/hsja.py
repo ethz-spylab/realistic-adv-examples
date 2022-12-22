@@ -23,6 +23,7 @@ class HSJA(PerturbationAttack):
                  discrete: bool,
                  num_iterations: int,
                  gamma: float = 1.0,
+                 fixed_delta: float | None = None,
                  stepsize_search: str = "geometric_progression",
                  max_num_evals: int = int(1e4),
                  init_num_evals: int = 100):
@@ -33,6 +34,7 @@ class HSJA(PerturbationAttack):
         self.gamma = gamma
         self.num_iterations = num_iterations
         self.constraint = 'l2' if distance.p == 2 else 'linf'
+        self.fixed_delta = fixed_delta
 
     def __call__(self,
                  model: ModelWrapper,
@@ -41,7 +43,7 @@ class HSJA(PerturbationAttack):
                  target: torch.Tensor | None = None,
                  query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
         return hsja(model, x, label, self.bounds.upper, self.bounds.lower, self.constraint, self.num_iterations,
-                    self.gamma, target, None, query_limit, self.stepsize_search, self.max_num_evals,
+                    self.gamma, self.fixed_delta, target, None, query_limit, self.stepsize_search, self.max_num_evals,
                     self.init_num_evals)
 
     ...
@@ -55,6 +57,7 @@ def hsja(model: ModelWrapper,
          constraint: str = 'l2',
          num_iterations: int = 40,
          gamma: float = 1.0,
+         fixed_delta: float | None = None,
          target_label: torch.Tensor | None = None,
          target_image: torch.Tensor | None = None,
          max_queries: int | None = None,
@@ -105,6 +108,7 @@ def hsja(model: ModelWrapper,
         'max_num_evals': max_num_evals,
         'init_num_evals': init_num_evals,
         'verbose': verbose,
+        'fixed_delta': fixed_delta,
     }
 
     # Set binary search threshold.
@@ -170,7 +174,7 @@ def hsja(model: ModelWrapper,
         # compute new distance.
         dist = compute_distance(perturbed, sample, constraint)
         if verbose:
-            print('iteration: {:d}, {:s} distance {:.4E}, total queries {:.4f} total unsafe queries {:.4f}'.format(
+            print('iteration: {:d}, {:s} distance {:.4f}, total queries {:.4f} total unsafe queries {:.4f}'.format(
                 j + 1, constraint, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
 
         if queries_counter.is_out_of_queries():
@@ -211,7 +215,7 @@ def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, constraint: str 
         raise ValueError(f'Unknown constraint {constraint}.')
 
 
-def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta, params,
+def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta: float, params,
                          queries_counter: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
     clip_max, clip_min = params['clip_max'], params['clip_min']
 
@@ -394,13 +398,16 @@ def select_delta(params, dist_post_update: float) -> float:
     between x and perturbed sample.
 
     """
+    if params['fixed_delta'] is not None:
+        return params['fixed_delta']
+
     if params['cur_iter'] == 1:
         delta = 0.1 * (params['clip_max'] - params['clip_min'])
     else:
         if params['constraint'] == 'l2':
-            delta = math.sqrt(params['d']) * params['theta'] * dist_post_update
+            delta = (math.sqrt(params['d']) * params['theta'] * dist_post_update).item()
         elif params['constraint'] == 'linf':
-            delta = params['d'] * params['theta'] * dist_post_update
+            delta = (params['d'] * params['theta'] * dist_post_update).item()
         else:
             raise ValueError(f"Unknown constraint {params['constraint']}")
 

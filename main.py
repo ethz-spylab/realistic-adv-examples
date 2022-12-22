@@ -1,6 +1,7 @@
 import argparse
 
 import lovely_tensors as lt
+
 lt.monkey_patch()
 
 import numpy as np
@@ -31,7 +32,7 @@ def main(args):
     count = 0
     misclassified = 0
     negatives = 0
-    
+
     for i, batch in enumerate(test_loader):
         if count == args.num:
             break
@@ -76,7 +77,7 @@ def main(args):
         count += 1
         attack_results.log_results(i)
         attack_results.save_results(exp_out_dir)
-    
+
     attack_results.save_results(exp_out_dir, verbose=True)
 
 
@@ -138,6 +139,11 @@ if __name__ == "__main__":
                         default=1.0,
                         type=float,
                         help='gamma parameter for HSJA (used for the binary search threshold)')
+    parser.add_argument('--hsja-delta',
+                        default=None,
+                        type=float,
+                        help='Whether to use a fixed delta for gradient estimation in HSJA, '
+                        'an adaptive delta is used if this is None')
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
     parser.add_argument('--opt-beta', default=0.001, type=float, help='beta parameter for OPT and Sign OPT')
     parser.add_argument('--sign-opt-num-grad-queries',
