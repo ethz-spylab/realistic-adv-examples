@@ -113,7 +113,7 @@ def resnet_v2(input_shape, depth, num_classes=10):
                              num_filters=num_filters_in,
                              kernel_size=1,
                              strides=strides,
-                             activation=activation,
+                             activation=activation,  # type: ignore
                              batch_normalization=batch_normalization,
                              conv_first=False)
 
@@ -126,12 +126,12 @@ def resnet_v2(input_shape, depth, num_classes=10):
                                  num_filters=num_filters_out,
                                  kernel_size=1,
                                  strides=strides,
-                                 activation=None,
+                                 activation=None,  # type: ignore
                                  batch_normalization=False)
 
             x = tf.keras.layers.add([x, y])
 
-        num_filters_in = num_filters_out
+        num_filters_in = num_filters_out  # type: ignore
 
     # Add classifier on top.
     # v2 has BN-ReLU before Pooling

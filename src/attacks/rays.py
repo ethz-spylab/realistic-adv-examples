@@ -6,7 +6,7 @@ import torch
 from foolbox.distances import LpDistance
 from torchvision.transforms.functional import rotate
 
-from src.attacks.base import Bounds, DirectionAttack, DirectionAttackPhase, SearchMode
+from src.attacks.base import Bounds, DirectionAttack, DirectionAttackPhase, ExtraResultsDict, SearchMode
 from src.attacks.queries_counter import QueriesCounter
 from src.model_wrappers import ModelWrapper
 
@@ -35,7 +35,7 @@ class RayS(DirectionAttack):
             x: torch.Tensor,
             y: torch.Tensor,
             target: torch.Tensor | None = None,
-            query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+            query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """ Attack the original image and return adversarial example
             model: (pytorch model)
             (x, y): original image
@@ -122,7 +122,7 @@ class RayS(DirectionAttack):
             "Iter %3d d_t %.6f queries %d bad queries %d" %
             (i + 1, best_distance, updated_queries_counter.total_queries, updated_queries_counter.total_unsafe_queries))
 
-        extra_results: dict[str, float | int] = {"search_early_stoppings": search_early_stoppings}
+        extra_results: ExtraResultsDict = {"search_early_stoppings": search_early_stoppings}
 
         return x_final, updated_queries_counter, best_distance, best_distance <= self.epsilon, extra_results
 
@@ -131,7 +131,7 @@ class RayS(DirectionAttack):
                  x: torch.Tensor,
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
-                 query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+                 query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         return self.attack_hard_label(model, x, label, target, query_limit)
 
     @staticmethod

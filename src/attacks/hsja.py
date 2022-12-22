@@ -3,7 +3,7 @@ import math
 import torch
 from foolbox.distances import LpDistance, l2, linf
 
-from src.attacks.base import Bounds, PerturbationAttack
+from src.attacks.base import Bounds, ExtraResultsDict, PerturbationAttack
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
 from src.model_wrappers import ModelWrapper
 from src.utils import compute_distance
@@ -41,7 +41,7 @@ class HSJA(PerturbationAttack):
                  x: torch.Tensor,
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         return hsja(model, x, label, self.bounds.upper, self.bounds.lower, self.distance, self.num_iterations,
                     self.gamma, self.fixed_delta, target, None, query_limit, self.stepsize_search, self.max_num_evals,
                     self.init_num_evals)
@@ -64,7 +64,7 @@ def hsja(model: ModelWrapper,
          stepsize_search: str = 'geometric_progression',
          max_num_evals: int = int(1e4),
          init_num_evals: int = 100,
-         verbose: bool = True) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+         verbose: bool = True) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
     """
     Main algorithm for HopSkipJumpAttack.
 

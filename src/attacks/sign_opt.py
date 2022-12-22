@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from foolbox.distances import LpDistance
 
-from src.attacks.base import Bounds
+from src.attacks.base import Bounds, ExtraResultsDict
 from src.attacks.opt import OPT, OPTAttackPhase, normalize
 from src.attacks.queries_counter import QueriesCounter
 from src.model_wrappers import ModelWrapper
@@ -41,13 +41,12 @@ class SignOPT(OPT):
         # self.tgt_init_query = args["signopt_tgt_init_query"]
         # self.targeted_dataloader = targeted_dataloader
 
-    def __call__(
-            self,
-            model: ModelWrapper,
-            x: torch.Tensor,
-            label: torch.Tensor,
-            target: torch.Tensor | None = None,
-            query_limit: int | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+    def __call__(self,
+                 model: ModelWrapper,
+                 x: torch.Tensor,
+                 label: torch.Tensor,
+                 target: torch.Tensor | None = None,
+                 query_limit: int | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         if target is not None:
             if self.momentum > 0:
                 warnings.warn("Currently, targeted Sign-OPT does not support momentum, ignoring argument.")
@@ -56,7 +55,7 @@ class SignOPT(OPT):
 
     def attack_untargeted(
             self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
-            query_limit: int | None) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+            query_limit: int | None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """Attack the original image and return adversarial example
         (x0, y0): original image
         """
@@ -72,7 +71,7 @@ class SignOPT(OPT):
                                                                      OPTAttackPhase.direction_search)
             if success.item():
                 theta, initial_lbd = normalize(theta)
-                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd, g_theta,
+                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd.item(), g_theta,
                                                                        queries_counter)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
@@ -117,14 +116,15 @@ class SignOPT(OPT):
                 else:
                     new_theta = xg - alpha * sign_gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter = self.fine_grained_binary_search_local(model,
-                                                                                x,
-                                                                                y,
-                                                                                new_theta,
-                                                                                queries_counter,
-                                                                                phase=OPTAttackPhase.step_size_search,
-                                                                                initial_lbd=min_g2,
-                                                                                tol=beta / 500)
+                new_g2, queries_counter, _ = self.fine_grained_binary_search_local(
+                    model,
+                    x,
+                    y,
+                    new_theta,
+                    queries_counter,
+                    phase=OPTAttackPhase.step_size_search,
+                    initial_lbd=min_g2,
+                    tol=beta / 500)
                 alpha *= 2
                 if new_g2 < min_g2:
                     min_theta = new_theta
@@ -143,7 +143,7 @@ class SignOPT(OPT):
                     else:
                         new_theta = xg - alpha * sign_gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter = self.fine_grained_binary_search_local(
+                    new_g2, queries_counter, _ = self.fine_grained_binary_search_local(
                         model,
                         x,
                         y,
@@ -201,7 +201,7 @@ class SignOPT(OPT):
                      h: float = 0.001) -> Tuple[torch.Tensor, QueriesCounter]:
         """
         Evaluate the sign of gradient by formulat
-        sign(g) = 1/Q [ \sum_{q=1}^Q sign( g(theta+h*u_i) - g(theta) )u_i$ ]
+        sign(g) = 1/Q [ \\sum_{q=1}^Q sign( g(theta+h*u_i) - g(theta) )u_i$ ]
         """
         sign_grad = torch.zeros_like(theta)
         num_batches = int(np.ceil(self.num_grad_queries / self.grad_batch_size))

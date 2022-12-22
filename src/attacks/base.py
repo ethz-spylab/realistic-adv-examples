@@ -16,6 +16,9 @@ class Bounds(NamedTuple):
     upper: float = 1.
 
 
+ExtraResultsDict = dict[str, float | int | list[float] | list[int]]
+
+
 class BaseAttack(abc.ABC):
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool):
         self.epsilon = epsilon
@@ -48,7 +51,7 @@ class BaseAttack(abc.ABC):
                  x: torch.Tensor,
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
+                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         ...
 
 
