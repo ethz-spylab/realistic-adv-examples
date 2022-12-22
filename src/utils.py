@@ -1,5 +1,5 @@
 import torch
-from foolbox.distances import l2, linf, LpDistance
+from foolbox.distances import LpDistance, l2
 
 
 def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, distance: LpDistance = l2) -> float:

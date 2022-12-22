@@ -122,6 +122,7 @@ class SignOPT(OPT):
                                                                                 y,
                                                                                 new_theta,
                                                                                 queries_counter,
+                                                                                phase=OPTAttackPhase.step_size_search,
                                                                                 initial_lbd=min_g2,
                                                                                 tol=beta / 500)
                 alpha *= 2
@@ -148,6 +149,7 @@ class SignOPT(OPT):
                         y,
                         new_theta,
                         queries_counter,
+                        phase=OPTAttackPhase.step_size_search,
                         initial_lbd=min_g2,
                         tol=beta / 500,
                     )
@@ -218,7 +220,8 @@ class SignOPT(OPT):
             x_ = self.get_x_adv(x, new_theta, initial_lbd)
             u = x_ - x_temp
             success, queries_counter = self.is_correct_boundary_side(model, x_, y, target, queries_counter,
-                                                                 OPTAttackPhase.gradient_estimation)
+                                                                     OPTAttackPhase.gradient_estimation)
+
             sign_v[success] = -1
 
             sign_grad += (u.sign() * sign_v).sum(0)

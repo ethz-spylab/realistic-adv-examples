@@ -1,7 +1,7 @@
 import math
 
 import torch
-from foolbox.distances import l2, LpDistance, linf
+from foolbox.distances import LpDistance, l2, linf
 
 from src.attacks.base import Bounds, PerturbationAttack
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
@@ -261,10 +261,9 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
     """ Binary search to approach the boundary."""
 
     # Compute distance between each of perturbed image and original image.
-    dists_post_update = torch.tensor([
-        compute_distance(original_image, perturbed_image, params['distance']) for perturbed_image in perturbed_images
-    ],
-                                     device=original_image.device)
+    dists_post_update = torch.tensor(
+        [compute_distance(original_image, perturbed_image, params['distance']) for perturbed_image in perturbed_images],
+        device=original_image.device)
 
     highs: torch.Tensor
     lows: torch.Tensor
@@ -305,8 +304,7 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
 
     # Compute distance of the output image to select the best choice.
     # (only used when stepsize_search is grid_search.)
-    dists = torch.tensor(
-        [compute_distance(original_image, out_image, params['distance']) for out_image in out_images])
+    dists = torch.tensor([compute_distance(original_image, out_image, params['distance']) for out_image in out_images])
     idx = torch.argmin(dists)
 
     dist = dists_post_update[idx].item()

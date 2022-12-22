@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from foolbox.distances import LpDistance, l2
 
@@ -9,9 +8,10 @@ from src.model_wrappers import ModelWrapper
 
 class OPTAttackPhase(AttackPhase):
     direction_search = "direction_search"
-    binary_search = "binary_search"
     direction_probing = "direction_probing"
     gradient_estimation = "gradient_estimation"
+    step_size_search = "step_size_search"
+    binary_search = "binary_search"
 
 
 class OPT(DirectionAttack):
@@ -63,7 +63,7 @@ class OPT(DirectionAttack):
                                                                      OPTAttackPhase.direction_search)
             if success.item():
                 theta, initial_lbd = normalize(theta)
-                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd, g_theta,
+                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd.item(), g_theta,
                                                                        queries_counter)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
@@ -110,6 +110,7 @@ class OPT(DirectionAttack):
                                                                             y,
                                                                             ttt[j],
                                                                             queries_counter,
+                                                                            OPTAttackPhase.gradient_estimation,
                                                                             initial_lbd=g2,
                                                                             tol=beta / 500)
                 gradient += (g1 - g2) / beta * u[j]
@@ -134,6 +135,7 @@ class OPT(DirectionAttack):
                                                                                 y,
                                                                                 new_theta,
                                                                                 queries_counter,
+                                                                                OPTAttackPhase.step_size_search,
                                                                                 initial_lbd=min_g2,
                                                                                 tol=beta / 500)
                 alpha *= 2
@@ -153,6 +155,7 @@ class OPT(DirectionAttack):
                                                                                     y,
                                                                                     new_theta,
                                                                                     queries_counter,
+                                                                                    OPTAttackPhase.step_size_search,
                                                                                     initial_lbd=min_g2,
                                                                                     tol=beta / 500)
                     if new_g2 < g2:
@@ -163,7 +166,7 @@ class OPT(DirectionAttack):
             if min_g2 <= min_g1:
                 theta, g2 = min_theta, min_g2
             else:
-                theta, g2 = min_ttt, min_g1
+                theta, g2 = min_ttt, min_g1  # type: ignore
 
             if g2 < g_theta:
                 best_theta, g_theta = theta, g2
@@ -183,6 +186,7 @@ class OPT(DirectionAttack):
 
             prev_best_theta = best_theta.clone()
 
+        assert prev_best_theta is not None
         target = model.predict_label(self.get_x_adv(x, prev_best_theta, g_theta)).item()
 
         self.log(f"\nAdversarial example found: distortion {g_theta:.4f} predicted class {target} queries "
@@ -190,8 +194,8 @@ class OPT(DirectionAttack):
 
         distance: float = (x + g_theta * prev_best_theta - x).norm().item()
 
-        return self.get_x_adv(x, g_theta,
-                              prev_best_theta), queries_counter, distance, not queries_counter.is_out_of_queries(), {}
+        return self.get_x_adv(x, prev_best_theta,
+                              g_theta), queries_counter, distance, not queries_counter.is_out_of_queries(), {}
 
     def log(self, arg):
         if self.verbose:
@@ -203,17 +207,18 @@ class OPT(DirectionAttack):
                                          y: torch.Tensor,
                                          theta: torch.Tensor,
                                          queries_counter: QueriesCounter,
+                                         phase: OPTAttackPhase,
                                          initial_lbd: float = 1.0,
                                          tol: float = 1e-5) -> tuple[float, QueriesCounter]:
         lbd = initial_lbd
 
         def is_correct_boundary_side_local(lbd_: float, qc: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
             x_adv_ = self.get_x_adv(x, theta, lbd_)
-            return self.is_correct_boundary_side(model, x_adv_, y, None, qc, OPTAttackPhase.gradient_estimation)
+            return self.is_correct_boundary_side(model, x_adv_, y, None, qc, phase)
 
-        x_adv = self.get_x_adv(x, theta, lbd)
+        x_adv = self.get_x_adv(x, theta, lbd)c
         success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, None, queries_counter,
-                                                                 OPTAttackPhase.gradient_estimation)
+                                                                 phase)
 
         if not success:
             lbd_lo = lbd
@@ -289,7 +294,7 @@ def normalize(x: torch.Tensor, batch: bool = False) -> tuple[torch.Tensor, torch
         batch (bool): First dimension of x is batch
     """
     if batch:
-        norm = x.reshape(x.size(0), -1).norm(2, 1)
+        norm = x.reshape(x.size(0), -1).norm(2, 1)  # type: ignore
     else:
         norm = x.norm()
     for _ in range(x.ndim - 1):
