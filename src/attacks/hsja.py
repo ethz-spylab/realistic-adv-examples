@@ -1,11 +1,12 @@
 import math
 
 import torch
-from foolbox.distances import LpDistance
+from foolbox.distances import l2, LpDistance, linf
 
 from src.attacks.base import Bounds, PerturbationAttack
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
 from src.model_wrappers import ModelWrapper
+from src.utils import compute_distance
 
 
 class HSJAttackPhase(AttackPhase):
@@ -33,7 +34,6 @@ class HSJA(PerturbationAttack):
         self.stepsize_search = stepsize_search
         self.gamma = gamma
         self.num_iterations = num_iterations
-        self.constraint = 'l2' if distance.p == 2 else 'linf'
         self.fixed_delta = fixed_delta
 
     def __call__(self,
@@ -42,7 +42,7 @@ class HSJA(PerturbationAttack):
                  label: torch.Tensor,
                  target: torch.Tensor | None = None,
                  query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, dict[str, float | int]]:
-        return hsja(model, x, label, self.bounds.upper, self.bounds.lower, self.constraint, self.num_iterations,
+        return hsja(model, x, label, self.bounds.upper, self.bounds.lower, self.distance, self.num_iterations,
                     self.gamma, self.fixed_delta, target, None, query_limit, self.stepsize_search, self.max_num_evals,
                     self.init_num_evals)
 
@@ -54,7 +54,7 @@ def hsja(model: ModelWrapper,
          original_label: torch.Tensor,
          clip_max: float = 1,
          clip_min: float = 0,
-         constraint: str = 'l2',
+         distance: LpDistance = l2,
          num_iterations: int = 40,
          gamma: float = 1.0,
          fixed_delta: float | None = None,
@@ -100,7 +100,7 @@ def hsja(model: ModelWrapper,
         'original_label': original_label,
         'target_label': target_label,
         'target_image': target_image,
-        'constraint': constraint,
+        'distance': distance,
         'num_iterations': num_iterations,
         'gamma': gamma,
         'd': int(math.prod(sample.shape)),
@@ -126,7 +126,7 @@ def hsja(model: ModelWrapper,
     # Project the initialization to the boundary.
     perturbed, dist_post_update, queries_counter = binary_search_batch(sample, torch.unsqueeze(perturbed, 0), model,
                                                                        params, queries_counter)
-    dist = compute_distance(perturbed, sample, constraint)
+    dist = compute_distance(perturbed, sample, distance)
 
     for j in range(params['num_iterations']):
         params['cur_iter'] = j + 1
@@ -140,7 +140,7 @@ def hsja(model: ModelWrapper,
 
         # approximate gradient.
         gradf, queries_counter = approximate_gradient(model, perturbed, num_evals, delta, params, queries_counter)
-        if params['constraint'] == 'linf':
+        if params['distance'] == linf:
             update = torch.sign(gradf)
         else:
             update = gradf
@@ -172,10 +172,10 @@ def hsja(model: ModelWrapper,
                                                                                    model, params, queries_counter)
 
         # compute new distance.
-        dist = compute_distance(perturbed, sample, constraint)
+        dist = compute_distance(perturbed, sample, distance)
         if verbose:
             print('iteration: {:d}, {:s} distance {:.4f}, total queries {:.4f} total unsafe queries {:.4f}'.format(
-                j + 1, constraint, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
+                j + 1, distance, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
 
         if queries_counter.is_out_of_queries():
             print("Out of queries")
@@ -205,25 +205,15 @@ def clip_image(image: torch.Tensor, clip_min: float | torch.Tensor, clip_max: fl
     return torch.clamp(image, clip_min, clip_max)  # type: ignore
 
 
-def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, constraint: str = 'l2') -> float:
-    # Compute the distance between two images.
-    if constraint == 'l2':
-        return torch.linalg.norm((x_ori - x_pert), dim=None).item()
-    elif constraint == 'linf':
-        return torch.max(abs(x_ori - x_pert)).item()
-    else:
-        raise ValueError(f'Unknown constraint {constraint}.')
-
-
-def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta: float, params,
+def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta, params,
                          queries_counter: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
     clip_max, clip_min = params['clip_max'], params['clip_min']
 
     # Generate random vectors.
     noise_shape = [num_evals] + list(params['shape'])
-    if params['constraint'] == 'l2':
+    if params['distance'] == l2:
         rv = torch.randn(*noise_shape, device=sample.device)
-    elif params['constraint'] == 'linf':
+    elif params['distance'] == linf:
         rv = torch.empty(*noise_shape, device=sample.device).uniform_(-1, 1)
     else:
         raise ValueError(f'Unknown constraint {params["constraint"]}.')
@@ -257,9 +247,9 @@ def approximate_gradient(model: ModelWrapper, sample: torch.Tensor, num_evals: i
 def project(original_image: torch.Tensor, perturbed_images: torch.Tensor, alphas: torch.Tensor, params) -> torch.Tensor:
     alphas_shape = [len(alphas)] + [1] * len(params['shape'])
     alphas = alphas.reshape(alphas_shape)
-    if params['constraint'] == 'l2':
+    if params['distance'] == l2:
         return (1 - alphas) * original_image + alphas * perturbed_images
-    elif params['constraint'] == 'linf':
+    elif params['distance'] == linf:
         out_images = clip_image(perturbed_images, original_image - alphas, original_image + alphas)
         return out_images
     else:
@@ -272,14 +262,14 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
 
     # Compute distance between each of perturbed image and original image.
     dists_post_update = torch.tensor([
-        compute_distance(original_image, perturbed_image, params['constraint']) for perturbed_image in perturbed_images
+        compute_distance(original_image, perturbed_image, params['distance']) for perturbed_image in perturbed_images
     ],
                                      device=original_image.device)
 
     highs: torch.Tensor
     lows: torch.Tensor
     # Choose upper thresholds in binary searchs based on constraint.
-    if params['constraint'] == 'linf':
+    if params['distance'] == linf:
         highs = dists_post_update
         # Stopping criteria.
         thresholds = torch.minimum(dists_post_update * params['theta'], params['theta'])
@@ -316,7 +306,7 @@ def binary_search_batch(original_image: torch.Tensor, perturbed_images: torch.Te
     # Compute distance of the output image to select the best choice.
     # (only used when stepsize_search is grid_search.)
     dists = torch.tensor(
-        [compute_distance(original_image, out_image, params['constraint']) for out_image in out_images])
+        [compute_distance(original_image, out_image, params['distance']) for out_image in out_images])
     idx = torch.argmin(dists)
 
     dist = dists_post_update[idx].item()
@@ -404,11 +394,11 @@ def select_delta(params, dist_post_update: float) -> float:
     if params['cur_iter'] == 1:
         delta = 0.1 * (params['clip_max'] - params['clip_min'])
     else:
-        if params['constraint'] == 'l2':
-            delta = (math.sqrt(params['d']) * params['theta'] * dist_post_update).item()
-        elif params['constraint'] == 'linf':
-            delta = (params['d'] * params['theta'] * dist_post_update).item()
+        if params['distance'] == l2:
+            delta = math.sqrt(params['d']) * params['theta'] * dist_post_update
+        elif params['distance'] == linf:
+            delta = params['d'] * params['theta'] * dist_post_update
         else:
-            raise ValueError(f"Unknown constraint {params['constraint']}")
+            raise ValueError(f"Unknown constraint {params['distance']}")
 
     return delta
