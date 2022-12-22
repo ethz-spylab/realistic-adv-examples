@@ -91,7 +91,7 @@ class OPT(DirectionAttack):
             return x, queries_counter, float("inf"), False, {}
 
         self.log(f"====> Found best distortion {g_theta:.4f} using {queries_counter.total_queries} "
-                 f"queries and {queries_counter.total_unsafe_queries} extra queries")
+                 f"queries and {queries_counter.total_unsafe_queries} unsafe queries")
 
         g1 = 1.0
         assert best_theta is not None
@@ -216,9 +216,8 @@ class OPT(DirectionAttack):
             x_adv_ = self.get_x_adv(x, theta, lbd_)
             return self.is_correct_boundary_side(model, x_adv_, y, None, qc, phase)
 
-        x_adv = self.get_x_adv(x, theta, lbd)c
-        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, None, queries_counter,
-                                                                 phase)
+        x_adv = self.get_x_adv(x, theta, lbd)
+        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, None, queries_counter, phase)
 
         if not success:
             lbd_lo = lbd
@@ -227,7 +226,8 @@ class OPT(DirectionAttack):
                 _, queries_counter = iter_result
                 lbd_hi *= 1.01
                 if lbd_hi > 20:
-                    return float('inf'), queries_counter
+                    # Here we return 2 * lbd_hi because inf breaks the attack
+                    return lbd_hi * 2, queries_counter
         else:
             lbd_hi = lbd
             lbd_lo = lbd * 0.99
