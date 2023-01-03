@@ -1,9 +1,10 @@
 import math
+from typing import Callable
 
 import torch
 from foolbox.distances import LpDistance, l2
 
-from src.attacks.base import Bounds, DirectionAttack, ExtraResultsDict
+from src.attacks.base import Bounds, DirectionAttack, ExtraResultsDict, SearchMode
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
 from src.model_wrappers import ModelWrapper
 
@@ -14,6 +15,9 @@ class OPTAttackPhase(AttackPhase):
     gradient_estimation = "gradient_estimation"
     step_size_search = "step_size_search"
     search = "search"
+
+
+DEFAULT_LINE_SEARCH_TOL = 1e-5
 
 
 class OPT(DirectionAttack):
@@ -30,7 +34,7 @@ class OPT(DirectionAttack):
         return self.attack_untargeted(model, x, label, query_limit)
 
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool, max_iter: int,
-                 alpha: float, beta: float):
+                 alpha: float, beta: float, search: SearchMode, line_search_overshoot: float):
         super().__init__(epsilon, distance, bounds, discrete)
         self.num_directions = 100 if distance == l2 else 500
         # TODO: we may need a better way for controlling number of queries
@@ -38,6 +42,30 @@ class OPT(DirectionAttack):
         self.iterations = max_iter
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
+        self.fine_grained_search: Callable[
+            [ModelWrapper, torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor, QueriesCounter, float, float],
+            tuple[float, QueriesCounter, float | None]]
+        self.fine_grained_search_local: Callable[[
+            ModelWrapper,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor | None,
+            torch.Tensor,
+            QueriesCounter,
+            float,
+            OPTAttackPhase,
+            float,
+        ], tuple[float, QueriesCounter, float | None]]
+        if search == SearchMode.binary:
+            self.fine_grained_search = self.fine_grained_binary_search
+            self.fine_grained_search_local = self.fine_grained_binary_search_local
+        elif search == SearchMode.line:
+            self.fine_grained_search = lambda model, x, y, target, theta, queries_counter, initial_lbd, current_best: \
+                self.line_search(model, x, y, target, theta, queries_counter, initial_lbd, OPTAttackPhase.search,
+                                 current_best, None)
+            self.fine_grained_search_local = (
+                lambda model, x, y, target, theta, queries_counter, initial_lbd, phase, tol: self.line_search(
+                    model, x, y, target, theta, queries_counter, initial_lbd, phase, None, line_search_overshoot, tol))
 
     def attack_untargeted(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, query_limit: int | None) -> \
             tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
@@ -58,8 +86,8 @@ class OPT(DirectionAttack):
                                                                      OPTAttackPhase.direction_search)
             if success.item():
                 theta, initial_lbd = normalize(theta)
-                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, None, theta, initial_lbd.item(),
-                                                                       g_theta, queries_counter)
+                lbd, queries_counter, _ = self.fine_grained_search(model, x, y, None, theta, queries_counter,
+                                                                   initial_lbd.item(), g_theta)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
                     self.log(f"---> Found distortion {g_theta:.4f}")
@@ -75,8 +103,8 @@ class OPT(DirectionAttack):
                                                                          OPTAttackPhase.direction_search)
                 if success.item():
                     theta, initial_lbd = normalize(theta)
-                    lbd, queries_counter = self.fine_grained_binary_search(model, x, y, None, theta, initial_lbd.item(),
-                                                                           g_theta, queries_counter)
+                    lbd, queries_counter, _ = self.fine_grained_search(model, x, y, None, theta, initial_lbd.item(),
+                                                                       g_theta, queries_counter)
                     if lbd < g_theta:
                         best_theta, g_theta = theta, lbd
                         self.log(f"---> Found distortion {g_theta:.4f}")
@@ -101,16 +129,10 @@ class OPT(DirectionAttack):
             ttt = theta.unsqueeze(0) + beta * u
             ttt, _ = normalize(ttt, batch=True)
             for j in range(q):
-                g1, queries_counter, lbd_factor = self.fine_grained_binary_search_local(
-                    model,
-                    x,
-                    y,
-                    None,
-                    ttt[j],
-                    queries_counter,
-                    OPTAttackPhase.gradient_estimation,
-                    initial_lbd=g2,
-                    tol=beta / 500)
+                g1, queries_counter, lbd_factor = self.fine_grained_search_local(model, x, y, None, ttt[j],
+                                                                                 queries_counter, g2,
+                                                                                 OPTAttackPhase.gradient_estimation,
+                                                                                 beta / 500)
                 gradient += (g1 - g2) / beta * u[j]
                 if g1 < min_g1:
                     min_g1 = g1
@@ -129,16 +151,8 @@ class OPT(DirectionAttack):
             for _ in range(15):
                 new_theta = theta - alpha * gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter, lbd_factor = self.fine_grained_binary_search_local(
-                    model,
-                    x,
-                    y,
-                    None,
-                    new_theta,
-                    queries_counter,
-                    OPTAttackPhase.step_size_search,
-                    initial_lbd=min_g2,
-                    tol=beta / 500)
+                new_g2, queries_counter, lbd_factor = self.fine_grained_search_local(
+                    model, x, y, None, new_theta, queries_counter, min_g2, OPTAttackPhase.step_size_search, beta / 500)
                 lbd_factors.append(lbd_factor)
                 alpha *= 2
                 if new_g2 < min_g2:
@@ -152,16 +166,9 @@ class OPT(DirectionAttack):
                     alpha *= 0.25
                     new_theta = theta - alpha * gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter, lbd_factor = self.fine_grained_binary_search_local(
-                        model,
-                        x,
-                        y,
-                        None,
-                        new_theta,
-                        queries_counter,
-                        OPTAttackPhase.step_size_search,
-                        initial_lbd=min_g2,
-                        tol=beta / 500)
+                    new_g2, queries_counter, lbd_factor = self.fine_grained_search_local(
+                        model, x, y, None, new_theta, queries_counter, min_g2, OPTAttackPhase.step_size_search,
+                        beta / 500)
                     lbd_factors.append(lbd_factor)
                     if new_g2 < g2:
                         min_theta = new_theta
@@ -217,9 +224,9 @@ class OPT(DirectionAttack):
                                          target: torch.Tensor | None,
                                          theta: torch.Tensor,
                                          queries_counter: QueriesCounter,
+                                         initial_lbd: float,
                                          phase: OPTAttackPhase,
-                                         initial_lbd: float = 1.0,
-                                         tol: float = 1e-5) -> tuple[float, QueriesCounter, float]:
+                                         tol: float = DEFAULT_LINE_SEARCH_TOL) -> tuple[float, QueriesCounter, float]:
         lbd = initial_lbd
 
         def is_correct_boundary_side_local(lbd_: float, qc: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
@@ -267,15 +274,14 @@ class OPT(DirectionAttack):
         return lbd_hi, queries_counter, lbd_factor
 
     def fine_grained_binary_search(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
-                                   target: torch.Tensor | None, theta: torch.Tensor, initial_lbd: float,
-                                   current_best: float,
-                                   queries_counter: QueriesCounter) -> tuple[float, QueriesCounter]:
+                                   target: torch.Tensor | None, theta: torch.Tensor, queries_counter: QueriesCounter,
+                                   initial_lbd: float, current_best: float) -> tuple[float, QueriesCounter, None]:
         if initial_lbd > current_best:
             x_adv = self.get_x_adv(x, theta, current_best)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
                                                                      OPTAttackPhase.direction_probing)
             if not success.item():
-                return float('inf'), queries_counter
+                return float('inf'), queries_counter, None
             lbd = current_best
         else:
             lbd = initial_lbd
@@ -284,7 +290,7 @@ class OPT(DirectionAttack):
         lbd_lo = 0.0
 
         # EDIT: This tol check has a numerical issue and may never quit (1e-5)
-        while lbd_hi - lbd_lo > 1e-5:
+        while lbd_hi - lbd_lo > DEFAULT_LINE_SEARCH_TOL:
             lbd_mid = (lbd_lo + lbd_hi) / 2
             # EDIT: add a break condition
             if lbd_mid == lbd_hi or lbd_mid == lbd_lo:
@@ -297,7 +303,7 @@ class OPT(DirectionAttack):
             else:
                 lbd_lo = lbd_mid
 
-        return lbd_hi, queries_counter
+        return lbd_hi, queries_counter, None
 
     def line_search(self,
                     model: ModelWrapper,
@@ -305,18 +311,18 @@ class OPT(DirectionAttack):
                     y: torch.Tensor,
                     target: torch.Tensor | None,
                     theta: torch.Tensor,
-                    initial_lbd: float,
-                    current_best: float,
-                    check_improvement: bool,
                     queries_counter: QueriesCounter,
+                    initial_lbd: float,
+                    phase: OPTAttackPhase,
+                    current_best: float | None,
                     overshoot_factor: float | None = 1.01,
-                    max_steps=200) -> tuple[float, QueriesCounter]:
-        if initial_lbd > current_best and check_improvement:
+                    tol: float = DEFAULT_LINE_SEARCH_TOL) -> tuple[float, QueriesCounter, float | None]:
+        if current_best is not None and initial_lbd > current_best:
             x_adv = self.get_x_adv(x, theta, current_best)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
                                                                      OPTAttackPhase.direction_probing)
             if not success.item():
-                return float('inf'), queries_counter
+                return float('inf'), queries_counter, None
             lbd = current_best
         else:
             lbd = initial_lbd
@@ -324,22 +330,26 @@ class OPT(DirectionAttack):
         if overshoot_factor is not None:
             lbd = lbd * overshoot_factor
 
-        if not self.discrete:
-            step_size = lbd / max_steps
-        else:
-            step_size = math.ceil(lbd / max_steps)
+        step_size = tol / 2
+        if self.discrete:
+            step_size = math.ceil(step_size)
 
         initial_lbd = lbd
-        for i in range(1, max_steps):
+        i = 1
+        while lbd != 0:
             lbd_tmp = initial_lbd - step_size * i
             x_adv = self.get_x_adv(x, theta, lbd_tmp)
-            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
-                                                                     OPTAttackPhase.search)
+            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase)
             if not success.item():
                 break
+            i += 1
             lbd = lbd_tmp
 
-        return lbd, queries_counter
+        if lbd == initial_lbd:
+            print("Warning: line search overshoot was not enough")
+            return float('inf'), queries_counter, None
+
+        return lbd, queries_counter, None
 
 
 def normalize(x: torch.Tensor, batch: bool = False) -> tuple[torch.Tensor, torch.Tensor]:

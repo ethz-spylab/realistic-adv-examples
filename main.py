@@ -146,6 +146,10 @@ if __name__ == "__main__":
                         'an adaptive delta is used if this is None')
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
     parser.add_argument('--opt-beta', default=0.001, type=float, help='beta parameter for OPT and Sign OPT')
+    parser.add_argument('--opt-line-search-overshoot',
+                        default=2.5,
+                        type=float,
+                        help='Line search overshoot for OPT and Sign OPT')
     parser.add_argument('--sign-opt-num-grad-queries',
                         default=200,
                         type=int,

@@ -99,6 +99,13 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "discrete": args.discrete == '1',
         "bounds": Bounds()
     }
+    opt_kwargs = {
+        "max_iter": args.max_iter,
+        "alpha": args.opt_alpha,
+        "beta": args.opt_beta,
+        "search": SearchMode(args.search),
+        "line_search_overshoot": args.opt_line_search_overshoot
+    }
     if args.attack == "rays":
         if args.rays_flip_squares == '1' and args.rays_flip_rand_pixels == '1':
             raise ValueError("`--flip-squares` cannot be `1` if also `--flip-rand-pixels` is `1`")
@@ -121,18 +128,14 @@ def setup_attack(args: Namespace) -> BaseAttack:
         }
         return HSJA(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "opt":
-        attack_kwargs = {"max_iter": args.max_iter, "alpha": args.opt_alpha, "beta": args.opt_beta}
-        return OPT(**base_attack_kwargs, **attack_kwargs)
+        return OPT(**base_attack_kwargs, **opt_kwargs)
     if args.attack == "sign_opt":
         attack_kwargs = {
-            "max_iter": args.max_iter,
-            "alpha": args.opt_alpha,
-            "beta": args.opt_beta,
             "num_grad_queries": args.sign_opt_num_grad_queries,
             "grad_batch_size": args.sign_opt_grad_bs,
             "momentum": args.sign_opt_momentum
         }
-        return SignOPT(**base_attack_kwargs, **attack_kwargs)
+        return SignOPT(**base_attack_kwargs, **opt_kwargs, **attack_kwargs)
     else:
         raise ValueError(f"Invalid attack: `{args.attack}`")
 
@@ -147,7 +150,7 @@ def setup_out_dir(args: Namespace) -> Path:
         out_dir.mkdir(parents=True)
 
     def make_exp_out_dir() -> Path:
-        return out_dir / f"discrete-{args.discrete}_tagreted-{args.targeted}_early-{args.early}_{args.search}" \
+        return out_dir / f"discrete-{args.discrete}_targeted-{args.targeted}_early-{args.early}_{args.search}" \
                          f"_{args.epsilon:.3f}_{uuid.uuid4().hex}"
 
     exp_out_dir = make_exp_out_dir()
