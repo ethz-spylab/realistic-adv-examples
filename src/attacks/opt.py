@@ -18,6 +18,8 @@ class OPTAttackPhase(AttackPhase):
 
 
 DEFAULT_LINE_SEARCH_TOL = 1e-5
+MAX_STEPS_LINE_SEARCH = 1_000
+MAX_STEPS_COARSE_LINE_SEARCH = 200
 
 
 class OPT(DirectionAttack):
@@ -330,26 +332,36 @@ class OPT(DirectionAttack):
         if overshoot_factor is not None:
             lbd = lbd * overshoot_factor
 
-        step_size = tol / 2
-        if self.discrete:
-            step_size = math.ceil(step_size)
+        coarse_search_step_size = lbd / MAX_STEPS_COARSE_LINE_SEARCH
+        coarse_lbd, queries_counter = self._line_search_body(model, x, y, target, theta, queries_counter, lbd, phase,
+                                                             MAX_STEPS_COARSE_LINE_SEARCH, coarse_search_step_size)
+        if lbd == coarse_lbd:
+            print("Warning: line search overshoot was not enough")
+            return lbd * 2, queries_counter, None
 
-        initial_lbd = lbd
-        i = 1
-        while lbd != 0:
+        ideal_step_size = tol / 2
+        if self.discrete:
+            ideal_step_size = math.ceil(ideal_step_size)
+        max_steps = min(math.ceil(coarse_lbd / ideal_step_size), MAX_STEPS_LINE_SEARCH)
+        step_size = coarse_lbd / max_steps
+        
+        lbd, queries_counter = self._line_search_body(model, x, y, target, theta, queries_counter, coarse_lbd, phase,
+                                                      max_steps, step_size)
+
+        return lbd, queries_counter, None
+
+    def _line_search_body(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None,
+                          theta: torch.Tensor, queries_counter: QueriesCounter, initial_lbd: float, phase: AttackPhase,
+                          max_steps: int, step_size: float) -> tuple[float, QueriesCounter]:
+        lbd = initial_lbd
+        for i in range(1, max_steps):
             lbd_tmp = initial_lbd - step_size * i
             x_adv = self.get_x_adv(x, theta, lbd_tmp)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase)
             if not success.item():
                 break
-            i += 1
             lbd = lbd_tmp
-
-        if lbd == initial_lbd:
-            print("Warning: line search overshoot was not enough")
-            return float('inf'), queries_counter, None
-
-        return lbd, queries_counter, None
+        return lbd, queries_counter
 
 
 def normalize(x: torch.Tensor, batch: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
