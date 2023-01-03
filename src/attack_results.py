@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
+from src.attacks.base import ExtraResultsDict, ExtraResultsDictContent
 from src.attacks.queries_counter import QueriesCounter
 
 
@@ -12,14 +13,14 @@ class AttackResults:
     successes: int = 0
     distances: list[float] = dataclasses.field(default_factory=list)
     queries_counters: list[QueriesCounter] = dataclasses.field(default_factory=list)
-    extra_results: list[dict[str, float]] = dataclasses.field(default_factory=list)
+    extra_results: list[ExtraResultsDict] = dataclasses.field(default_factory=list)
     failures: int = 0
     failed_distances: list[float] = dataclasses.field(default_factory=list)
     failed_queries_counters: list[QueriesCounter] = dataclasses.field(default_factory=list)
-    failed_extra_results: list[dict[str, float]] = dataclasses.field(default_factory=list)
+    failed_extra_results: list[ExtraResultsDict] = dataclasses.field(default_factory=list)
 
     def update_with_success(self, distance: float, queries_counter: QueriesCounter,
-                            extra_results: dict[str, float | int]) -> "AttackResults":
+                            extra_results: ExtraResultsDict) -> "AttackResults":
         return dataclasses.replace(self,
                                    successes=self.successes + 1,
                                    distances=self.distances + [distance],
@@ -27,7 +28,7 @@ class AttackResults:
                                    extra_results=self.extra_results + [extra_results])
 
     def update_with_failure(self, distance: float, queries_counter: QueriesCounter,
-                            extra_results: dict[str, float]) -> "AttackResults":
+                            extra_results: ExtraResultsDict) -> "AttackResults":
         return dataclasses.replace(self,
                                    failures=self.failures + 1,
                                    failed_distances=self.failed_distances + [distance],
@@ -60,6 +61,8 @@ class AttackResults:
             for phase, queries_list in aggregated_unsafe_queries.items():
                 results_dict[f"{stat}_unsafe_queries_{phase}"] = stat_fn(np.array(queries_list))
             for key, value_list in aggregate_extra_results(self.extra_results).items():
+                if len(value_list) != 0 and isinstance(value_list[0], list):
+                    continue
                 results_dict[f"{stat}_{key}"] = stat_fn(np.array(value_list))
 
         return results_dict
@@ -113,7 +116,7 @@ class AttackResults:
         return list(map(lambda counter: counter.total_unsafe_queries, self.failed_queries_counters))
 
 
-def aggregate_extra_results(extra_results_list: list[dict[str, float]]) -> dict[str, list[float]]:
+def aggregate_extra_results(extra_results_list: list[ExtraResultsDict]) -> dict[str, list[ExtraResultsDictContent]]:
     aggregated_extra_results = {}
     for extra_results in extra_results_list:
         for key, value in extra_results.items():

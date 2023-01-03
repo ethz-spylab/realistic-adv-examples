@@ -109,25 +109,27 @@ def resnet_v2(input_shape, depth, num_classes=10):
                     strides = 2  # downsample
 
             # bottleneck residual unit
-            y = resnet_layer(inputs=x,
-                             num_filters=num_filters_in,
-                             kernel_size=1,
-                             strides=strides,
-                             activation=activation,  # type: ignore
-                             batch_normalization=batch_normalization,
-                             conv_first=False)
+            y = resnet_layer(
+                inputs=x,
+                num_filters=num_filters_in,
+                kernel_size=1,
+                strides=strides,
+                activation=activation,  # type: ignore
+                batch_normalization=batch_normalization,
+                conv_first=False)
 
             y = resnet_layer(inputs=y, num_filters=num_filters_in, conv_first=False)
             y = resnet_layer(inputs=y, num_filters=num_filters_out, kernel_size=1, conv_first=False)
             if res_block == 0:
                 # linear projection residual shortcut connection to match
                 # changed dims
-                x = resnet_layer(inputs=x,
-                                 num_filters=num_filters_out,
-                                 kernel_size=1,
-                                 strides=strides,
-                                 activation=None,  # type: ignore
-                                 batch_normalization=False)
+                x = resnet_layer(
+                    inputs=x,
+                    num_filters=num_filters_out,
+                    kernel_size=1,
+                    strides=strides,
+                    activation=None,  # type: ignore
+                    batch_normalization=False)
 
             x = tf.keras.layers.add([x, y])
 

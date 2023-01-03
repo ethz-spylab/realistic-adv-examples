@@ -60,6 +60,7 @@ class SignOPT(OPT):
         (x0, y0): original image
         """
         queries_counter = QueriesCounter(query_limit)
+        target = None
 
         # Calculate a good starting point.
         best_theta, g_theta = None, float("inf")
@@ -67,12 +68,12 @@ class SignOPT(OPT):
             print(f"Searching for the initial direction on {self.num_directions} random directions: ")
         for i in range(self.num_directions):
             theta = torch.randn_like(x)
-            success, queries_counter = self.is_correct_boundary_side(model, x + theta, y, None, queries_counter,
+            success, queries_counter = self.is_correct_boundary_side(model, x + theta, y, target, queries_counter,
                                                                      OPTAttackPhase.direction_search)
             if success.item():
                 theta, initial_lbd = normalize(theta)
-                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd.item(), g_theta,
-                                                                       queries_counter)
+                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, target, theta, initial_lbd.item(),
+                                                                       g_theta, queries_counter)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
                     if self.verbose:
@@ -120,6 +121,7 @@ class SignOPT(OPT):
                     model,
                     x,
                     y,
+                    target,
                     new_theta,
                     queries_counter,
                     phase=OPTAttackPhase.step_size_search,
@@ -147,6 +149,7 @@ class SignOPT(OPT):
                         model,
                         x,
                         y,
+                        target,
                         new_theta,
                         queries_counter,
                         phase=OPTAttackPhase.step_size_search,

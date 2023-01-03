@@ -29,15 +29,8 @@ class OPT(DirectionAttack):
             raise NotImplementedError('Targeted attack is not implemented for OPT')
         return self.attack_untargeted(model, x, label, query_limit)
 
-    def __init__(self,
-                 epsilon: float | None,
-                 distance: LpDistance,
-                 bounds: Bounds,
-                 discrete: bool,
-                 max_iter: int,
-                 alpha: float,
-                 beta: float,
-                 substract_steps: int = 0):
+    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool, max_iter: int,
+                 alpha: float, beta: float):
         super().__init__(epsilon, distance, bounds, discrete)
         self.num_directions = 100 if distance == l2 else 500
         # TODO: we may need a better way for controlling number of queries
@@ -65,8 +58,8 @@ class OPT(DirectionAttack):
                                                                      OPTAttackPhase.direction_search)
             if success.item():
                 theta, initial_lbd = normalize(theta)
-                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd.item(), g_theta,
-                                                                       queries_counter)
+                lbd, queries_counter = self.fine_grained_binary_search(model, x, y, None, theta, initial_lbd.item(),
+                                                                       g_theta, queries_counter)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
                     self.log(f"---> Found distortion {g_theta:.4f}")
@@ -82,7 +75,7 @@ class OPT(DirectionAttack):
                                                                          OPTAttackPhase.direction_search)
                 if success.item():
                     theta, initial_lbd = normalize(theta)
-                    lbd, queries_counter = self.fine_grained_binary_search(model, x, y, theta, initial_lbd.item(),
+                    lbd, queries_counter = self.fine_grained_binary_search(model, x, y, None, theta, initial_lbd.item(),
                                                                            g_theta, queries_counter)
                     if lbd < g_theta:
                         best_theta, g_theta = theta, lbd
@@ -98,6 +91,7 @@ class OPT(DirectionAttack):
         g1 = 1.0
         assert best_theta is not None
         theta, g2 = best_theta, g_theta
+        lbd_factors = []
         for i in range(self.iterations):
             q = 10
             min_g1 = float("inf")
@@ -111,6 +105,7 @@ class OPT(DirectionAttack):
                     model,
                     x,
                     y,
+                    None,
                     ttt[j],
                     queries_counter,
                     OPTAttackPhase.gradient_estimation,
@@ -120,6 +115,7 @@ class OPT(DirectionAttack):
                 if g1 < min_g1:
                     min_g1 = g1
                     min_ttt = ttt[j]
+                lbd_factors.append(lbd_factor)
             gradient = 1.0 / q * gradient
 
             if (i + 1) % 10 == 0:
@@ -133,14 +129,17 @@ class OPT(DirectionAttack):
             for _ in range(15):
                 new_theta = theta - alpha * gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter, _ = self.fine_grained_binary_search_local(model,
-                                                                                   x,
-                                                                                   y,
-                                                                                   new_theta,
-                                                                                   queries_counter,
-                                                                                   OPTAttackPhase.step_size_search,
-                                                                                   initial_lbd=min_g2,
-                                                                                   tol=beta / 500)
+                new_g2, queries_counter, lbd_factor = self.fine_grained_binary_search_local(
+                    model,
+                    x,
+                    y,
+                    None,
+                    new_theta,
+                    queries_counter,
+                    OPTAttackPhase.step_size_search,
+                    initial_lbd=min_g2,
+                    tol=beta / 500)
+                lbd_factors.append(lbd_factor)
                 alpha *= 2
                 if new_g2 < min_g2:
                     min_theta = new_theta
@@ -153,14 +152,17 @@ class OPT(DirectionAttack):
                     alpha *= 0.25
                     new_theta = theta - alpha * gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter, _ = self.fine_grained_binary_search_local(model,
-                                                                                       x,
-                                                                                       y,
-                                                                                       new_theta,
-                                                                                       queries_counter,
-                                                                                       OPTAttackPhase.step_size_search,
-                                                                                       initial_lbd=min_g2,
-                                                                                       tol=beta / 500)
+                    new_g2, queries_counter, lbd_factor = self.fine_grained_binary_search_local(
+                        model,
+                        x,
+                        y,
+                        None,
+                        new_theta,
+                        queries_counter,
+                        OPTAttackPhase.step_size_search,
+                        initial_lbd=min_g2,
+                        tol=beta / 500)
+                    lbd_factors.append(lbd_factor)
                     if new_g2 < g2:
                         min_theta = new_theta
                         min_g2 = new_g2
@@ -197,8 +199,12 @@ class OPT(DirectionAttack):
 
         distance: float = (x + g_theta * prev_best_theta - x).norm().item()
 
-        return self.get_x_adv(x, prev_best_theta,
-                              g_theta), queries_counter, distance, not queries_counter.is_out_of_queries(), {}
+        extra_results: ExtraResultsDict = {
+            "lbd_factors": lbd_factors,
+        }
+
+        return (self.get_x_adv(x, prev_best_theta, g_theta), queries_counter, distance,
+                not queries_counter.is_out_of_queries(), extra_results)
 
     def log(self, arg):
         if self.verbose:
@@ -208,6 +214,7 @@ class OPT(DirectionAttack):
                                          model: ModelWrapper,
                                          x: torch.Tensor,
                                          y: torch.Tensor,
+                                         target: torch.Tensor | None,
                                          theta: torch.Tensor,
                                          queries_counter: QueriesCounter,
                                          phase: OPTAttackPhase,
@@ -217,10 +224,10 @@ class OPT(DirectionAttack):
 
         def is_correct_boundary_side_local(lbd_: float, qc: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
             x_adv_ = self.get_x_adv(x, theta, lbd_)
-            return self.is_correct_boundary_side(model, x_adv_, y, None, qc, phase)
+            return self.is_correct_boundary_side(model, x_adv_, y, target, qc, phase)
 
         x_adv = self.get_x_adv(x, theta, lbd)
-        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, None, queries_counter, phase)
+        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase)
 
         if not success:
             lbd_lo = lbd
@@ -259,12 +266,13 @@ class OPT(DirectionAttack):
             diff = lbd_hi - lbd_lo
         return lbd_hi, queries_counter, lbd_factor
 
-    def fine_grained_binary_search(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, theta: torch.Tensor,
-                                   initial_lbd: float, current_best: float,
+    def fine_grained_binary_search(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
+                                   target: torch.Tensor | None, theta: torch.Tensor, initial_lbd: float,
+                                   current_best: float,
                                    queries_counter: QueriesCounter) -> tuple[float, QueriesCounter]:
         if initial_lbd > current_best:
             x_adv = self.get_x_adv(x, theta, current_best)
-            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, None, queries_counter,
+            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
                                                                      OPTAttackPhase.direction_probing)
             if not success.item():
                 return float('inf'), queries_counter
@@ -282,7 +290,7 @@ class OPT(DirectionAttack):
             if lbd_mid == lbd_hi or lbd_mid == lbd_lo:
                 break
             x_adv = self.get_x_adv(x, theta, lbd_mid)
-            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, None, queries_counter,
+            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
                                                                      OPTAttackPhase.search)
             if success.item():
                 lbd_hi = lbd_mid

@@ -16,7 +16,8 @@ class Bounds(NamedTuple):
     upper: float = 1.
 
 
-ExtraResultsDict = dict[str, float | int | list[float] | list[int]]
+ExtraResultsDictContent = float | int | list[float] | list[int]
+ExtraResultsDict = dict[str, ExtraResultsDictContent]
 
 
 class BaseAttack(abc.ABC):
