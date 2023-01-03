@@ -18,6 +18,7 @@ class OPTAttackPhase(AttackPhase):
 
 
 DEFAULT_LINE_SEARCH_TOL = 1e-5
+MAX_STEPS_LINE_SEARCH = 10_000
 
 
 class OPT(DirectionAttack):
@@ -330,19 +331,22 @@ class OPT(DirectionAttack):
         if overshoot_factor is not None:
             lbd = lbd * overshoot_factor
 
-        step_size = tol / 2
+        ideal_step_size = tol / 2
         if self.discrete:
-            step_size = math.ceil(step_size)
+            ideal_step_size = math.ceil(ideal_step_size)
+        
+        max_steps = min(math.ceil(initial_lbd / ideal_step_size), MAX_STEPS_LINE_SEARCH)
+        step_size = initial_lbd / max_steps
+        
+        print(max_steps, step_size)
 
         initial_lbd = lbd
-        i = 1
-        while lbd != 0:
+        for i in range(1, max_steps):
             lbd_tmp = initial_lbd - step_size * i
             x_adv = self.get_x_adv(x, theta, lbd_tmp)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase)
             if not success.item():
                 break
-            i += 1
             lbd = lbd_tmp
 
         if lbd == initial_lbd:
