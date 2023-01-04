@@ -27,15 +27,16 @@ class BaseAttack(abc.ABC):
         self.bounds = bounds
         self.distance = distance
 
-    @staticmethod
-    def is_correct_boundary_side(model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None,
-                                 queries_counter: QueriesCounter,
-                                 attack_phase: AttackPhase) -> tuple[torch.Tensor, QueriesCounter]:
+    def is_correct_boundary_side(self, model: ModelWrapper, x_adv: torch.Tensor, y: torch.Tensor,
+                                 target: torch.Tensor | None, queries_counter: QueriesCounter,
+                                 attack_phase: AttackPhase,
+                                 original_x: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
         if target is not None:
-            success = model.predict_label(x) == target
+            success = model.predict_label(x_adv) == target
         else:
-            success = model.predict_label(x) != y
-        return success, queries_counter.increase(attack_phase, safe=success)  # type: ignore
+            success = model.predict_label(x_adv) != y
+        distance = self.distance(original_x, x_adv)
+        return success, queries_counter.increase(attack_phase, safe=success, distance=distance)
 
     def clamp_and_discretize(self, out: torch.Tensor) -> torch.Tensor:
         out = torch.clamp(out, self.bounds.lower, self.bounds.upper)

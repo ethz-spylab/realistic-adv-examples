@@ -73,7 +73,7 @@ class SignOPT(OPT):
         for i in range(self.num_directions):
             theta = torch.randn_like(x)
             success, queries_counter = self.is_correct_boundary_side(model, x + theta, y, target, queries_counter,
-                                                                     OPTAttackPhase.direction_search)
+                                                                     OPTAttackPhase.direction_search, x)
             if success.item():
                 theta, initial_lbd = normalize(theta)
                 lbd, queries_counter, _ = self.fine_grained_search(model, x, y, target, theta, queries_counter,
@@ -221,7 +221,7 @@ class SignOPT(OPT):
             x_ = self.get_x_adv(x, new_theta, initial_lbd)
             u = x_ - x_temp
             success, queries_counter = self.is_correct_boundary_side(model, x_, y, target, queries_counter,
-                                                                     OPTAttackPhase.gradient_estimation)
+                                                                     OPTAttackPhase.gradient_estimation, x)
 
             sign_v[success] = -1
 

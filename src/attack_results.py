@@ -1,4 +1,5 @@
 import dataclasses
+import pickle
 import json
 from pathlib import Path
 
@@ -48,6 +49,7 @@ class AttackResults:
         results_dict = {
             "asr": self.asr,
             "distortion": np.mean(np.array(self.distances)),
+            "median_distortion": np.median(np.array(self.distances)),
             "mean_queries": np.mean(np.array(self._get_overall_queries())),
             "median_queries": np.median(np.array(self._get_overall_queries())),
             "mean_unsafe_queries": np.mean(np.array(self._get_overall_unsafe_queries())),
@@ -78,6 +80,12 @@ class AttackResults:
         np.save(out_dir / "failed_distances.npy", np.array(self.failed_distances))
         np.save(out_dir / "failed_queries.npy", np.array(self._get_overall_failed_queries()))
         np.save(out_dir / "failed_unsafe_queries.npy", np.array(self._get_overall_failed_unsafe_queries()))
+        with open(out_dir / "distances_traces.pkl", 'wb') as f:
+            distances_list = list(map(lambda qc: qc.distances, self.queries_counters))
+            pickle.dump(distances_list, f)
+        with open(out_dir / "failed_distances_traces.pkl", 'wb') as f:
+            distances_list = list(map(lambda qc: qc.distances, self.failed_queries_counters))
+            pickle.dump(distances_list, f)
         if verbose:
             print(f"Saved results to {out_dir}")
 

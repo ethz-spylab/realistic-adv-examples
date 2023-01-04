@@ -34,7 +34,7 @@ class RayS(DirectionAttack):
             model: ModelWrapper,
             x: torch.Tensor,
             y: torch.Tensor,
-            target: torch.Tensor | None = None,
+            target: torch.Tensor | None,
             query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """ Attack the original image and return adversarial example
             model: (pytorch model)
@@ -153,7 +153,7 @@ class RayS(DirectionAttack):
         for distance in range(start, end + 1):
             x_adv = self.get_x_adv(x, direction, distance)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
-                                                                             DirectionAttackPhase.direction_probing)
+                                                                             DirectionAttackPhase.direction_probing, x)
             if success.item():
                 d_end = distance
                 print("Found initial perturbation")
@@ -192,7 +192,7 @@ class RayS(DirectionAttack):
             x_adv = self.get_x_adv(x, direction, d_mid)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
                                                                              updated_queries_counter,
-                                                                             DirectionAttackPhase.search)
+                                                                             DirectionAttackPhase.search, x)
             if success.item():
                 d_end = d_mid
             else:
@@ -228,7 +228,7 @@ class RayS(DirectionAttack):
             x_adv = self.get_x_adv(x, direction, d_end_tmp)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
                                                                              updated_queries_counter,
-                                                                             DirectionAttackPhase.search)
+                                                                             DirectionAttackPhase.search, x)
             if not success.item():
                 break
             d_end = d_end_tmp
@@ -245,7 +245,7 @@ class RayS(DirectionAttack):
         if not np.isinf(best_distance):
             x_adv = self.get_x_adv(x, direction, best_distance)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
-                                                                             DirectionAttackPhase.direction_probing)
+                                                                             DirectionAttackPhase.direction_probing, x)
             # If the example is on the safe side then search, otherwise discard direction
             if success.item():
                 d_end = best_distance

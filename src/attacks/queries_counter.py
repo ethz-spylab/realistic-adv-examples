@@ -32,6 +32,7 @@ class QueriesCounter:
     limit_unsafe_queries: bool = False
     _queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
     _unsafe_queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
+    _distances: list[tuple[AttackPhase, bool, float]] = dataclasses.field(default_factory=list)
 
     @property
     def total_queries(self) -> int:
@@ -49,12 +50,19 @@ class QueriesCounter:
     def unsafe_queries(self) -> dict[AttackPhase, int]:
         return self._unsafe_queries
 
-    def increase(self, attack_phase: AttackPhase, safe: torch.Tensor) -> "QueriesCounter":
+    @property
+    def distances(self) -> list[tuple[AttackPhase, bool, float]]:
+        return self._distances
+
+    def increase(self, attack_phase: AttackPhase, safe: torch.Tensor, distance: torch.Tensor) -> "QueriesCounter":
         n_queries = safe.shape[0]
         updated_self = dataclasses.replace(self, _queries=increase_dict(self._queries, attack_phase, n_queries))
         n_unsafe = int((torch.logical_not(safe)).sum().item())
+        updated_distances = updated_self._distances + [(attack_phase, s, d)
+                                                       for s, d in zip(safe.tolist(), distance.tolist())]
         return dataclasses.replace(updated_self,
-                                   _unsafe_queries=increase_dict(self._unsafe_queries, attack_phase, n_unsafe))
+                                   _unsafe_queries=increase_dict(self._unsafe_queries, attack_phase, n_unsafe),
+                                   _distances=updated_distances)
 
     def is_out_of_queries(self) -> bool:
         if self.queries_limit is None:

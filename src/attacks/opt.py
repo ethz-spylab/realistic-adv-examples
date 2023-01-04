@@ -25,15 +25,8 @@ FineGrainedSearchFn = Callable[
     [ModelWrapper, torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor, QueriesCounter, float, float],
     tuple[float, QueriesCounter, float | None]]
 LocalFineGrainedSearchFn = Callable[[
-    ModelWrapper,
-    torch.Tensor,
-    torch.Tensor,
-    torch.Tensor | None,
-    torch.Tensor,
-    QueriesCounter,
-    float,
-    OPTAttackPhase,
-    float,
+    ModelWrapper, torch.Tensor, torch.Tensor, torch.Tensor
+    | None, torch.Tensor, QueriesCounter, float, OPTAttackPhase, float
 ], tuple[float, QueriesCounter, float | None]]
 
 
@@ -67,9 +60,9 @@ class OPT(DirectionAttack):
         if search == SearchMode.binary:
             self.fine_grained_search = self.fine_grained_binary_search
         elif search == SearchMode.line:
-            self.fine_grained_search = lambda model, x, y, target, theta, queries_counter, initial_lbd, current_best: \
-                self.line_search(model, x, y, target, theta, queries_counter, initial_lbd, OPTAttackPhase.search,
-                                 current_best, None)
+            self.fine_grained_search = (lambda model, x, y, target, theta, queries_counter, initial_lbd, current_best:
+                                        self.line_search(model, x, y, target, theta, queries_counter, initial_lbd,
+                                                         OPTAttackPhase.search, current_best, None))
 
         if grad_estimation_search == SearchMode.binary:
             self.grad_estimation_search_fn = self.fine_grained_binary_search_local
@@ -102,7 +95,7 @@ class OPT(DirectionAttack):
         for i in range(self.num_directions):
             theta = torch.randn_like(x)
             success, queries_counter = self.is_correct_boundary_side(model, x + theta, y, None, queries_counter,
-                                                                     OPTAttackPhase.direction_search)
+                                                                     OPTAttackPhase.direction_search, x)
             if success.item():
                 theta, initial_lbd = normalize(theta)
                 lbd, queries_counter, _ = self.fine_grained_search(model, x, y, None, theta, queries_counter,
@@ -119,11 +112,11 @@ class OPT(DirectionAttack):
             for i in range(self.num_directions):
                 theta = torch.randn_like(x)
                 success, queries_counter = self.is_correct_boundary_side(model, x + theta, y, None, queries_counter,
-                                                                         OPTAttackPhase.direction_search)
+                                                                         OPTAttackPhase.direction_search, x)
                 if success.item():
                     theta, initial_lbd = normalize(theta)
-                    lbd, queries_counter, _ = self.fine_grained_search(model, x, y, None, theta, initial_lbd.item(),
-                                                                       g_theta, queries_counter)
+                    lbd, queries_counter, _ = self.fine_grained_search(model, x, y, None, theta, queries_counter,
+                                                                       initial_lbd.item(), g_theta)
                     if lbd < g_theta:
                         best_theta, g_theta = theta, lbd
                         self.log(f"---> Found distortion {g_theta:.4f}")
@@ -250,10 +243,10 @@ class OPT(DirectionAttack):
 
         def is_correct_boundary_side_local(lbd_: float, qc: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
             x_adv_ = self.get_x_adv(x, theta, lbd_)
-            return self.is_correct_boundary_side(model, x_adv_, y, target, qc, phase)
+            return self.is_correct_boundary_side(model, x_adv_, y, target, qc, phase, x)
 
         x_adv = self.get_x_adv(x, theta, lbd)
-        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase)
+        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase, x)
 
         if not success:
             lbd_lo = lbd
@@ -298,7 +291,7 @@ class OPT(DirectionAttack):
         if initial_lbd > current_best:
             x_adv = self.get_x_adv(x, theta, current_best)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
-                                                                     OPTAttackPhase.direction_probing)
+                                                                     OPTAttackPhase.direction_probing, x)
             if not success.item():
                 return float('inf'), queries_counter, None
             lbd = current_best
@@ -316,7 +309,7 @@ class OPT(DirectionAttack):
                 break
             x_adv = self.get_x_adv(x, theta, lbd_mid)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
-                                                                     OPTAttackPhase.search)
+                                                                     OPTAttackPhase.search, x)
             if success.item():
                 lbd_hi = lbd_mid
             else:
@@ -339,7 +332,7 @@ class OPT(DirectionAttack):
         if current_best is not None and initial_lbd > current_best:
             x_adv = self.get_x_adv(x, theta, current_best)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
-                                                                     OPTAttackPhase.direction_probing)
+                                                                     OPTAttackPhase.direction_probing, x)
             if not success.item():
                 return float('inf'), queries_counter, None
             lbd = current_best
@@ -374,7 +367,7 @@ class OPT(DirectionAttack):
         for i in range(1, max_steps):
             lbd_tmp = initial_lbd - step_size * i
             x_adv = self.get_x_adv(x, theta, lbd_tmp)
-            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase)
+            success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase, x)
             if not success.item():
                 break
             lbd = lbd_tmp
