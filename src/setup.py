@@ -99,19 +99,25 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "discrete": args.discrete == '1',
         "bounds": Bounds()
     }
+    search = SearchMode(args.search)
+    opt_grad_estimation_search = (SearchMode(args.opt_grad_est_search)
+                                  if args.opt_grad_est_search is not None else search)
+    opt_step_size_search = SearchMode(args.opt_step_size_search) if args.opt_step_size_search is not None else search
     opt_kwargs = {
         "max_iter": args.max_iter,
         "alpha": args.opt_alpha,
         "beta": args.opt_beta,
-        "search": SearchMode(args.search),
-        "line_search_overshoot": args.opt_line_search_overshoot
+        "search": search,
+        "line_search_overshoot": args.opt_line_search_overshoot,
+        "grad_estimation_search": opt_grad_estimation_search,
+        "step_size_search": opt_step_size_search,
     }
     if args.attack == "rays":
         if args.rays_flip_squares == '1' and args.rays_flip_rand_pixels == '1':
             raise ValueError("`--flip-squares` cannot be `1` if also `--flip-rand-pixels` is `1`")
         attack_kwargs = {
             "early_stopping": args.early == '1',
-            "search": SearchMode(args.search),
+            "search": search,
             "line_search_tol": args.line_search_tol,
             "flip_squares": args.rays_flip_squares == '1',
             "flip_rand_pixels": args.rays_flip_rand_pixels == '1'

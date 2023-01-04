@@ -21,6 +21,21 @@ DEFAULT_LINE_SEARCH_TOL = 1e-5
 MAX_STEPS_LINE_SEARCH = 1_000
 MAX_STEPS_COARSE_LINE_SEARCH = 200
 
+FineGrainedSearchFn = Callable[
+    [ModelWrapper, torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor, QueriesCounter, float, float],
+    tuple[float, QueriesCounter, float | None]]
+LocalFineGrainedSearchFn = Callable[[
+    ModelWrapper,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor | None,
+    torch.Tensor,
+    QueriesCounter,
+    float,
+    OPTAttackPhase,
+    float,
+], tuple[float, QueriesCounter, float | None]]
+
 
 class OPT(DirectionAttack):
     verbose = True
@@ -36,7 +51,8 @@ class OPT(DirectionAttack):
         return self.attack_untargeted(model, x, label, query_limit)
 
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool, max_iter: int,
-                 alpha: float, beta: float, search: SearchMode, line_search_overshoot: float):
+                 alpha: float, beta: float, search: SearchMode, line_search_overshoot: float,
+                 grad_estimation_search: SearchMode, step_size_search: SearchMode):
         super().__init__(epsilon, distance, bounds, discrete)
         self.num_directions = 100 if distance == l2 else 500
         # TODO: we may need a better way for controlling number of queries
@@ -44,33 +60,34 @@ class OPT(DirectionAttack):
         self.iterations = max_iter
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
-        self.fine_grained_search: Callable[
-            [ModelWrapper, torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor, QueriesCounter, float, float],
-            tuple[float, QueriesCounter, float | None]]
-        self.fine_grained_search_local: Callable[[
-            ModelWrapper,
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor | None,
-            torch.Tensor,
-            QueriesCounter,
-            float,
-            OPTAttackPhase,
-            float,
-        ], tuple[float, QueriesCounter, float | None]]
+
+        self.fine_grained_search: FineGrainedSearchFn
+        self.grad_estimation_search_fn: LocalFineGrainedSearchFn
+        self.step_size_search_search_fn: LocalFineGrainedSearchFn
         if search == SearchMode.binary:
             self.fine_grained_search = self.fine_grained_binary_search
-            self.fine_grained_search_local = self.fine_grained_binary_search_local
         elif search == SearchMode.line:
             self.fine_grained_search = lambda model, x, y, target, theta, queries_counter, initial_lbd, current_best: \
                 self.line_search(model, x, y, target, theta, queries_counter, initial_lbd, OPTAttackPhase.search,
                                  current_best, None)
-            self.fine_grained_search_local = (
+
+        if grad_estimation_search == SearchMode.binary:
+            self.grad_estimation_search_fn = self.fine_grained_binary_search_local
+        elif grad_estimation_search == SearchMode.line:
+            self.grad_estimation_search_fn = (
                 lambda model, x, y, target, theta, queries_counter, initial_lbd, phase, tol: self.line_search(
                     model, x, y, target, theta, queries_counter, initial_lbd, phase, None, line_search_overshoot, tol))
 
-    def attack_untargeted(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, query_limit: int | None) -> \
-            tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+        if step_size_search == SearchMode.binary:
+            self.step_size_search_search_fn = self.fine_grained_binary_search_local
+        else:
+            self.step_size_search_search_fn = (
+                lambda model, x, y, target, theta, queries_counter, initial_lbd, phase, tol: self.line_search(
+                    model, x, y, target, theta, queries_counter, initial_lbd, phase, None, line_search_overshoot, tol))
+
+    def attack_untargeted(
+            self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
+            query_limit: int | None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """Attack the original image and return adversarial example
         model: (pytorch model)
         train_dataset: set of training data
@@ -131,7 +148,7 @@ class OPT(DirectionAttack):
             ttt = theta.unsqueeze(0) + beta * u
             ttt, _ = normalize(ttt, batch=True)
             for j in range(q):
-                g1, queries_counter, lbd_factor = self.fine_grained_search_local(model, x, y, None, ttt[j],
+                g1, queries_counter, lbd_factor = self.grad_estimation_search_fn(model, x, y, None, ttt[j],
                                                                                  queries_counter, g2,
                                                                                  OPTAttackPhase.gradient_estimation,
                                                                                  beta / 500)
@@ -153,7 +170,7 @@ class OPT(DirectionAttack):
             for _ in range(15):
                 new_theta = theta - alpha * gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter, lbd_factor = self.fine_grained_search_local(
+                new_g2, queries_counter, lbd_factor = self.step_size_search_search_fn(
                     model, x, y, None, new_theta, queries_counter, min_g2, OPTAttackPhase.step_size_search, beta / 500)
                 lbd_factors.append(lbd_factor)
                 alpha *= 2
@@ -168,7 +185,7 @@ class OPT(DirectionAttack):
                     alpha *= 0.25
                     new_theta = theta - alpha * gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter, lbd_factor = self.fine_grained_search_local(
+                    new_g2, queries_counter, lbd_factor = self.step_size_search_search_fn(
                         model, x, y, None, new_theta, queries_counter, min_g2, OPTAttackPhase.step_size_search,
                         beta / 500)
                     lbd_factors.append(lbd_factor)
@@ -344,7 +361,7 @@ class OPT(DirectionAttack):
             ideal_step_size = math.ceil(ideal_step_size)
         max_steps = min(math.ceil(coarse_lbd / ideal_step_size), MAX_STEPS_LINE_SEARCH)
         step_size = coarse_lbd / max_steps
-        
+
         lbd, queries_counter = self._line_search_body(model, x, y, target, theta, queries_counter, coarse_lbd, phase,
                                                       max_steps, step_size)
 

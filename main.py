@@ -146,6 +146,16 @@ if __name__ == "__main__":
                         'an adaptive delta is used if this is None')
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
     parser.add_argument('--opt-beta', default=0.001, type=float, help='beta parameter for OPT and Sign OPT')
+    parser.add_argument(
+        '--opt-grad-est-search',
+        default=None,
+        type=str,
+        help='What search should be used for gradient estimation in OPT. Default is what it specified with --search')
+    parser.add_argument(
+        '--opt-step-size-search',
+        default=None,
+        type=str,
+        help='What search should be used for step size search in OPT. Default is what it specified with --search')
     parser.add_argument('--opt-line-search-overshoot',
                         default=2.5,
                         type=float,

@@ -26,10 +26,13 @@ class SignOPT(OPT):
         num_grad_queries: int,
         search: SearchMode,
         line_search_overshoot: float,
+        grad_estimation_search: SearchMode,
+        step_size_search: SearchMode,
         momentum: float = 0.,
         grad_batch_size: int | None = None,
     ):
-        super().__init__(epsilon, distance, bounds, discrete, max_iter, alpha, beta, search, line_search_overshoot)
+        super().__init__(epsilon, distance, bounds, discrete, max_iter, alpha, beta, search, line_search_overshoot,
+                         grad_estimation_search, step_size_search)
         self.num_grad_queries = num_grad_queries  # Num queries for grad estimate (default: 200)
         self.num_directions = 100
         self.momentum = momentum  # (default: 0)
@@ -118,16 +121,10 @@ class SignOPT(OPT):
                 else:
                     new_theta = xg - alpha * sign_gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter, _ = self.fine_grained_search_local(
-                    model,
-                    x,
-                    y,
-                    target,
-                    new_theta,
-                    queries_counter,
-                    min_g2,
-                    OPTAttackPhase.step_size_search,
-                    beta / 500)
+                new_g2, queries_counter, _ = self.step_size_search_search_fn(model, x, y, target, new_theta,
+                                                                             queries_counter, min_g2,
+                                                                             OPTAttackPhase.step_size_search,
+                                                                             beta / 500)
                 alpha *= 2
                 if new_g2 < min_g2:
                     min_theta = new_theta
@@ -146,7 +143,7 @@ class SignOPT(OPT):
                     else:
                         new_theta = xg - alpha * sign_gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter, _ = self.fine_grained_search_local(
+                    new_g2, queries_counter, _ = self.step_size_search_search_fn(
                         model,
                         x,
                         y,
