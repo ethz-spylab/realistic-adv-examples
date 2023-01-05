@@ -158,7 +158,7 @@ class SignOPT(OPT):
                         min_theta = new_theta
                         min_g2 = new_g2
                         if self.momentum > 0:
-                            min_vg = new_vg
+                            min_vg = new_vg  # type: ignore
                         break
 
             if alpha < 1e-4:
@@ -189,7 +189,7 @@ class SignOPT(OPT):
 
         x_adv = self.get_x_adv(x, xg, gg)
 
-        return x_adv, queries_counter, gg.item(), not queries_counter.is_out_of_queries(), {}
+        return x_adv, queries_counter, gg, not queries_counter.is_out_of_queries(), {}
 
     def sign_grad_v2(self,
                      model,

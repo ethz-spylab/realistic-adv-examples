@@ -27,12 +27,21 @@ def update_dict(d: dict[K, V], k: K, v: V) -> dict[K, V]:
 
 
 @dataclasses.dataclass
+class CurrentDistanceInfo:
+    phase: AttackPhase
+    safe: bool
+    distance: float
+    best_distance: float
+
+
+@dataclasses.dataclass
 class QueriesCounter:
     queries_limit: int | None
     limit_unsafe_queries: bool = False
     _queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
     _unsafe_queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
-    _distances: list[tuple[AttackPhase, bool, float]] = dataclasses.field(default_factory=list)
+    _distances: list[CurrentDistanceInfo] = dataclasses.field(default_factory=list)
+    _best_distance: float = float("inf")
 
     @property
     def total_queries(self) -> int:
@@ -51,18 +60,33 @@ class QueriesCounter:
         return self._unsafe_queries
 
     @property
-    def distances(self) -> list[tuple[AttackPhase, bool, float]]:
+    def distances(self) -> list[CurrentDistanceInfo]:
         return self._distances
+
+    @property
+    def best_distance(self) -> float:
+        return self._best_distance
 
     def increase(self, attack_phase: AttackPhase, safe: torch.Tensor, distance: torch.Tensor) -> "QueriesCounter":
         n_queries = safe.shape[0]
         updated_self = dataclasses.replace(self, _queries=increase_dict(self._queries, attack_phase, n_queries))
         n_unsafe = int((torch.logical_not(safe)).sum().item())
-        updated_distances = updated_self._distances + [(attack_phase, s, d)
-                                                       for s, d in zip(safe.tolist(), distance.tolist())]
+        new_distances, best_distance = self._make_distances_to_log(attack_phase, safe, distance)
+        updated_distances = updated_self._distances + new_distances
         return dataclasses.replace(updated_self,
                                    _unsafe_queries=increase_dict(self._unsafe_queries, attack_phase, n_unsafe),
-                                   _distances=updated_distances)
+                                   _distances=updated_distances,
+                                   _best_distance=best_distance)
+
+    def _make_distances_to_log(self, attack_phase: AttackPhase, safe_list: torch.Tensor,
+                               distance_list: torch.Tensor) -> tuple[list[CurrentDistanceInfo], float]:
+        updated_distances = []
+        best_distance = self.best_distance
+        for safe, distance in zip(safe_list.tolist(), distance_list.tolist()):
+            if safe and distance < best_distance:
+                best_distance = distance
+            updated_distances.append(CurrentDistanceInfo(attack_phase, safe, distance, best_distance))
+        return updated_distances, best_distance
 
     def is_out_of_queries(self) -> bool:
         if self.queries_limit is None:

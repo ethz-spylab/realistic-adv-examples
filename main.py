@@ -107,7 +107,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '--save-img-every',
-        default=None,
+        default=50,
         type=int,
     )
     parser.add_argument('--strong-preprocessing',
