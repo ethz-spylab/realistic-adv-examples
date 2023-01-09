@@ -67,7 +67,7 @@ ResponseLabelT = TypeVar("ResponseLabelT", bound=ResponseLabel)
 class EdenAINSFWModel(abc.ABC, Generic[ResponseLabelT]):
     _PROVIDER: Provider
     _URL: str = "https://api.edenai.run/v2/image/explicit_content"
-    _API_KEY: str = os.environ['EDENAI_TEST_API_KEY']
+    _API_KEY: str = os.environ['EDENAI_TEST_API_KEY'] if 'EDENAI_TEST_API_KEY' in os.environ else ""
     _RESPONSE_LABEL_TYPE: type[ResponseLabelT]
     _MAX_TRIALS = 10
 

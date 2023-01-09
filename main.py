@@ -106,6 +106,11 @@ if __name__ == "__main__":
         type=str,
     )
     parser.add_argument(
+        '--data-dir',
+        default='/data/imagenet/val',
+        type=str,
+    )
+    parser.add_argument(
         '--save-img-every',
         default=50,
         type=int,

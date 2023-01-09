@@ -40,7 +40,7 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
     elif args.dataset == 'resnet_imagenet':
         inner_model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).to(device).eval()
         inner_model = torch.nn.DataParallel(inner_model, device_ids=[0])
-        test_loader = dataset.load_imagenet_test_data(args.batch)
+        test_loader = dataset.load_imagenet_test_data(args.batch, args.data_dir)
         model = TorchModelWrapper(inner_model,
                                   n_class=1000,
                                   im_mean=(0.485, 0.456, 0.406),
@@ -49,7 +49,7 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
         inner_model = binary_resnet50.BinaryResNet50.load_from_checkpoint("checkpoints/binary_imagenet.ckpt").model.to(
             device).eval()
         inner_model = torch.nn.DataParallel(inner_model, device_ids=[0])
-        test_loader = dataset.load_binary_imagenet_test_data(args.batch)
+        test_loader = dataset.load_binary_imagenet_test_data(args.batch, args.data_dir)
         model = TorchModelWrapper(inner_model, n_class=2, im_mean=(0.485, 0.456, 0.406), im_std=(0.229, 0.224, 0.225))
     elif args.dataset == 'imagenet_nsfw':
         inner_model = clip_laion_nsfw.CLIPNSFWDetector("b32", "checkpoints")
