@@ -98,7 +98,7 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "distance": DISTANCES[args.norm],
         "discrete": args.discrete == '1',
         "bounds": Bounds(),
-        "limit_bad_queries": args.limit_bad_queries == '1'
+        "limit_unsafe_queries": args.limit_bad_queries == '1'
     }
     search = SearchMode(args.search)
     opt_grad_estimation_search = (SearchMode(args.opt_grad_est_search)
