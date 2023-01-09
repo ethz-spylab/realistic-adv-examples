@@ -111,7 +111,7 @@ class HSJA(PerturbationAttack):
         }
 
         # Set binary search threshold.
-        if params['constraint'] == 'l2':
+        if params['distance'] == l2:
             params['theta'] = params['gamma'] / (math.sqrt(params['d']) * params['d'])
         else:
             params['theta'] = params['gamma'] / (params['d']**2)
