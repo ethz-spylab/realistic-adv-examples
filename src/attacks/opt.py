@@ -19,10 +19,9 @@ class OPTAttackPhase(AttackPhase):
 
 
 class EMAValue:
-    def __init__(self, init_value: float, alpha: float = 0.9995, percentile: float = 95):
+    def __init__(self, init_value: float = 1.1, alpha: float = 0.9995, percentile: float = 95):
         self.alpha = alpha
         self.percentile = percentile
-        # TODO: decide if init_value can be 1 by default
         self._value: float = init_value
         self._all_values = [init_value]
 
@@ -66,10 +65,10 @@ class OPT(DirectionAttack):
             raise NotImplementedError('Targeted attack is not implemented for OPT')
         return self.attack_untargeted(model, x, label, query_limit)
 
-    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool, max_iter: int,
-                 alpha: float, beta: float, search: SearchMode, line_search_overshoot: float,
-                 grad_estimation_search: SearchMode, step_size_search: SearchMode):
-        super().__init__(epsilon, distance, bounds, discrete)
+    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
+                 limit_unsafe_queries: bool, max_iter: int, alpha: float, beta: float, search: SearchMode,
+                 line_search_overshoot: float, grad_estimation_search: SearchMode, step_size_search: SearchMode):
+        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries)
         self.num_directions = 100 if distance == l2 else 500
         self.iterations = max_iter
         self.alpha = alpha  # 0.2
@@ -116,7 +115,7 @@ class OPT(DirectionAttack):
         train_dataset: set of training data
         (x0, y0): original image
         """
-        queries_counter = QueriesCounter(query_limit)
+        queries_counter = QueriesCounter(query_limit, limit_unsafe_queries=self.limit_unsafe_queries)
         alpha, beta = self.alpha, self.beta
         grad_est_search_upper_bound = EMAValue(self.line_search_overshoot)
         grad_est_search_lower_bound = EMAValue(1 - (self.line_search_overshoot - 1))
@@ -395,7 +394,7 @@ class OPT(DirectionAttack):
                 upper_b.update(lbd_to_return / initial_lbd)
             return lbd_to_return, queries_counter, None, lower_b, upper_b
 
-        ideal_step_size = tol / 2
+        ideal_step_size = tol
         if self.discrete:
             ideal_step_size = math.ceil(ideal_step_size)
         max_steps = min(math.ceil(coarse_lbd / ideal_step_size), MAX_STEPS_LINE_SEARCH)
@@ -421,8 +420,8 @@ class OPT(DirectionAttack):
             lbd_tmp = initial_lbd - step_size * i
             x_adv = self.get_x_adv(x, theta, lbd_tmp)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase, x)
+            # We should update lbd and the counter *only* if the query was unsafe
             if success.item():
-                # We should not update lbd and the counter if the query was unsafe
                 lbd = lbd_tmp
                 i += 1
         first_query_failed = i == 0

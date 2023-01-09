@@ -22,13 +22,14 @@ class HSJA(PerturbationAttack):
                  distance: LpDistance,
                  bounds: Bounds,
                  discrete: bool,
+                 limit_unsafe_queries: bool,
                  num_iterations: int,
                  gamma: float = 1.0,
                  fixed_delta: float | None = None,
                  stepsize_search: str = "geometric_progression",
                  max_num_evals: int = int(1e4),
                  init_num_evals: int = 100):
-        super().__init__(epsilon, distance, bounds, discrete)
+        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries)
         self.init_num_evals = init_num_evals
         self.max_num_evals = max_num_evals
         self.stepsize_search = stepsize_search
@@ -116,7 +117,7 @@ class HSJA(PerturbationAttack):
             params['theta'] = params['gamma'] / (params['d']**2)
         params['theta'] = torch.tensor([params['theta']], device=sample.device)
 
-        queries_counter = QueriesCounter(max_queries)
+        queries_counter = QueriesCounter(max_queries, limit_unsafe_queries=self.limit_unsafe_queries)
 
         # Initialize.
         perturbed, queries_counter = self.initialize(model, sample, params, queries_counter)

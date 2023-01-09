@@ -116,6 +116,7 @@ if __name__ == "__main__":
                         help='Whether strong preprocessing (i.e., JPEG, Resize, Crop) '
                         'should be applied before feeding the image to the classifier')
     parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
+    parser.add_argument('--limit-bad-queries', default='0', type=str, help='Limit the number of bad queries')
     parser.add_argument('--discrete',
                         default='0',
                         type=str,
@@ -128,7 +129,7 @@ if __name__ == "__main__":
                         default='0',
                         type=str,
                         help='Whether the attack should flip random pixels not chunks of a 1-d vector')
-    parser.add_argument('--max-iter', default=64, type=int, help='Number of iterations for HSJA')
+    parser.add_argument('--max-iter', default=64, type=int, help='Number of iterations for HSJA, OPT and SignOPT')
     parser.add_argument('--hsja-stepsize-search',
                         default='geometric_progression',
                         type=str,

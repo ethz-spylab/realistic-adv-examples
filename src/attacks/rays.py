@@ -16,9 +16,10 @@ class RayS(DirectionAttack):
     n_early_stopping = 0
     init_line_search_radius = 10
 
-    def __init__(self, epsilon: float, distance: LpDistance, bounds: Bounds, discrete: bool, early_stopping: bool,
-                 search: SearchMode, line_search_tol: float | None, flip_squares: bool, flip_rand_pixels: bool):
-        super().__init__(epsilon, distance, bounds, discrete)
+    def __init__(self, epsilon: float, distance: LpDistance, bounds: Bounds, discrete: bool, limit_unsafe_queries: bool,
+                 early_stopping: bool, search: SearchMode, line_search_tol: float | None, flip_squares: bool,
+                 flip_rand_pixels: bool):
+        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries)
         self.line_search_tol = line_search_tol
         self.early_stopping = early_stopping
         self.search = search
@@ -44,7 +45,7 @@ class RayS(DirectionAttack):
         dim = int(np.prod(shape[1:]))
 
         # Init counter and variables
-        queries_counter = QueriesCounter(query_limit)
+        queries_counter = QueriesCounter(query_limit, limit_unsafe_queries=self.limit_unsafe_queries)
         best_distance = np.inf
         sgn_vector = torch.ones_like(x)
         x_final = self.get_x_adv(x, sgn_vector, best_distance)

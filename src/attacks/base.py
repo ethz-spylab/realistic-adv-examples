@@ -21,11 +21,13 @@ ExtraResultsDict = dict[str, ExtraResultsDictContent]
 
 
 class BaseAttack(abc.ABC):
-    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool):
+    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
+                 limit_unsafe_queries: bool):
         self.epsilon = epsilon
         self.discrete = discrete
         self.bounds = bounds
         self.distance = distance
+        self.limit_unsafe_queries = limit_unsafe_queries
 
     def is_correct_boundary_side(self, model: ModelWrapper, x_adv: torch.Tensor, y: torch.Tensor,
                                  target: torch.Tensor | None, queries_counter: QueriesCounter,

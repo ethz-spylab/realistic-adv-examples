@@ -20,6 +20,7 @@ class SignOPT(OPT):
         distance: LpDistance,
         bounds: Bounds,
         discrete: bool,
+        limit_unsafe_queries: bool,
         max_iter: int,
         alpha: float,
         beta: float,
@@ -31,8 +32,8 @@ class SignOPT(OPT):
         momentum: float = 0.,
         grad_batch_size: int | None = None,
     ):
-        super().__init__(epsilon, distance, bounds, discrete, max_iter, alpha, beta, search, line_search_overshoot,
-                         grad_estimation_search, step_size_search)
+        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries, max_iter, alpha, beta, search,
+                         line_search_overshoot, grad_estimation_search, step_size_search)
         self.num_grad_queries = num_grad_queries  # Num queries for grad estimate (default: 200)
         self.num_directions = 100
         self.momentum = momentum  # (default: 0)
@@ -63,7 +64,7 @@ class SignOPT(OPT):
         """Attack the original image and return adversarial example
         (x0, y0): original image
         """
-        queries_counter = QueriesCounter(query_limit)
+        queries_counter = QueriesCounter(query_limit, limit_unsafe_queries=self.limit_unsafe_queries)
         target = None
 
         # Calculate a good starting point.
