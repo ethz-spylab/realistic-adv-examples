@@ -125,7 +125,7 @@ class HSJA(PerturbationAttack):
         # Project the initialization to the boundary.
         perturbed, dist_post_update, queries_counter = self.binary_search_batch(sample, torch.unsqueeze(perturbed, 0),
                                                                                 model, params, queries_counter)
-        dist = compute_distance(perturbed, sample, distance)
+        dist = compute_distance(perturbed, sample, distance).item()
 
         for j in range(params['num_iterations']):
             params['cur_iter'] = j + 1
@@ -172,7 +172,7 @@ class HSJA(PerturbationAttack):
                         sample, perturbeds[idx_perturbed], model, params, queries_counter)
 
             # compute new distance.
-            dist = compute_distance(perturbed, sample, distance)
+            dist = compute_distance(perturbed, sample, distance).item()
             if verbose:
                 print('iteration: {:d}, {:s} distance {:.4f}, total queries {:.4f} total unsafe queries {:.4f}'.format(
                     j + 1, distance, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
