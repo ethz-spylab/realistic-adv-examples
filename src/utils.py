@@ -9,9 +9,9 @@ from src.attacks.queries_counter import AttackPhase, QueriesCounter
 from src.model_wrappers.general_model import ModelWrapper
 
 
-def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, distance: LpDistance = l2) -> float:
+def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, distance: LpDistance = l2) -> torch.Tensor:
     # Compute the distance between two images.
-    return distance(x_ori, x_pert).item()
+    return distance(x_ori, x_pert)
 
 
 def binomial_sum(x: int, max_unsafe_queries: int, max_steps: int):
