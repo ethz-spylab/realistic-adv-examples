@@ -38,6 +38,24 @@ class BaseAttack(abc.ABC):
         distance = self.distance(original_x, x_adv)
         return success, queries_counter.increase(attack_phase, safe=success, distance=distance)
 
+    def is_correct_boundary_side_batched(self, model: ModelWrapper, x_adv: torch.Tensor, y: torch.Tensor,
+                                         target: torch.Tensor | None, queries_counter: QueriesCounter,
+                                         attack_phase: AttackPhase,
+                                         original_x: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
+        # Get success vector but ignore queries counter because we will update it later
+        success, _ = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, attack_phase, original_x)
+        # If we hit the boundary, then we we consider the output up to the first unsafe query inclusive
+        # Otherwise we consider the whole output
+        boundary_hit = not success.all()
+        if boundary_hit:
+            first_unsafe_query_idx = torch.argmin(success.to(torch.int))
+        else:
+            first_unsafe_query_idx = len(success) + 1
+        relevant_success = success[:first_unsafe_query_idx + 1]
+        distance = self.distance(original_x, x_adv[:first_unsafe_query_idx + 1])
+        updated_queries_counter = queries_counter.increase(attack_phase, safe=relevant_success, distance=distance)
+        return relevant_success, updated_queries_counter
+
     def clamp_and_discretize(self, out: torch.Tensor) -> torch.Tensor:
         out = torch.clamp(out, self.bounds.lower, self.bounds.upper)
         if self.discrete:
@@ -67,8 +85,9 @@ class DirectionAttack(BaseAttack, abc.ABC):
     """
     Base class for attacks which optimize a direction instead of the perturbation directly
     """
-    def get_x_adv(self, x: torch.Tensor, v: torch.Tensor, d: float) -> torch.Tensor:
-        if self.discrete and not np.isinf(d):
+    def get_x_adv(self, x: torch.Tensor, v: torch.Tensor, d: float | torch.Tensor) -> torch.Tensor:
+        # TODO: make this check work on tensors as well
+        if isinstance(d, float) and self.discrete and not np.isinf(d):
             assert int(d) == d
             d = d / 255
         out: torch.Tensor = x + d * v  # type: ignore

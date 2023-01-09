@@ -71,8 +71,6 @@ class OPT(DirectionAttack):
                  grad_estimation_search: SearchMode, step_size_search: SearchMode):
         super().__init__(epsilon, distance, bounds, discrete)
         self.num_directions = 100 if distance == l2 else 500
-        # TODO: we may need a better way for controlling number of queries
-        # Can't exactly set max query for line search / binary search
         self.iterations = max_iter
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
@@ -157,7 +155,7 @@ class OPT(DirectionAttack):
                         self.log(f"---> Found distortion {g_theta:.4f}")
 
         if g_theta == float("inf"):
-            self.log("Couldn't find valid initial, failed")
+            self.log("Couldn't find valid initial direction, failed")
             return x, queries_counter, float("inf"), False, {}
 
         self.log(f"====> Found best distortion {g_theta:.4f} using {queries_counter.total_queries} "
@@ -387,10 +385,10 @@ class OPT(DirectionAttack):
             coarse_search_step_size = (lbd - lower_lbd) / MAX_STEPS_COARSE_LINE_SEARCH
         else:
             coarse_search_step_size = lbd / MAX_STEPS_COARSE_LINE_SEARCH
-        coarse_lbd, queries_counter = self._line_search_body(model, x, y, target, theta, queries_counter, lbd, phase,
-                                                             coarse_search_step_size)
+        coarse_lbd, queries_counter, first_query_failed = self._batched_line_search_body(
+            model, x, y, target, theta, queries_counter, lbd, phase, coarse_search_step_size)
 
-        if lbd == coarse_lbd:
+        if first_query_failed:
             print("Warning: line search overshoot was not enough")
             lbd_to_return = lbd * 2
             if upper_b is not None:
@@ -403,8 +401,8 @@ class OPT(DirectionAttack):
         max_steps = min(math.ceil(coarse_lbd / ideal_step_size), MAX_STEPS_LINE_SEARCH)
         step_size = coarse_search_step_size / max_steps
 
-        lbd, queries_counter = self._line_search_body(model, x, y, target, theta, queries_counter, coarse_lbd, phase,
-                                                      step_size)
+        lbd, queries_counter, _ = self._batched_line_search_body(model, x, y, target, theta, queries_counter,
+                                                                 coarse_lbd, phase, step_size)
 
         if upper_b is not None and lbd > initial_lbd:
             upper_b.update(lbd / initial_lbd)
@@ -415,17 +413,67 @@ class OPT(DirectionAttack):
 
     def _line_search_body(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None,
                           theta: torch.Tensor, queries_counter: QueriesCounter, initial_lbd: float, phase: AttackPhase,
-                          step_size: float) -> tuple[float, QueriesCounter]:
+                          step_size: float) -> tuple[float, QueriesCounter, bool]:
         lbd = initial_lbd
         success = torch.tensor([True])
-        i = 1
+        i = 0
         while success.item():
             lbd_tmp = initial_lbd - step_size * i
             x_adv = self.get_x_adv(x, theta, lbd_tmp)
             success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase, x)
-            lbd = lbd_tmp
-            i += 1
-        return lbd, queries_counter
+            if success.item():
+                # We should not update lbd and the counter if the query was unsafe
+                lbd = lbd_tmp
+                i += 1
+        first_query_failed = i == 0
+        return lbd, queries_counter, first_query_failed
+
+    def _batched_line_search_body(self,
+                                  model: ModelWrapper,
+                                  x: torch.Tensor,
+                                  y: torch.Tensor,
+                                  target: torch.Tensor | None,
+                                  theta: torch.Tensor,
+                                  queries_counter: QueriesCounter,
+                                  initial_lbd: float,
+                                  phase: AttackPhase,
+                                  step_size: float,
+                                  batch_size: int = 100) -> tuple[float, QueriesCounter, bool]:
+        success = torch.tensor([True])
+        batch_idx = 0
+        lbds_inner_shape = tuple([1] * (len(x.shape) - 1))
+        previous_last_lbd = torch.tensor([initial_lbd])
+        lbds = None
+
+        while success.all():
+            # Get steps bounds based on the batch index
+            start = batch_idx * batch_size
+            end = batch_idx * batch_size + 1
+            # Compute the steps to do
+            steps_sizes = torch.arange(start, end, device=x.device) * step_size
+            # Subtract the steps from the original distance
+            lbds = (initial_lbd - steps_sizes).reshape(-1, *lbds_inner_shape)
+            # Compute advex and query the model
+            batch = self.get_x_adv(x, theta, lbds)
+            success, queries_counter = self.is_correct_boundary_side_batched(model, batch, y, target, queries_counter,
+                                                                             phase, x)
+            # Update the last lbd (in case the whole next batch is unsafe) and the index
+            previous_last_lbd = lbds[-1]
+            batch_idx += 1
+
+        assert lbds is not None
+        # We get the index of the first unsafe query
+        unsafe_query_idx = torch.argmin(success.to(torch.int))
+        if unsafe_query_idx == 0:
+            # If no query was safe in the latest batch, then we return the last lbd from the previous batch
+            lbd = previous_last_lbd.item()
+        else:
+            lbd = lbds[unsafe_query_idx - 1].item()
+
+        # If we exited the loop after the first batch and the very first element was unsafe, then it means that
+        # the first query was unsafe
+        first_query_failed = batch_idx == 0 and bool((unsafe_query_idx == 0).item())
+        return lbd, queries_counter, first_query_failed
 
 
 def normalize(x: torch.Tensor, batch: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
