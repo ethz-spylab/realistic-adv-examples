@@ -6,7 +6,7 @@ import torch
 from foolbox.distances import LpDistance
 
 from src.attacks.base import Bounds, ExtraResultsDict, SearchMode
-from src.attacks.opt import OPT, OPTAttackPhase, normalize
+from src.attacks.opt import OPT, EMAValue, OPTAttackPhase, normalize
 from src.attacks.queries_counter import QueriesCounter
 from src.model_wrappers import ModelWrapper
 
@@ -76,8 +76,8 @@ class SignOPT(OPT):
                                                                      OPTAttackPhase.direction_search, x)
             if success.item():
                 theta, initial_lbd = normalize(theta)
-                lbd, queries_counter, _ = self.fine_grained_search(model, x, y, target, theta, queries_counter,
-                                                                   initial_lbd.item(), g_theta)
+                lbd, queries_counter, _, _, _ = self.fine_grained_search(model, x, y, target, theta, queries_counter,
+                                                                         initial_lbd.item(), g_theta)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
                     if self.verbose:
@@ -99,6 +99,7 @@ class SignOPT(OPT):
         best_pert = gg * xg
         vg = torch.zeros_like(xg)
         alpha, beta = self.alpha, self.beta
+        search_lower_bound = EMAValue(1 - (self.line_search_overshoot - 1), )
 
         for i in range(self.iterations):
             sign_gradient, queries_counter = self.sign_grad_v2(model,
@@ -121,10 +122,8 @@ class SignOPT(OPT):
                 else:
                     new_theta = xg - alpha * sign_gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter, _ = self.step_size_search_search_fn(model, x, y, target, new_theta,
-                                                                             queries_counter, min_g2,
-                                                                             OPTAttackPhase.step_size_search,
-                                                                             beta / 500)
+                new_g2, queries_counter, _, search_lower_bound, _ = self.step_size_search_search_fn(
+                    model, x, y, target, new_theta, queries_counter, min_g2, beta / 500, search_lower_bound)
                 alpha *= 2
                 if new_g2 < min_g2:
                     min_theta = new_theta
@@ -143,17 +142,8 @@ class SignOPT(OPT):
                     else:
                         new_theta = xg - alpha * sign_gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter, _ = self.step_size_search_search_fn(
-                        model,
-                        x,
-                        y,
-                        target,
-                        new_theta,
-                        queries_counter,
-                        min_g2,
-                        OPTAttackPhase.step_size_search,
-                        beta / 500,
-                    )
+                    new_g2, queries_counter, _, search_lower_bound, _ = self.step_size_search_search_fn(
+                        model, x, y, target, new_theta, queries_counter, min_g2, beta / 500, search_lower_bound)
                     if new_g2 < gg:
                         min_theta = new_theta
                         min_g2 = new_g2
