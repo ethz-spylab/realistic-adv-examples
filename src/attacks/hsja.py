@@ -125,7 +125,7 @@ class HSJA(PerturbationAttack):
         # Project the initialization to the boundary.
         perturbed, dist_post_update, queries_counter = self.binary_search_batch(sample, torch.unsqueeze(perturbed, 0),
                                                                                 model, params, queries_counter)
-        dist = compute_distance(perturbed, sample, distance).item()
+        dist = compute_distance(perturbed, sample.unsqueeze(0), distance).item()
 
         for j in range(params['num_iterations']):
             params['cur_iter'] = j + 1
@@ -172,10 +172,10 @@ class HSJA(PerturbationAttack):
                         sample, perturbeds[idx_perturbed], model, params, queries_counter)
 
             # compute new distance.
-            dist = compute_distance(perturbed, sample, distance).item()
+            dist = compute_distance(perturbed, sample.unsqueeze(0), distance).item()
             if verbose:
-                print('iteration: {:d}, {:s} distance {:.4f}, total queries {:.4f} total unsafe queries {:.4f}'.format(
-                    j + 1, distance, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
+                print('iteration: {:d}, {:f} distance {:.4f}, total queries {:.4f} total unsafe queries {:.4f}'.format(
+                    j + 1, distance.p, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
 
             if queries_counter.is_out_of_queries():
                 print("Out of queries")
@@ -261,11 +261,7 @@ class HSJA(PerturbationAttack):
         """ Binary search to approach the boundary."""
 
         # Compute distance between each of perturbed image and original image.
-        dists_post_update = torch.tensor([
-            compute_distance(original_image, perturbed_image, params['distance'])
-            for perturbed_image in perturbed_images
-        ],
-                                         device=original_image.device)
+        dists_post_update = compute_distance(original_image.unsqueeze(0), perturbed_images, params['distance'])
 
         highs: torch.Tensor
         lows: torch.Tensor
@@ -306,8 +302,7 @@ class HSJA(PerturbationAttack):
 
         # Compute distance of the output image to select the best choice.
         # (only used when stepsize_search is grid_search.)
-        dists = torch.tensor(
-            [compute_distance(original_image, out_image, params['distance']) for out_image in out_images])
+        dists = compute_distance(original_image.unsqueeze(0), out_images, params['distance'])
         idx = torch.argmin(dists)
 
         dist = dists_post_update[idx].item()
