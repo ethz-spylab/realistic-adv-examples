@@ -171,7 +171,7 @@ class RayS(DirectionAttack):
         stopped_early = False
         if self.discrete and not np.isinf(best_distance):
             # If we're in the discrete case then we can directly query the next integer
-            best_distance = math.ceil(best_distance * 255 - 1) / 255
+            best_distance = round(best_distance * 255 - 1) / 255
         d_start = 0
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
@@ -209,7 +209,7 @@ class RayS(DirectionAttack):
         self._check_input_size(x)
         if self.discrete and not np.isinf(best_distance):
             # If we're in the discrete case then we can directly query the next integer
-            best_distance = math.ceil(best_distance * 255 - 1) / 255
+            best_distance = round(best_distance * 255 - 1) / 255
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         stopped_early = False
@@ -251,7 +251,7 @@ class RayS(DirectionAttack):
         self._check_input_size(x)
         if self.discrete and not np.isinf(best_distance):
             # If we're in the discrete case then we can directly query the next integer
-            best_distance = math.ceil(best_distance * 255 - 1) / 255
+            best_distance = round(best_distance * 255 - 1) / 255
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         stopped_early = False
