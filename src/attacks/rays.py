@@ -16,8 +16,8 @@ class RayS(DirectionAttack):
     n_early_stopping = 0
     init_line_search_radius = 10
 
-    def __init__(self, epsilon: float, distance: LpDistance, bounds: Bounds, discrete: bool, queries_limit: int | None,
-                 unsafe_queries_limit: int | None, early_stopping: bool, search: SearchMode,
+    def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
+                 queries_limit: int | None, unsafe_queries_limit: int | None, early_stopping: bool, search: SearchMode,
                  line_search_tol: float | None, flip_squares: bool, flip_rand_pixels: bool):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.line_search_tol = line_search_tol
@@ -26,9 +26,8 @@ class RayS(DirectionAttack):
         self.flip_squares = flip_squares
         self.flip_rand_pixels = flip_rand_pixels
 
-        if self.discrete:
-            self.epsilon = round(self.epsilon * 255)
-            print(f"Making attack discrete with epsilon = {self.epsilon}")
+        if self.discrete and self.epsilon is not None:
+            print(f"Making attack discrete with epsilon = {self.epsilon * 255:.2f} / 255")
 
     def attack_hard_label(
             self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
@@ -106,7 +105,7 @@ class RayS(DirectionAttack):
                 max_block_ind = 2**block_level
 
             # Stop if the attack was successful or if we're out of queries
-            if self.early_stopping and (best_distance <= self.epsilon):
+            if self.early_stopping and self.epsilon is not None and best_distance <= self.epsilon:
                 break
             if updated_queries_counter.is_out_of_queries():
                 print('Out of queries')
@@ -114,8 +113,8 @@ class RayS(DirectionAttack):
 
             i += 1
             if i % 10 == 0:
-                print("Iter %3d d_t %.8f queries %d bad queries %d" %
-                      (i + 1, best_distance, updated_queries_counter.total_queries,
+                print("Iter %3d d_t %.2f / 255 queries %d bad queries %d" %
+                      (i + 1, best_distance * 255, updated_queries_counter.total_queries,
                        updated_queries_counter.total_unsafe_queries))
 
         print(
@@ -124,7 +123,8 @@ class RayS(DirectionAttack):
 
         extra_results: ExtraResultsDict = {"search_early_stoppings": search_early_stoppings}
 
-        return x_final, updated_queries_counter, best_distance, best_distance <= self.epsilon, extra_results
+        return (x_final, updated_queries_counter, best_distance,
+                best_distance <= self.epsilon if self.epsilon is not None else True, extra_results)
 
     def __call__(
             self,
@@ -145,9 +145,6 @@ class RayS(DirectionAttack):
         d_end = np.inf
         start = 1
         end = self.init_line_search_radius
-        if self.discrete:
-            start *= 255
-            end *= 255
 
         updated_queries_counter = queries_counter
         for distance in range(start, end + 1):
@@ -172,7 +169,9 @@ class RayS(DirectionAttack):
                       tol: float = 1e-3) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)
         stopped_early = False
-
+        if self.discrete and not np.isinf(best_distance):
+            # If we're in the discrete case then we can directly query the next integer
+            best_distance = math.ceil(best_distance * 255 - 1) / 255
         d_start = 0
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
@@ -180,13 +179,13 @@ class RayS(DirectionAttack):
             return d_end, updated_queries_counter, stopped_early
 
         if self.discrete:
-            tol = math.ceil(tol * 255)
+            tol = math.ceil(tol * 255) / 255
 
-        while d_end - d_start > tol:
+        while d_end - d_start > tol and not np.allclose((d_end - d_start) * 255, tol * 255, atol=1e-5):
             if not self.discrete:
                 d_mid = (d_start + d_end) / 2.0
             else:
-                d_mid = math.ceil((d_start + d_end) / 2.0)
+                d_mid = math.ceil((d_start + d_end) * 255 / 2) / 255
             x_adv = self.get_x_adv(x, direction, d_mid)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
                                                                              updated_queries_counter,
@@ -208,6 +207,9 @@ class RayS(DirectionAttack):
                     queries_counter: QueriesCounter,
                     tol: float = 1e-3) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)
+        if self.discrete and not np.isinf(best_distance):
+            # If we're in the discrete case then we can directly query the next integer
+            best_distance = math.ceil(best_distance * 255 - 1) / 255
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         stopped_early = False
@@ -217,7 +219,7 @@ class RayS(DirectionAttack):
         if not self.discrete:
             step_size = tol
         else:
-            step_size = math.ceil(tol * 255)
+            step_size = math.ceil(tol * 255) / 255
         max_steps = int(d_end // step_size)
 
         initial_d_end = d_end
@@ -247,6 +249,9 @@ class RayS(DirectionAttack):
                                  queries_counter: QueriesCounter,
                                  tol: float = 1e-3) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)
+        if self.discrete and not np.isinf(best_distance):
+            # If we're in the discrete case then we can directly query the next integer
+            best_distance = math.ceil(best_distance * 255 - 1) / 255
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         stopped_early = False
@@ -256,7 +261,8 @@ class RayS(DirectionAttack):
         if not self.discrete:
             step_size = tol
         else:
-            step_size = math.ceil(tol * 255)
+            step_size = math.ceil(tol * 255) / 255
+
         max_steps = int(d_end // step_size)
         steps_to_try = compute_eggs_steps_to_try(max_steps)
         initial_d_end = d_end

@@ -92,10 +92,14 @@ class DirectionAttack(BaseAttack, abc.ABC):
     Base class for attacks which optimize a direction instead of the perturbation directly
     """
     def get_x_adv(self, x: torch.Tensor, v: torch.Tensor, d: float | torch.Tensor) -> torch.Tensor:
-        # TODO: make this check work on tensors as well
-        if isinstance(d, float) and self.discrete and not np.isinf(d):
-            assert int(d) == d
-            d = d / 255
+        if self.discrete and not np.isinf(d):
+            integer_d = d * 255
+            if isinstance(integer_d, torch.Tensor):
+                assert torch.allclose(integer_d, torch.round(integer_d))
+                d = torch.round(integer_d) / 255
+            else:
+                assert np.allclose(round(integer_d), integer_d)
+                d = round(integer_d) / 255
         out: torch.Tensor = x + d * v  # type: ignore
         out = self.clamp_and_discretize(out)
         return out
