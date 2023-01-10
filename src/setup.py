@@ -13,10 +13,11 @@ from torchvision import models as models
 from torchvision.models import ResNet50_Weights
 
 from src import dataset
-from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, resnet50_cifar10, google_nsfw_model
+from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, google_nsfw_model, resnet50_cifar10
 from src.attacks import HSJA, OPT, RayS, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
-from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper, GoogleNSFWModelWrapper
+from src.model_wrappers import (EdenAIModelWrapper, GoogleNSFWModelWrapper, ModelWrapper, TFModelWrapper,
+                                TorchModelWrapper)
 
 API_KEY_NAME = "EDENAI_API_KEY"
 load_dotenv()

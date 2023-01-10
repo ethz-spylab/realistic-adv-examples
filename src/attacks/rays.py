@@ -179,13 +179,13 @@ class RayS(DirectionAttack):
             return d_end, updated_queries_counter, stopped_early
 
         if self.discrete:
-            tol = math.ceil(tol * 255) / 255
+            tol = (math.ceil(tol * 255) + 0.5) / 255
 
-        while d_end - d_start > tol and not np.allclose((d_end - d_start) * 255, tol * 255, atol=1e-5):
+        while d_end - d_start > tol:
             if not self.discrete:
                 d_mid = (d_start + d_end) / 2.0
             else:
-                d_mid = math.ceil((d_start + d_end) * 255 / 2) / 255
+                d_mid = round((d_start + d_end) * 255 / 2) / 255
             x_adv = self.get_x_adv(x, direction, d_mid)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
                                                                              updated_queries_counter,
