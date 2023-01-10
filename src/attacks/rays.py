@@ -57,6 +57,9 @@ class RayS(DirectionAttack):
         elif self.search == SearchMode.line:
             search_fn = lambda direction, distance, q_counter: self.line_search(model, x, y, target, direction,
                                                                                 distance, q_counter)
+        elif self.search == SearchMode.eggs_dropping:
+            search_fn = lambda direction, distance, q_counter: self.two_eggs_dropping_search(
+                model, x, y, target, direction, distance, q_counter)
         else:
             raise ValueError(f"Search method '{self.search}' not supported")
 
@@ -175,7 +178,7 @@ class RayS(DirectionAttack):
                                                            queries_counter)
         if np.isinf(d_end):
             return d_end, updated_queries_counter, stopped_early
-            
+
         if self.discrete:
             tol = math.ceil(tol * 255)
 
