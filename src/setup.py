@@ -153,8 +153,7 @@ def setup_attack(args: Namespace) -> BaseAttack:
 
 
 def get_git_revision_hash() -> str:
-    return "abcd"
-    #return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
 
 
 def setup_out_dir(args: Namespace) -> Path:
