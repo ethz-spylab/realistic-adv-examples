@@ -37,7 +37,7 @@ class CurrentDistanceInfo:
 @dataclasses.dataclass
 class QueriesCounter:
     queries_limit: int | None
-    limit_unsafe_queries: bool = False
+    unsafe_queries_limit: int | None = None
     _queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
     _unsafe_queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
     _distances: list[CurrentDistanceInfo] = dataclasses.field(default_factory=list)
@@ -89,8 +89,7 @@ class QueriesCounter:
         return updated_distances, best_distance
 
     def is_out_of_queries(self) -> bool:
-        if self.queries_limit is None:
-            return False
-        if self.limit_unsafe_queries:
-            return self.total_unsafe_queries >= self.queries_limit
-        return self.total_queries >= self.queries_limit
+        out_of_unsafe_queries = (self.unsafe_queries_limit is not None
+                                 and self.total_unsafe_queries >= self.unsafe_queries_limit)
+        out_of_safe_queries = self.queries_limit is not None and self.total_queries >= self.queries_limit
+        return out_of_unsafe_queries or out_of_safe_queries

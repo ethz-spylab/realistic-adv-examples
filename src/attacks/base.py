@@ -22,12 +22,16 @@ ExtraResultsDict = dict[str, ExtraResultsDictContent]
 
 class BaseAttack(abc.ABC):
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
-                 limit_unsafe_queries: bool):
+                 queries_limit: int | None, unsafe_queries_limit: int | None):
         self.epsilon = epsilon
         self.discrete = discrete
         self.bounds = bounds
         self.distance = distance
-        self.limit_unsafe_queries = limit_unsafe_queries
+        self.queries_limit = queries_limit
+        self.unsafe_queries_limit = unsafe_queries_limit
+
+    def _make_queries_counter(self) -> QueriesCounter:
+        return QueriesCounter(self.queries_limit, self.unsafe_queries_limit)
 
     def is_correct_boundary_side(self, model: ModelWrapper, x_adv: torch.Tensor, y: torch.Tensor,
                                  target: torch.Tensor | None, queries_counter: QueriesCounter,
@@ -68,12 +72,12 @@ class BaseAttack(abc.ABC):
         return out
 
     @abc.abstractmethod
-    def __call__(self,
-                 model: ModelWrapper,
-                 x: torch.Tensor,
-                 label: torch.Tensor,
-                 target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+    def __call__(
+            self,
+            model: ModelWrapper,
+            x: torch.Tensor,
+            label: torch.Tensor,
+            target: torch.Tensor | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         ...
 
 

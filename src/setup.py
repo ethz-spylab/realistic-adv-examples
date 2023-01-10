@@ -98,7 +98,8 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "distance": DISTANCES[args.norm],
         "discrete": args.discrete == '1',
         "bounds": Bounds(),
-        "limit_unsafe_queries": args.limit_bad_queries == '1'
+        "queries_limit": args.max_queries,
+        "unsafe_queries_limit": args.max_unsafe_queries
     }
     search = SearchMode(args.search)
     opt_grad_estimation_search = (SearchMode(args.opt_grad_est_search)
@@ -109,7 +110,6 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "alpha": args.opt_alpha,
         "beta": args.opt_beta,
         "search": search,
-        "line_search_overshoot": args.opt_line_search_overshoot,
         "grad_estimation_search": opt_grad_estimation_search,
         "step_size_search": opt_step_size_search,
     }

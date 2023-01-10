@@ -16,10 +16,10 @@ class RayS(DirectionAttack):
     n_early_stopping = 0
     init_line_search_radius = 10
 
-    def __init__(self, epsilon: float, distance: LpDistance, bounds: Bounds, discrete: bool, limit_unsafe_queries: bool,
-                 early_stopping: bool, search: SearchMode, line_search_tol: float | None, flip_squares: bool,
-                 flip_rand_pixels: bool):
-        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries)
+    def __init__(self, epsilon: float, distance: LpDistance, bounds: Bounds, discrete: bool, queries_limit: int | None,
+                 unsafe_queries_limit: int | None, early_stopping: bool, search: SearchMode,
+                 line_search_tol: float | None, flip_squares: bool, flip_rand_pixels: bool):
+        super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.line_search_tol = line_search_tol
         self.early_stopping = early_stopping
         self.search = search
@@ -31,12 +31,8 @@ class RayS(DirectionAttack):
             print(f"Making attack discrete with epsilon = {self.epsilon}")
 
     def attack_hard_label(
-            self,
-            model: ModelWrapper,
-            x: torch.Tensor,
-            y: torch.Tensor,
-            target: torch.Tensor | None,
-            query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+            self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
+            target: torch.Tensor | None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """ Attack the original image and return adversarial example
             model: (pytorch model)
             (x, y): original image
@@ -45,7 +41,7 @@ class RayS(DirectionAttack):
         dim = int(np.prod(shape[1:]))
 
         # Init counter and variables
-        queries_counter = QueriesCounter(query_limit, limit_unsafe_queries=self.limit_unsafe_queries)
+        queries_counter = self._make_queries_counter()
         best_distance = np.inf
         sgn_vector = torch.ones_like(x)
         x_final = self.get_x_adv(x, sgn_vector, best_distance)
@@ -127,13 +123,13 @@ class RayS(DirectionAttack):
 
         return x_final, updated_queries_counter, best_distance, best_distance <= self.epsilon, extra_results
 
-    def __call__(self,
-                 model: ModelWrapper,
-                 x: torch.Tensor,
-                 label: torch.Tensor,
-                 target: torch.Tensor | None = None,
-                 query_limit: int = 10000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
-        return self.attack_hard_label(model, x, label, target, query_limit)
+    def __call__(
+            self,
+            model: ModelWrapper,
+            x: torch.Tensor,
+            label: torch.Tensor,
+            target: torch.Tensor | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+        return self.attack_hard_label(model, x, label, target)
 
     @staticmethod
     def _check_input_size(x: torch.Tensor) -> None:

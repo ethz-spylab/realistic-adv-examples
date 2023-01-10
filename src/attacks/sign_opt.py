@@ -6,7 +6,7 @@ import torch
 from foolbox.distances import LpDistance
 
 from src.attacks.base import Bounds, ExtraResultsDict, SearchMode
-from src.attacks.opt import OPT, EMAValue, OPTAttackPhase, normalize
+from src.attacks.opt import INITIAL_OVERSHOOT_EMA_VALUE, OPT, EMAValue, OPTAttackPhase, normalize
 from src.attacks.queries_counter import QueriesCounter
 from src.model_wrappers import ModelWrapper
 
@@ -20,20 +20,20 @@ class SignOPT(OPT):
         distance: LpDistance,
         bounds: Bounds,
         discrete: bool,
-        limit_unsafe_queries: bool,
+        queries_limit: int | None,
+        unsafe_queries_limit: int | None,
         max_iter: int,
         alpha: float,
         beta: float,
         num_grad_queries: int,
         search: SearchMode,
-        line_search_overshoot: float,
         grad_estimation_search: SearchMode,
         step_size_search: SearchMode,
         momentum: float = 0.,
         grad_batch_size: int | None = None,
     ):
-        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries, max_iter, alpha, beta, search,
-                         line_search_overshoot, grad_estimation_search, step_size_search)
+        super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit, max_iter, alpha,
+                         beta, search, grad_estimation_search, step_size_search)
         self.num_grad_queries = num_grad_queries  # Num queries for grad estimate (default: 200)
         self.num_directions = 100
         self.momentum = momentum  # (default: 0)
@@ -46,25 +46,24 @@ class SignOPT(OPT):
         # self.tgt_init_query = args["signopt_tgt_init_query"]
         # self.targeted_dataloader = targeted_dataloader
 
-    def __call__(self,
-                 model: ModelWrapper,
-                 x: torch.Tensor,
-                 label: torch.Tensor,
-                 target: torch.Tensor | None = None,
-                 query_limit: int | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+    def __call__(
+            self,
+            model: ModelWrapper,
+            x: torch.Tensor,
+            label: torch.Tensor,
+            target: torch.Tensor | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         if target is not None:
             if self.momentum > 0:
                 warnings.warn("Currently, targeted Sign-OPT does not support momentum, ignoring argument.")
             raise NotImplementedError('Targeted attack is not implemented for OPT')
-        return self.attack_untargeted(model, x, label, query_limit)
+        return self.attack_untargeted(model, x, label)
 
-    def attack_untargeted(
-            self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
-            query_limit: int | None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+    def attack_untargeted(self, model: ModelWrapper, x: torch.Tensor,
+                          y: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """Attack the original image and return adversarial example
         (x0, y0): original image
         """
-        queries_counter = QueriesCounter(query_limit, limit_unsafe_queries=self.limit_unsafe_queries)
+        queries_counter = self._make_queries_counter()
         target = None
 
         # Calculate a good starting point.
@@ -100,7 +99,7 @@ class SignOPT(OPT):
         best_pert = gg * xg
         vg = torch.zeros_like(xg)
         alpha, beta = self.alpha, self.beta
-        search_lower_bound = EMAValue(1 - (self.line_search_overshoot - 1), )
+        search_lower_bound = EMAValue(1 - (INITIAL_OVERSHOOT_EMA_VALUE - 1), )
 
         for i in range(self.iterations):
             sign_gradient, queries_counter = self.sign_grad_v2(model,

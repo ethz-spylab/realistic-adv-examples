@@ -19,7 +19,7 @@ class OPTAttackPhase(AttackPhase):
 
 
 class EMAValue:
-    def __init__(self, init_value: float = 1.1, alpha: float = 0.9995, percentile: float = 95):
+    def __init__(self, init_value: float, alpha: float = 0.9995, percentile: float = 95):
         self.alpha = alpha
         self.percentile = percentile
         self._value: float = init_value
@@ -38,6 +38,7 @@ class EMAValue:
 DEFAULT_LINE_SEARCH_TOL = 1e-5
 MAX_STEPS_LINE_SEARCH = 100
 MAX_STEPS_COARSE_LINE_SEARCH = 100
+INITIAL_OVERSHOOT_EMA_VALUE = 1.1
 
 FineGrainedSearchFn = Callable[
     [ModelWrapper, torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor, QueriesCounter, float, float],
@@ -55,25 +56,24 @@ StepSizeSearchSearchFn = Callable[[
 class OPT(DirectionAttack):
     verbose = True
 
-    def __call__(self,
-                 model: ModelWrapper,
-                 x: torch.Tensor,
-                 label: torch.Tensor,
-                 target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+    def __call__(
+            self,
+            model: ModelWrapper,
+            x: torch.Tensor,
+            label: torch.Tensor,
+            target: torch.Tensor | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         if target is not None:
             raise NotImplementedError('Targeted attack is not implemented for OPT')
-        return self.attack_untargeted(model, x, label, query_limit)
+        return self.attack_untargeted(model, x, label)
 
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
-                 limit_unsafe_queries: bool, max_iter: int, alpha: float, beta: float, search: SearchMode,
-                 line_search_overshoot: float, grad_estimation_search: SearchMode, step_size_search: SearchMode):
-        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries)
+                 queries_limit: int | None, unsafe_queries_limit: int | None, max_iter: int, alpha: float, beta: float,
+                 search: SearchMode, grad_estimation_search: SearchMode, step_size_search: SearchMode):
+        super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.num_directions = 100 if distance == l2 else 500
         self.iterations = max_iter
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
-        self.line_search_overshoot = line_search_overshoot
 
         self.fine_grained_search: FineGrainedSearchFn
         self.grad_estimation_search_fn: GradientEstimationSearchFn
@@ -107,19 +107,18 @@ class OPT(DirectionAttack):
                     model, x, y, target, theta, queries_counter, initial_lbd, OPTAttackPhase.step_size_search, None,
                     lower_b, None, tol))
 
-    def attack_untargeted(
-            self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor,
-            query_limit: int | None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+    def attack_untargeted(self, model: ModelWrapper, x: torch.Tensor,
+                          y: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """Attack the original image and return adversarial example
         model: (pytorch model)
         train_dataset: set of training data
         (x0, y0): original image
         """
-        queries_counter = QueriesCounter(query_limit, limit_unsafe_queries=self.limit_unsafe_queries)
+        queries_counter = self._make_queries_counter()
         alpha, beta = self.alpha, self.beta
-        grad_est_search_upper_bound = EMAValue(self.line_search_overshoot)
-        grad_est_search_lower_bound = EMAValue(1 - (self.line_search_overshoot - 1))
-        step_size_search_lower_bound = EMAValue(1 - (self.line_search_overshoot - 1))
+        grad_est_search_upper_bound = EMAValue(INITIAL_OVERSHOOT_EMA_VALUE)
+        grad_est_search_lower_bound = EMAValue(1 - (INITIAL_OVERSHOOT_EMA_VALUE - 1))
+        step_size_search_lower_bound = EMAValue(1 - (INITIAL_OVERSHOOT_EMA_VALUE - 1))
 
         best_theta, prev_best_theta, g_theta = None, None, float("inf")
         print(f"Searching for the initial direction on {self.num_directions} random directions")

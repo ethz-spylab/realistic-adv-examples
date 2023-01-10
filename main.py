@@ -63,7 +63,7 @@ def main(args):
             print('re-generate target label')
             target = np.random.randint(model.n_class) * torch.ones(len(xi), dtype=torch.long).to(device)
 
-        adv, queries_counter, dist, succ, extra_results = attack(model, xi, yi, target, args.max_queries)
+        adv, queries_counter, dist, succ, extra_results = attack(model, xi, yi, target)
 
         if args.save_img_every is not None and count % args.save_img_every == 0:
             np.save(exp_out_dir / f"{i}_adv.npy", adv[0].cpu().numpy())
@@ -89,6 +89,7 @@ if __name__ == "__main__":
     parser.add_argument('--norm', default='linf', type=str, help='Norm for attack, linf only')
     parser.add_argument('--num', default=1000, type=int, help='Number of samples to be attacked from test dataset.')
     parser.add_argument('--max-queries', default=None, type=int, help='Maximum queries for the attack')
+    parser.add_argument('--max-unsafe-queries', default=None, type=int, help='Maximum unsafe queries for the attack')
     parser.add_argument('--batch', default=1, type=int, help='attack batch size.')
     parser.add_argument('--epsilon', default=0.05, type=float, help='attack strength')
     parser.add_argument('--early',
@@ -121,7 +122,6 @@ if __name__ == "__main__":
                         help='Whether strong preprocessing (i.e., JPEG, Resize, Crop) '
                         'should be applied before feeding the image to the classifier')
     parser.add_argument('--model-threshold', default=0.25, type=float, help='The threshold to use for the API model')
-    parser.add_argument('--limit-bad-queries', default='0', type=str, help='Limit the number of bad queries')
     parser.add_argument('--discrete',
                         default='0',
                         type=str,

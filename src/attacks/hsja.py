@@ -22,14 +22,15 @@ class HSJA(PerturbationAttack):
                  distance: LpDistance,
                  bounds: Bounds,
                  discrete: bool,
-                 limit_unsafe_queries: bool,
+                 queries_limit: int | None,
+                 unsafe_queries_limit: int | None,
                  num_iterations: int,
                  gamma: float = 1.0,
                  fixed_delta: float | None = None,
                  stepsize_search: str = "geometric_progression",
                  max_num_evals: int = int(1e4),
                  init_num_evals: int = 100):
-        super().__init__(epsilon, distance, bounds, discrete, limit_unsafe_queries)
+        super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.init_num_evals = init_num_evals
         self.max_num_evals = max_num_evals
         self.stepsize_search = stepsize_search
@@ -37,15 +38,15 @@ class HSJA(PerturbationAttack):
         self.num_iterations = num_iterations
         self.fixed_delta = fixed_delta
 
-    def __call__(self,
-                 model: ModelWrapper,
-                 x: torch.Tensor,
-                 label: torch.Tensor,
-                 target: torch.Tensor | None = None,
-                 query_limit: int = 10_000) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
+    def __call__(
+            self,
+            model: ModelWrapper,
+            x: torch.Tensor,
+            label: torch.Tensor,
+            target: torch.Tensor | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         return self.hsja(model, x, label, self.bounds.upper, self.bounds.lower, self.distance, self.num_iterations,
-                         self.gamma, self.fixed_delta, target, None, query_limit, self.stepsize_search,
-                         self.max_num_evals, self.init_num_evals)
+                         self.gamma, self.fixed_delta, target, None, self.stepsize_search, self.max_num_evals,
+                         self.init_num_evals)
 
     def hsja(self,
              model: ModelWrapper,
@@ -59,7 +60,6 @@ class HSJA(PerturbationAttack):
              fixed_delta: float | None = None,
              target_label: torch.Tensor | None = None,
              target_image: torch.Tensor | None = None,
-             max_queries: int | None = None,
              stepsize_search: str = 'geometric_progression',
              max_num_evals: int = int(1e4),
              init_num_evals: int = 100,
@@ -117,7 +117,7 @@ class HSJA(PerturbationAttack):
             params['theta'] = params['gamma'] / (params['d']**2)
         params['theta'] = torch.tensor([params['theta']], device=sample.device)
 
-        queries_counter = QueriesCounter(max_queries, limit_unsafe_queries=self.limit_unsafe_queries)
+        queries_counter = self._make_queries_counter()
 
         # Initialize.
         perturbed, queries_counter = self.initialize(model, sample, params, queries_counter)
