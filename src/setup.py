@@ -159,16 +159,14 @@ def get_git_revision_hash() -> str:
 
 def setup_out_dir(args: Namespace) -> Path:
     out_dir = Path(args.out_dir) / args.dataset / args.norm / args.attack
-    if not out_dir.exists():
-        out_dir.mkdir(parents=True)
-
-    def make_exp_out_dir() -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    def make_exp_out_dir_name() -> Path:
         return out_dir / f"discrete-{args.discrete}_targeted-{args.targeted}_early-{args.early}_{args.search}" \
                          f"_{args.epsilon:.3f}_{uuid.uuid4().hex}"
 
-    exp_out_dir = make_exp_out_dir()
+    exp_out_dir = make_exp_out_dir_name()
     while exp_out_dir.exists():
-        exp_out_dir = make_exp_out_dir()
+        exp_out_dir = make_exp_out_dir_name()
     exp_out_dir.mkdir()
     print(f"Saving results in {exp_out_dir}")
     exp_args = vars(args)
