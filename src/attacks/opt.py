@@ -75,6 +75,9 @@ class OPT(DirectionAttack):
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
 
+        if SearchMode.eggs_dropping in {search, grad_estimation_search, step_size_search}:
+            raise ValueError("eggs dropping search not available for OPT and SignOPT")
+
         self.fine_grained_search: FineGrainedSearchFn
         self.grad_estimation_search_fn: GradientEstimationSearchFn
         self.step_size_search_search_fn: StepSizeSearchSearchFn

@@ -175,13 +175,11 @@ class RayS(DirectionAttack):
                                                            queries_counter)
         if np.isinf(d_end):
             return d_end, updated_queries_counter, stopped_early
+            
+        if self.discrete:
+            tol = math.ceil(tol * 255)
 
-        if not self.discrete:
-            condition = lambda end, start: (end - start) > tol
-        else:
-            condition = lambda end, start: (end - start) > 1
-
-        while condition(d_end, d_start):
+        while d_end - d_start > tol:
             if not self.discrete:
                 d_mid = (d_start + d_end) / 2.0
             else:
@@ -205,9 +203,8 @@ class RayS(DirectionAttack):
                     direction: torch.Tensor,
                     best_distance: float,
                     queries_counter: QueriesCounter,
-                    max_steps=200) -> tuple[float, QueriesCounter, bool]:
+                    tol: float = 1e-3) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)
-
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         stopped_early = False
@@ -215,12 +212,73 @@ class RayS(DirectionAttack):
             return d_end, updated_queries_counter, stopped_early
 
         if not self.discrete:
-            step_size = d_end / max_steps
+            step_size = tol
         else:
-            step_size = math.ceil(d_end / max_steps)
+            step_size = math.ceil(tol * 255)
+        max_steps = int(d_end // step_size)
 
         initial_d_end = d_end
         for i in range(1, max_steps):
+            d_end_tmp = initial_d_end - step_size * i
+            x_adv = self.get_x_adv(x, direction, d_end_tmp)
+            success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
+                                                                             updated_queries_counter,
+                                                                             DirectionAttackPhase.search, x)
+            if not success.item():
+                break
+            d_end = d_end_tmp
+            # Check whether we can early stop and save an unsafe query
+            if self.line_search_tol is not None and 1 - (d_end / best_distance) >= self.line_search_tol:
+                stopped_early = True
+                break
+
+        return d_end, updated_queries_counter, stopped_early
+
+    def two_eggs_dropping_search(self,
+                                 model: ModelWrapper,
+                                 x: torch.Tensor,
+                                 y: torch.Tensor,
+                                 target: torch.Tensor | None,
+                                 direction: torch.Tensor,
+                                 best_distance: float,
+                                 queries_counter: QueriesCounter,
+                                 tol: float = 1e-3) -> tuple[float, QueriesCounter, bool]:
+        self._check_input_size(x)
+        d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
+                                                           queries_counter)
+        stopped_early = False
+        if np.isinf(d_end):
+            return d_end, updated_queries_counter, stopped_early
+
+        if not self.discrete:
+            step_size = tol
+        else:
+            step_size = math.ceil(tol * 255)
+        max_steps = int(d_end // step_size)
+        steps_to_try = compute_eggs_steps_to_try(max_steps)
+        initial_d_end = d_end
+        steps_done = 0
+        # Do the search with the first drop. The search does: n steps, then if it is successful it does n-1, and so on.
+        # If it fails, then it will continue with a regular line search
+        while steps_done <= max_steps:
+            d_end_tmp = initial_d_end - step_size * min(steps_to_try + steps_done, max_steps)
+            x_adv = self.get_x_adv(x, direction, d_end_tmp)
+            success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
+                                                                             updated_queries_counter,
+                                                                             DirectionAttackPhase.search, x)
+            if not success.item():
+                break
+            # Update the new d_end, increase the steps we did and reduce by one the number of steps to do at once
+            d_end = d_end_tmp
+            steps_done += steps_to_try
+            steps_to_try -= 1
+            if self.line_search_tol is not None and 1 - (d_end / best_distance) >= self.line_search_tol:
+                stopped_early = True
+                return d_end, updated_queries_counter, stopped_early
+
+        # Do a regular line search with the second drop
+        initial_d_end = d_end
+        for i in range(steps_done + 1, max_steps):
             d_end_tmp = initial_d_end - step_size * i
             x_adv = self.get_x_adv(x, direction, d_end_tmp)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
@@ -286,3 +344,7 @@ def flip_sign(sgn_vector: torch.Tensor, shape: list[int], dim: int, start: int, 
 
 def get_start_end(dim: int, block_ind: int, block_size: int) -> tuple[int, int]:
     return block_ind * block_size, min(dim, (block_ind + 1) * block_size)
+
+
+def compute_eggs_steps_to_try(max_steps: int) -> int:
+    return math.ceil((-1 + math.sqrt(1 + 8 * max_steps)) / 2)

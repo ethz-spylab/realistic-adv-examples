@@ -114,3 +114,4 @@ class PerturbationAttack(BaseAttack, abc.ABC):
 class SearchMode(str, Enum):
     binary = "binary"
     line = "line"
+    eggs_dropping = "eggs_dropping"
