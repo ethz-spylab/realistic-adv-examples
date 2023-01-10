@@ -173,7 +173,7 @@ class RayS(DirectionAttack):
             # If we're in the discrete case then we can directly query the next integer
             best_distance = math.ceil(best_distance * 255 - 1) / 255
         d_start = 0
-        d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance-1, direction,
+        d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         if np.isinf(d_end):
             return d_end, updated_queries_counter, stopped_early

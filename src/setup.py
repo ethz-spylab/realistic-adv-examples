@@ -153,7 +153,10 @@ def setup_attack(args: Namespace) -> BaseAttack:
 
 
 def get_git_revision_hash() -> str:
-    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    try:
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    except Exception:
+        return "unable to retrieve hash"
 
 
 def setup_out_dir(args: Namespace) -> Path:

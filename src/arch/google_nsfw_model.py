@@ -1,6 +1,7 @@
+import io
+
 import torch
 from google.cloud import vision
-import io
 
 from src.image_utils import torch_to_buffer
 
