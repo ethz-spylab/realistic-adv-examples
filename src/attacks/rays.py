@@ -39,6 +39,9 @@ class RayS(DirectionAttack):
         shape = list(x.shape)
         dim = int(np.prod(shape[1:]))
 
+        # tolerance for binary search and line search
+        tol = 1e-3 if not self.discrete else 1.0 / 255
+
         # Init counter and variables
         queries_counter = self._make_queries_counter()
         best_distance = np.inf
@@ -52,13 +55,13 @@ class RayS(DirectionAttack):
         search_fn: Callable[[torch.Tensor, float, QueriesCounter], tuple[float, QueriesCounter, bool]]
         if self.search == SearchMode.binary:
             search_fn = lambda direction, distance, q_counter: self.binary_search(model, x, y, target, direction,
-                                                                                  distance, q_counter)
+                                                                                  distance, q_counter, tol)
         elif self.search == SearchMode.line:
             search_fn = lambda direction, distance, q_counter: self.line_search(model, x, y, target, direction,
-                                                                                distance, q_counter)
+                                                                                distance, q_counter, tol)
         elif self.search == SearchMode.eggs_dropping:
             search_fn = lambda direction, distance, q_counter: self.two_eggs_dropping_search(
-                model, x, y, target, direction, distance, q_counter)
+                model, x, y, target, direction, distance, q_counter, tol)
         else:
             raise ValueError(f"Search method '{self.search}' not supported")
 
@@ -169,23 +172,17 @@ class RayS(DirectionAttack):
                       tol: float = 1e-3) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)
         stopped_early = False
+
         if self.discrete and not np.isinf(best_distance):
-            # If we're in the discrete case then we can directly query the next integer
-            best_distance = round(best_distance * 255 - 1) / 255
+            best_distance = best_distance - tol
         d_start = 0
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         if np.isinf(d_end):
             return d_end, updated_queries_counter, stopped_early
 
-        if self.discrete:
-            tol = (math.ceil(tol * 255) + 0.5) / 255
-
         while d_end - d_start > tol:
-            if not self.discrete:
-                d_mid = (d_start + d_end) / 2.0
-            else:
-                d_mid = round((d_start + d_end) * 255 / 2) / 255
+            d_mid = (d_start + d_end) / 2.0
             x_adv = self.get_x_adv(x, direction, d_mid)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
                                                                              updated_queries_counter,
@@ -194,6 +191,9 @@ class RayS(DirectionAttack):
                 d_end = d_mid
             else:
                 d_start = d_mid
+
+        if self.discrete:
+            d_end = math.ceil(d_end * 255) / 255
 
         return d_end, updated_queries_counter, stopped_early
 
@@ -208,18 +208,14 @@ class RayS(DirectionAttack):
                     tol: float = 1e-3) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)
         if self.discrete and not np.isinf(best_distance):
-            # If we're in the discrete case then we can directly query the next integer
-            best_distance = round(best_distance * 255 - 1) / 255
+            best_distance = best_distance - tol
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         stopped_early = False
         if np.isinf(d_end):
             return d_end, updated_queries_counter, stopped_early
 
-        if not self.discrete:
-            step_size = tol
-        else:
-            step_size = math.ceil(tol * 255) / 255
+        step_size = tol
         max_steps = int(d_end // step_size)
 
         initial_d_end = d_end
@@ -237,6 +233,8 @@ class RayS(DirectionAttack):
                 stopped_early = True
                 break
 
+        if self.discrete:
+            d_end = math.ceil(d_end * 255) / 255
         return d_end, updated_queries_counter, stopped_early
 
     def two_eggs_dropping_search(self,
@@ -251,17 +249,14 @@ class RayS(DirectionAttack):
         self._check_input_size(x)
         if self.discrete and not np.isinf(best_distance):
             # If we're in the discrete case then we can directly query the next integer
-            best_distance = round(best_distance * 255 - 1) / 255
+            best_distance = best_distance - tol
         d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
                                                            queries_counter)
         stopped_early = False
         if np.isinf(d_end):
             return d_end, updated_queries_counter, stopped_early
 
-        if not self.discrete:
-            step_size = tol
-        else:
-            step_size = math.ceil(tol * 255) / 255
+        step_size = tol
 
         max_steps = int(d_end // step_size)
         steps_to_try = compute_eggs_steps_to_try(max_steps)
@@ -300,6 +295,9 @@ class RayS(DirectionAttack):
             if self.line_search_tol is not None and 1 - (d_end / best_distance) >= self.line_search_tol:
                 stopped_early = True
                 break
+
+        if self.discrete:
+            d_end = math.ceil(d_end * 255) / 255
 
         return d_end, updated_queries_counter, stopped_early
 

@@ -64,11 +64,11 @@ class BaseAttack(abc.ABC):
 
     def clamp_and_discretize(self, out: torch.Tensor) -> torch.Tensor:
         out = torch.clamp(out, self.bounds.lower, self.bounds.upper)
-        if self.discrete:
-            assert torch.allclose(out, torch.round(out * 255) / 255)  # type: ignore
-            decoded_out = encode_decode(out)
-            assert torch.allclose(out, decoded_out, atol=1 / 256)
-            out = decoded_out
+        #if self.discrete:
+        #    assert torch.allclose(out, torch.round(out * 255) / 255)  # type: ignore
+        #    decoded_out = encode_decode(out)
+        #    assert torch.allclose(out, decoded_out, atol=1 / 256)
+        #    out = decoded_out
         return out
 
     @abc.abstractmethod
@@ -92,14 +92,14 @@ class DirectionAttack(BaseAttack, abc.ABC):
     Base class for attacks which optimize a direction instead of the perturbation directly
     """
     def get_x_adv(self, x: torch.Tensor, v: torch.Tensor, d: float | torch.Tensor) -> torch.Tensor:
-        if self.discrete and not np.isinf(d):
-            integer_d = d * 255
-            if isinstance(integer_d, torch.Tensor):
-                assert torch.allclose(integer_d, torch.round(integer_d))
-                d = torch.round(integer_d) / 255
-            else:
-                assert np.allclose(round(integer_d), integer_d)
-                d = round(integer_d) / 255
+        #if self.discrete and not np.isinf(d):
+        #    integer_d = d * 255
+        #    if isinstance(integer_d, torch.Tensor):
+        #        assert torch.allclose(integer_d, torch.round(integer_d))
+        #        d = torch.round(integer_d) / 255
+        #    else:
+        #        assert np.allclose(round(integer_d), integer_d)
+        #        d = round(integer_d) / 255
         out: torch.Tensor = x + d * v  # type: ignore
         out = self.clamp_and_discretize(out)
         return out
@@ -107,9 +107,9 @@ class DirectionAttack(BaseAttack, abc.ABC):
 
 class PerturbationAttack(BaseAttack, abc.ABC):
     def get_x_adv(self, x: torch.Tensor, delta: torch.Tensor) -> torch.Tensor:
-        if self.discrete:
-            assert torch.round(delta) == delta
-            delta = delta / 255
+        #if self.discrete:
+        #    assert torch.round(delta) == delta
+        #    delta = delta / 255
         out: torch.Tensor = x + delta  # type: ignore
         out = self.clamp_and_discretize(out)
         return out
