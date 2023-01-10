@@ -179,13 +179,14 @@ class RayS(DirectionAttack):
             return d_end, updated_queries_counter, stopped_early
 
         if self.discrete:
-            tol = (math.ceil(tol * 255) + 0.5) / 255
+            tol = 1 / 255
 
+        # We need to make self.discrete = False for the search only to avoid errors with ceil, round etc and numerical
+        # precision issues related to discretizing
+        was_discrete = self.discrete
+        self.discrete = False
         while d_end - d_start > tol:
-            if not self.discrete:
-                d_mid = (d_start + d_end) / 2.0
-            else:
-                d_mid = round((d_start + d_end) * 255 / 2) / 255
+            d_mid = (d_start + d_end) / 2.0
             x_adv = self.get_x_adv(x, direction, d_mid)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
                                                                              updated_queries_counter,
@@ -194,6 +195,8 @@ class RayS(DirectionAttack):
                 d_end = d_mid
             else:
                 d_start = d_mid
+        if was_discrete:
+            self.discrete = True
 
         return d_end, updated_queries_counter, stopped_early
 
