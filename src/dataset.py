@@ -91,7 +91,7 @@ def load_imagenet_nsfw_test_data(test_batch_size=1, indices_path: Optional[Path]
         batch["image"] = unnormalized_images
         return batch
 
-    val_dataset = load_dataset("dedeswim/imagenet-nsfw", split="train")
+    val_dataset = load_dataset("ethz-privsec/imagenet-nsfw", split="train")
     val_dataset = val_dataset.with_transform(transform)  # type: ignore
     if indices_path is not None:
         print(f"Filtering datasets keeping indices in {indices_path}")

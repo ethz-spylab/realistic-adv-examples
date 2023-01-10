@@ -13,10 +13,10 @@ from torchvision import models as models
 from torchvision.models import ResNet50_Weights
 
 from src import dataset
-from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, resnet50_cifar10
+from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, resnet50_cifar10, google_nsfw_model
 from src.attacks import HSJA, OPT, RayS, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
-from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper
+from src.model_wrappers import EdenAIModelWrapper, ModelWrapper, TFModelWrapper, TorchModelWrapper, GoogleNSFWModelWrapper
 
 API_KEY_NAME = "EDENAI_API_KEY"
 load_dotenv()
@@ -84,6 +84,11 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
                                                   strong_preprocessing=args.strong_preprocessing == '1')
         model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
+    elif args.dataset == 'google_cloud_nsfw':
+        inner_model = google_nsfw_model.GoogleNSFWModel(device)
+        model = GoogleNSFWModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
+        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch,
+                                                           Path("nsfw_filters_results/google_racy_five_indices.npy"))
     else:
         raise ValueError("Invalid model")
 
@@ -148,7 +153,8 @@ def setup_attack(args: Namespace) -> BaseAttack:
 
 
 def get_git_revision_hash() -> str:
-    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    return "abcd"
+    #return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
 
 
 def setup_out_dir(args: Namespace) -> Path:

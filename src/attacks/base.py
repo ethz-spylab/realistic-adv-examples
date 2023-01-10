@@ -93,9 +93,16 @@ class DirectionAttack(BaseAttack, abc.ABC):
     """
     def get_x_adv(self, x: torch.Tensor, v: torch.Tensor, d: float | torch.Tensor) -> torch.Tensor:
         # TODO: make this check work on tensors as well
-        if isinstance(d, float) and self.discrete and not np.isinf(d):
-            assert int(d) == d
+        #if isinstance(d, float) and self.discrete and not np.isinf(d):
+        #    assert int(d) == d
+        #    d = d / 255
+        if self.discrete and not np.isinf(d):
+            if isinstance(d, torch.Tensor):
+                assert torch.round(d) == d
+            else:
+                assert int(d) == d
             d = d / 255
+
         out: torch.Tensor = x + d * v  # type: ignore
         out = self.clamp_and_discretize(out)
         return out

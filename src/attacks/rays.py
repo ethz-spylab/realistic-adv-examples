@@ -171,7 +171,7 @@ class RayS(DirectionAttack):
         stopped_early = False
 
         d_start = 0
-        d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
+        d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance-1, direction,
                                                            queries_counter)
         if np.isinf(d_end):
             return d_end, updated_queries_counter, stopped_early
@@ -208,7 +208,7 @@ class RayS(DirectionAttack):
                     max_steps=200) -> tuple[float, QueriesCounter, bool]:
         self._check_input_size(x)
 
-        d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance, direction,
+        d_end, updated_queries_counter = self._init_search(model, x, y, target, best_distance-1, direction,
                                                            queries_counter)
         stopped_early = False
         if np.isinf(d_end):
