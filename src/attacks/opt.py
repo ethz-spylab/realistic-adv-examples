@@ -386,6 +386,7 @@ class OPT(DirectionAttack):
             coarse_search_step_size = (lbd - lower_lbd) / MAX_STEPS_COARSE_LINE_SEARCH
         else:
             coarse_search_step_size = lbd / MAX_STEPS_COARSE_LINE_SEARCH
+
         coarse_lbd, queries_counter, first_query_failed = self._batched_line_search_body(
             model, x, y, target, theta, queries_counter, lbd, phase, coarse_search_step_size)
 
@@ -444,22 +445,22 @@ class OPT(DirectionAttack):
         batch_idx = 0
         lbds_inner_shape = tuple([1] * (len(x.shape) - 1))
         previous_last_lbd = torch.tensor([initial_lbd])
-        lbds = None
+        lbds = np.array([initial_lbd])
 
         while success.all():
+            # Update the last lbd (in case the whole next batch is unsafe) and the index
+            previous_last_lbd = lbds[-1]
             # Get steps bounds based on the batch index
             start = batch_idx * batch_size
-            end = batch_idx * batch_size + 1
+            end = (batch_idx + 1) * batch_size
             # Compute the steps to do
-            steps_sizes = torch.arange(start, end, device=x.device) * step_size
+            steps_sizes = np.arange(start, end) * step_size
             # Subtract the steps from the original distance
             lbds = (initial_lbd - steps_sizes).reshape(-1, *lbds_inner_shape)
             # Compute advex and query the model
-            batch = self.get_x_adv(x, theta, lbds)
+            batch = self.get_x_adv(x, theta, torch.from_numpy(lbds).float().to(device=x.device))
             success, queries_counter = self.is_correct_boundary_side_batched(model, batch, y, target, queries_counter,
                                                                              phase, x)
-            # Update the last lbd (in case the whole next batch is unsafe) and the index
-            previous_last_lbd = lbds[-1]
             batch_idx += 1
 
         assert lbds is not None
