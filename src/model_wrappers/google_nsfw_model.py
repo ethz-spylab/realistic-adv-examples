@@ -27,6 +27,8 @@ class GoogleNSFWModelWrapper(ModelWrapper):
         self.num_queries += image.size(0)
         if self.num_queries % 100 == 0:
             print(f"Ran {self.num_queries} queries on Google NSFW model")
+        if self.num_queries > 10_000:
+            raise RuntimeError("Ran too many queries on Google NSFW model. Probably stuck somewhere")
         return prob
 
     def predict_label_binary(self, image, verbose=False):
