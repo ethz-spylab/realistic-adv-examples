@@ -391,9 +391,9 @@ class OPT(DirectionAttack):
             model, x, y, target, theta, queries_counter, lbd, phase, coarse_search_step_size)
 
         if first_query_failed:
-            print("Warning: line search overshoot was not enough")
             lbd_to_return = lbd * 2
             if upper_b is not None:
+                print("Warning: line search overshoot was not enough")
                 upper_b.update(lbd_to_return / initial_lbd)
             return lbd_to_return, queries_counter, None, lower_b, upper_b
 
@@ -474,7 +474,7 @@ class OPT(DirectionAttack):
 
         # If we exited the loop after the first batch and the very first element was unsafe, then it means that
         # the first query was unsafe
-        first_query_failed = batch_idx == 0 and bool((unsafe_query_idx == 0).item())
+        first_query_failed = batch_idx == 1 and bool((unsafe_query_idx == 0).item())
         return lbd, queries_counter, first_query_failed
 
 
