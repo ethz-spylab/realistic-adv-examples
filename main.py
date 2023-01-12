@@ -167,6 +167,15 @@ if __name__ == "__main__":
                         default=2.5,
                         type=float,
                         help='Line search overshoot for OPT and Sign OPT')
+    parser.add_argument('--opt-n-searches',
+                        default=2,
+                        type=int,
+                        help='Number of searches for OPT and Sign OPT',
+                        choices=[1, 2])
+    parser.add_argument('--opt-max-search-steps',
+                        default=10_000,
+                        type=int,
+                        help='Max number of line search steps for OPT and Sign OPT')
     parser.add_argument('--sign-opt-num-grad-queries',
                         default=200,
                         type=int,

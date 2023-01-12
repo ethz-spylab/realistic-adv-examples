@@ -68,15 +68,20 @@ class OPT(DirectionAttack):
 
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
                  queries_limit: int | None, unsafe_queries_limit: int | None, max_iter: int, alpha: float, beta: float,
-                 search: SearchMode, grad_estimation_search: SearchMode, step_size_search: SearchMode):
+                 search: SearchMode, grad_estimation_search: SearchMode, step_size_search: SearchMode, n_searches: int,
+                 max_search_steps: int):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.num_directions = 100 if distance == l2 else 500
         self.iterations = max_iter
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
+        self.n_searches = n_searches
+        self.max_search_steps = max_search_steps
 
         if SearchMode.eggs_dropping in {search, grad_estimation_search, step_size_search}:
             raise ValueError("eggs dropping search not available for OPT and SignOPT")
+        if self.n_searches not in {1, 2}:
+            raise ValueError("Only 1 or 2 searches can be done in OPT.")
 
         self.fine_grained_search: FineGrainedSearchFn
         self.grad_estimation_search_fn: GradientEstimationSearchFn
@@ -377,20 +382,22 @@ class OPT(DirectionAttack):
         if lower_b is not None:
             lower_lbd = lbd * lower_b.value
         else:
-            lower_lbd = None
+            lower_lbd = 0.
 
         if upper_b is not None:
             lbd = lbd * upper_b.value
 
-        if lower_lbd is not None:
-            coarse_search_step_size = (lbd - lower_lbd) / MAX_STEPS_COARSE_LINE_SEARCH
+        assert self.n_searches in {1, 2}
+        if self.n_searches == 2:
+            search_max_steps = math.ceil(math.sqrt(self.max_search_steps))
         else:
-            coarse_search_step_size = lbd / MAX_STEPS_COARSE_LINE_SEARCH
+            search_max_steps = self.max_search_steps
 
-        coarse_search_step_size = max(coarse_search_step_size, tol * MAX_STEPS_LINE_SEARCH)
+        first_search_step_size = (lbd - lower_lbd) / search_max_steps
+        # first_search_step_size = max(first_search_step_size, tol * search_max_steps)
 
-        coarse_lbd, queries_counter, first_query_failed = self._batched_line_search_body(
-            model, x, y, target, theta, queries_counter, lbd, phase, coarse_search_step_size)
+        first_search_lbd, queries_counter, first_query_failed = self._batched_line_search_body(
+            model, x, y, target, theta, queries_counter, lbd, phase, first_search_step_size)
 
         if first_query_failed:
             lbd_to_return = lbd * 2
@@ -399,21 +406,20 @@ class OPT(DirectionAttack):
                 upper_b.update(lbd_to_return / initial_lbd)
             return lbd_to_return, queries_counter, None, lower_b, upper_b
 
-        ideal_step_size = tol
-        if self.discrete:
-            ideal_step_size = math.ceil(ideal_step_size)
-        max_steps = min(math.ceil(coarse_lbd / ideal_step_size), MAX_STEPS_LINE_SEARCH)
-        step_size = coarse_search_step_size / max_steps
-
-        lbd, queries_counter, _ = self._batched_line_search_body(model, x, y, target, theta, queries_counter,
-                                                                 coarse_lbd, phase, step_size)
+        if self.n_searches == 2:
+            second_search_step_size = first_search_step_size / search_max_steps
+            final_lbd, queries_counter, _ = self._batched_line_search_body(model, x, y, target, theta, queries_counter,
+                                                                           first_search_lbd, phase,
+                                                                           second_search_step_size)
+        else:
+            final_lbd = first_search_lbd
 
         if upper_b is not None and lbd > initial_lbd:
-            upper_b.update(lbd / initial_lbd)
-        elif lower_b is not None and lbd < initial_lbd:
-            lower_b.update(lbd / initial_lbd)
+            upper_b.update(final_lbd / initial_lbd)
+        elif lower_b is not None and final_lbd < initial_lbd:
+            lower_b.update(final_lbd / initial_lbd)
 
-        return lbd, queries_counter, None, lower_b, upper_b
+        return final_lbd, queries_counter, None, lower_b, upper_b
 
     def _line_search_body(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None,
                           theta: torch.Tensor, queries_counter: QueriesCounter, initial_lbd: float, phase: AttackPhase,

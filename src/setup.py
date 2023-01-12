@@ -118,6 +118,8 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "search": search,
         "grad_estimation_search": opt_grad_estimation_search,
         "step_size_search": opt_step_size_search,
+        "n_searches": args.opt_n_searches,
+        "max_search_steps": args.opt_max_search_steps
     }
     if args.attack == "rays":
         if args.rays_flip_squares == '1' and args.rays_flip_rand_pixels == '1':
