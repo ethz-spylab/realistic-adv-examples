@@ -27,8 +27,8 @@ class EMAValue:
 
     def update(self, new_value: float):
         self._all_values.append(new_value)
-        percentile_value = np.percentile(self._all_values, self.percentile)
-        self._value = self.alpha * percentile_value + (1 - self.alpha) * percentile_value  # type: ignore
+        #percentile_value = np.percentile(self._all_values[-200:], self.percentile)
+        #self._value = self.alpha * percentile_value + (1 - self.alpha) * percentile_value  # type: ignore
 
     @property
     def value(self) -> float:
@@ -38,7 +38,7 @@ class EMAValue:
 DEFAULT_LINE_SEARCH_TOL = 1e-5
 MAX_STEPS_LINE_SEARCH = 100
 MAX_STEPS_COARSE_LINE_SEARCH = 100
-INITIAL_OVERSHOOT_EMA_VALUE = 1.1
+INITIAL_OVERSHOOT_EMA_VALUE = 1.01
 
 FineGrainedSearchFn = Callable[
     [ModelWrapper, torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor, QueriesCounter, float, float],
@@ -386,6 +386,8 @@ class OPT(DirectionAttack):
             coarse_search_step_size = (lbd - lower_lbd) / MAX_STEPS_COARSE_LINE_SEARCH
         else:
             coarse_search_step_size = lbd / MAX_STEPS_COARSE_LINE_SEARCH
+
+        coarse_search_step_size = max(coarse_search_step_size, tol * MAX_STEPS_LINE_SEARCH)
 
         coarse_lbd, queries_counter, first_query_failed = self._batched_line_search_body(
             model, x, y, target, theta, queries_counter, lbd, phase, coarse_search_step_size)
