@@ -181,7 +181,7 @@ class SignOPT(OPT):
 
         x_adv = self.get_x_adv(x, xg, gg)
 
-        return x_adv, queries_counter, gg, not queries_counter.is_out_of_queries(), {}
+        return x_adv, queries_counter, gg, True, {}
 
     def sign_grad_v2(self,
                      model,

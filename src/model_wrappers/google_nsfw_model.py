@@ -11,7 +11,7 @@ class GoogleNSFWModelWrapper(ModelWrapper):
                  im_mean: MeanStdType = None,
                  im_std: MeanStdType = None,
                  take_sigmoid=False,
-                 threshold: float = 2.0/5.0):
+                 threshold: float = 2.0 / 5.0):
         self.model = model
         self.threshold = threshold
         super().__init__(n_class, im_mean, im_std, take_sigmoid)

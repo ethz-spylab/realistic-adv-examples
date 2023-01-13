@@ -78,6 +78,10 @@ def main(args):
         count += 1
         attack_results.log_results(i)
         attack_results.save_results(exp_out_dir)
+        if attack_results.has_simulated_counters:
+            print("Simulated results:")
+            attack_results.simulated_self.log_results(i)
+            # attack_results.simulated_self.save_results(exp_out_dir / "simulated")
 
     attack_results.save_results(exp_out_dir, verbose=True)
 
@@ -92,7 +96,7 @@ if __name__ == "__main__":
     parser.add_argument('--max-queries', default=None, type=int, help='Maximum queries for the attack')
     parser.add_argument('--max-unsafe-queries', default=None, type=int, help='Maximum unsafe queries for the attack')
     parser.add_argument('--batch', default=1, type=int, help='attack batch size.')
-    parser.add_argument('--epsilon', default=0.05, type=float, help='attack strength')
+    parser.add_argument('--epsilon', default=None, type=float, help='attack strength')
     parser.add_argument('--early',
                         default='1',
                         type=str,

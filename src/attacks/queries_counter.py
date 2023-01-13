@@ -1,7 +1,7 @@
 import dataclasses
 from collections import defaultdict
 from enum import Enum
-from typing import TypeVar
+from typing import Optional, TypeVar
 
 import torch
 
@@ -42,6 +42,7 @@ class QueriesCounter:
     _unsafe_queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
     _distances: list[CurrentDistanceInfo] = dataclasses.field(default_factory=list)
     _best_distance: float = float("inf")
+    simulated_counter: Optional["QueriesCounter"] = None  # `"QueriesCounter" | None` is not supported for some reason
 
     @property
     def total_queries(self) -> int:
@@ -73,10 +74,15 @@ class QueriesCounter:
         n_unsafe = int((torch.logical_not(safe)).sum().item())
         new_distances, best_distance = self._make_distances_to_log(attack_phase, safe, distance)
         updated_distances = updated_self._distances + new_distances
+        if self.simulated_counter is not None:
+            new_simulated_counter = self.simulated_counter.increase(attack_phase, safe, distance)
+        else:
+            new_simulated_counter = None
         return dataclasses.replace(updated_self,
                                    _unsafe_queries=increase_dict(self._unsafe_queries, attack_phase, n_unsafe),
                                    _distances=updated_distances,
-                                   _best_distance=best_distance)
+                                   _best_distance=best_distance,
+                                   simulated_counter=new_simulated_counter)
 
     def _make_distances_to_log(self, attack_phase: AttackPhase, safe_list: torch.Tensor,
                                distance_list: torch.Tensor) -> tuple[list[CurrentDistanceInfo], float]:

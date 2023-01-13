@@ -44,6 +44,22 @@ class AttackResults:
               f"median bad queries: {np.median(np.array(self._get_overall_unsafe_queries())):.4f} "
               f"asr: {np.mean(np.array(self.asr)):.4f} \n")
 
+    @property
+    def simulated_self(self) -> "AttackResults":
+        simulated_queries_counters = list(map(lambda x: x.simulated_counter, self.queries_counters))
+        simulated_failed_queries_counters = list(map(lambda x: x.simulated_counter, self.failed_queries_counters))
+        return dataclasses.replace(self,
+                                   queries_counters=simulated_queries_counters,
+                                   failed_queries_counters=simulated_failed_queries_counters)
+
+    @property
+    def has_simulated_counters(self) -> bool:
+        has_simulated_counters = (len(self.queries_counters) != 0
+                                  and self.queries_counters[0].simulated_counter is not None)
+        has_simulated_failed_counters = (len(self.failed_queries_counters) != 0
+                                         and self.failed_queries_counters[0].simulated_counter is not None)
+        return has_simulated_counters or has_simulated_failed_counters
+
     def get_aggregated_results_dict(self) -> dict[str, float]:
         results_dict = {
             "asr": self.asr,
@@ -69,6 +85,9 @@ class AttackResults:
         return results_dict
 
     def save_results(self, out_dir: Path, verbose: bool = False):
+        import time
+        if not out_dir.exists():
+            out_dir.mkdir()
         with open(out_dir / "aggregated_results.json", 'w') as f:
             json.dump(self.get_aggregated_results_dict(), f, indent=4)
         with open(out_dir / "full_results.json", 'w') as f:
@@ -80,12 +99,19 @@ class AttackResults:
         np.save(out_dir / "failed_queries.npy", np.array(self._get_overall_failed_queries()))
         np.save(out_dir / "failed_unsafe_queries.npy", np.array(self._get_overall_failed_unsafe_queries()))
         with open(out_dir / "distances_traces.json", 'w') as f:
-            distances_list = list(map(lambda qc: list(map(dataclasses.asdict, qc.distances)), self.queries_counters))
-            json.dump(distances_list, f, indent=4)
+            start = time.time()
+            distances_list = list(
+                map(lambda qc: list(map(lambda distance_info: distance_info.__dict__, qc.distances)),
+                    self.queries_counters))
+            print(f"Computing {len(distances_list[0])} distances traces took {time.time() - start:.2f} seconds")
+            start = time.time()
+            json.dump(distances_list, f)
+            print(f"Dumping {len(distances_list[0])} distances traces took {time.time() - start:.2f} seconds")
         with open(out_dir / "failed_distances_traces.json", 'w') as f:
             distances_list = list(
-                map(lambda qc: list(map(dataclasses.asdict, qc.distances)), self.failed_queries_counters))
-            json.dump(distances_list, f, indent=4)
+                map(lambda qc: list(map(lambda distance_info: distance_info.__dict__, qc.distances)),
+                    self.failed_queries_counters))
+            json.dump(distances_list, f)
         if verbose:
             print(f"Saved results to {out_dir}")
 
