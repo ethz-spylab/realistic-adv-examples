@@ -46,19 +46,11 @@ class AttackResults:
 
     @property
     def simulated_self(self) -> "AttackResults":
-        simulated_queries_counters = list(map(lambda x: x.simulated_counter, self.queries_counters))
-        simulated_failed_queries_counters = list(map(lambda x: x.simulated_counter, self.failed_queries_counters))
-        return dataclasses.replace(self,
-                                   queries_counters=simulated_queries_counters,
-                                   failed_queries_counters=simulated_failed_queries_counters)
+        ...
 
     @property
     def has_simulated_counters(self) -> bool:
-        has_simulated_counters = (len(self.queries_counters) != 0
-                                  and self.queries_counters[0].simulated_counter is not None)
-        has_simulated_failed_counters = (len(self.failed_queries_counters) != 0
-                                         and self.failed_queries_counters[0].simulated_counter is not None)
-        return has_simulated_counters or has_simulated_failed_counters
+        return False
 
     def get_aggregated_results_dict(self) -> dict[str, float]:
         results_dict = {

@@ -81,7 +81,6 @@ def main(args):
         if attack_results.has_simulated_counters:
             print("Simulated results:")
             attack_results.simulated_self.log_results(i)
-            # attack_results.simulated_self.save_results(exp_out_dir / "simulated")
 
     attack_results.save_results(exp_out_dir, verbose=True)
 
@@ -180,10 +179,7 @@ if __name__ == "__main__":
                         default=10_000,
                         type=int,
                         help='Max number of line search steps for OPT and Sign OPT')
-    parser.add_argument('--opt-bs',
-                        default=100,
-                        type=int,
-                        help='Batch size for for OPT and Sign OPT')
+    parser.add_argument('--opt-bs', default=100, type=int, help='Batch size for for OPT and Sign OPT')
     parser.add_argument('--sign-opt-num-grad-queries',
                         default=200,
                         type=int,

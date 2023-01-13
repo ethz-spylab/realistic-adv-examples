@@ -146,10 +146,7 @@ def setup_attack(args: Namespace) -> BaseAttack:
     if args.attack == "opt":
         return OPT(**base_attack_kwargs, **opt_kwargs)
     if args.attack == "sign_opt":
-        attack_kwargs = {
-            "num_grad_queries": args.sign_opt_num_grad_queries,
-            "momentum": args.sign_opt_momentum
-        }
+        attack_kwargs = {"num_grad_queries": args.sign_opt_num_grad_queries, "momentum": args.sign_opt_momentum}
         return SignOPT(**base_attack_kwargs, **opt_kwargs, **attack_kwargs)
     else:
         raise ValueError(f"Invalid attack: `{args.attack}`")

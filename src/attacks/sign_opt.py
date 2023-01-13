@@ -35,7 +35,8 @@ class SignOPT(OPT):
         batch_size: int | None = None,
     ):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit, max_iter, alpha,
-                         beta, search, grad_estimation_search, step_size_search, n_searches, max_search_steps, batch_size)
+                         beta, search, grad_estimation_search, step_size_search, n_searches, max_search_steps,
+                         batch_size)
         self.num_grad_queries = num_grad_queries  # Num queries for grad estimate (default: 200)
         self.num_directions = 100
         self.momentum = momentum  # (default: 0)

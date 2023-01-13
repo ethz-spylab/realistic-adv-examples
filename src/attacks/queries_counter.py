@@ -1,7 +1,7 @@
 import dataclasses
 from collections import defaultdict
 from enum import Enum
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 import torch
 
@@ -32,6 +32,7 @@ class CurrentDistanceInfo:
     safe: bool
     distance: float
     best_distance: float
+    equivalent_simulated_queries: int = 0
 
 
 @dataclasses.dataclass
@@ -42,7 +43,6 @@ class QueriesCounter:
     _unsafe_queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
     _distances: list[CurrentDistanceInfo] = dataclasses.field(default_factory=list)
     _best_distance: float = float("inf")
-    simulated_counter: Optional["QueriesCounter"] = None  # `"QueriesCounter" | None` is not supported for some reason
 
     @property
     def total_queries(self) -> int:
@@ -68,30 +68,34 @@ class QueriesCounter:
     def best_distance(self) -> float:
         return self._best_distance
 
-    def increase(self, attack_phase: AttackPhase, safe: torch.Tensor, distance: torch.Tensor) -> "QueriesCounter":
+    def increase(self,
+                 attack_phase: AttackPhase,
+                 safe: torch.Tensor,
+                 distance: torch.Tensor,
+                 equivalent_simulated_queries: int = 0) -> "QueriesCounter":
         n_queries = safe.shape[0]
         updated_self = dataclasses.replace(self, _queries=increase_dict(self._queries, attack_phase, n_queries))
         n_unsafe = int((torch.logical_not(safe)).sum().item())
-        new_distances, best_distance = self._make_distances_to_log(attack_phase, safe, distance)
+        new_distances, best_distance = self._make_distances_to_log(attack_phase, safe, distance,
+                                                                   equivalent_simulated_queries)
         updated_distances = updated_self._distances + new_distances
-        if self.simulated_counter is not None:
-            new_simulated_counter = self.simulated_counter.increase(attack_phase, safe, distance)
-        else:
-            new_simulated_counter = None
         return dataclasses.replace(updated_self,
                                    _unsafe_queries=increase_dict(self._unsafe_queries, attack_phase, n_unsafe),
                                    _distances=updated_distances,
-                                   _best_distance=best_distance,
-                                   simulated_counter=new_simulated_counter)
+                                   _best_distance=best_distance)
 
-    def _make_distances_to_log(self, attack_phase: AttackPhase, safe_list: torch.Tensor,
-                               distance_list: torch.Tensor) -> tuple[list[CurrentDistanceInfo], float]:
+    def _make_distances_to_log(self,
+                               attack_phase: AttackPhase,
+                               safe_list: torch.Tensor,
+                               distance_list: torch.Tensor,
+                               equivalent_simulated_queries: int = 0) -> tuple[list[CurrentDistanceInfo], float]:
         updated_distances = []
         best_distance = self.best_distance
         for safe, distance in zip(safe_list.tolist(), distance_list.tolist()):
             if safe and distance < best_distance:
                 best_distance = distance
-            updated_distances.append(CurrentDistanceInfo(attack_phase, safe, distance, best_distance))
+            updated_distances.append(
+                CurrentDistanceInfo(attack_phase, safe, distance, best_distance, equivalent_simulated_queries))
         return updated_distances, best_distance
 
     def is_out_of_queries(self) -> bool:

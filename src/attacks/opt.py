@@ -1,4 +1,3 @@
-from dataclasses import replace
 import math
 from typing import Callable
 
@@ -127,8 +126,6 @@ class OPT(DirectionAttack):
         (x0, y0): original image
         """
         queries_counter = self._make_queries_counter()
-        if self.grad_estimation_search_type and self.n_searches == 2:
-            queries_counter.simulated_counter = self._make_queries_counter()
 
         alpha, beta = self.alpha, self.beta
         grad_est_search_upper_bound = EMAValue(INITIAL_OVERSHOOT_EMA_VALUE)
@@ -403,7 +400,20 @@ class OPT(DirectionAttack):
         # first_search_step_size = max(first_search_step_size, tol * search_max_steps)
 
         first_search_lbd, first_search_queries_counter, first_query_failed = self._batched_line_search_body(
-            model, x, y, target, theta, queries_counter, lbd, phase, first_search_step_size, search_batch_size)
+            model,
+            x,
+            y,
+            target,
+            theta,
+            queries_counter,
+            lbd,
+            phase,
+            first_search_step_size,
+            search_batch_size,
+            # Here we count each query of the first search as equivalent to search_max_steps queries of when we do 1
+            equivalent_simulated_queries=search_max_steps,
+            # But we don't count the queries from the last batch as they will be counted in the second search
+            count_equivalent_if_unsafe=False)
 
         if first_query_failed:
             lbd_to_return = lbd * 2
@@ -415,8 +425,20 @@ class OPT(DirectionAttack):
         if self.n_searches == 2:
             second_search_step_size = first_search_step_size / search_max_steps
             final_lbd, second_search_queries_counter, _ = self._batched_line_search_body(
-                model, x, y, target, theta, first_search_queries_counter, first_search_lbd, phase,
-                second_search_step_size, search_batch_size)
+                model,
+                x,
+                y,
+                target,
+                theta,
+                first_search_queries_counter,
+                first_search_lbd,
+                phase,
+                second_search_step_size,
+                search_batch_size,
+                # Here each query has the same step size as if we were doing one search only
+                equivalent_simulated_queries=1,
+                # And we count the queries from the last batch as they are not counted in the first search
+                count_equivalent_if_unsafe=True)
         else:
             second_search_queries_counter = first_search_queries_counter
             final_lbd = first_search_lbd
@@ -426,43 +448,7 @@ class OPT(DirectionAttack):
         elif lower_b is not None and final_lbd < initial_lbd:
             lower_b.update(final_lbd / initial_lbd)
 
-        if queries_counter.simulated_counter is None:
-            final_queries_counter = second_search_queries_counter
-        else:
-            # If we are simulating the 1-search attack, then add the simulated queries to the
-            # simulated counter from prior to the 2 searches, but this simulated counter is put
-            # into the counter from the searches
-            final_queries_counter = self._add_simulated_line_search_queries(x, theta, queries_counter,
-                                                                            second_search_queries_counter, phase, lbd,
-                                                                            lower_lbd, final_lbd)
-
-        return final_lbd, final_queries_counter, None, lower_b, upper_b
-
-    def _add_simulated_line_search_queries(self, x: torch.Tensor, theta: torch.Tensor,
-                                           original_queries_counter: QueriesCounter,
-                                           queries_counter_to_update: QueriesCounter, attack_phase: AttackPhase,
-                                           upper_lbd: float, lower_lbd: float, final_lbd: float) -> QueriesCounter:
-        assert original_queries_counter.simulated_counter is not None
-        # Compute the step size of the search
-        step_size = (upper_lbd - lower_lbd) / self.max_search_steps
-        # Compute the steps lbds of the steps to do in the search
-        steps = torch.arange(lower_lbd, upper_lbd, step_size, device=x.device)
-        # Compute the steps that would have been done in the search and keep only those
-        # We have to include one additional step representing the unsafe query
-        n_steps_done = steps[steps <= final_lbd].shape[0] + 1
-        steps_done = steps[:n_steps_done + 1]
-        # Create the success tensor: all the steps are safe but the last one
-        success = torch.ones_like(steps_done).to(torch.bool)
-        success[-1] = False
-        # Compute the distances given the steps done
-        updated_simulated_counter = original_queries_counter.simulated_counter
-        for i in range(0, steps_done.shape[0], self.batch_size):
-            steps_done_batch = steps_done[i:i + self.batch_size].reshape(-1, *tuple([1] * (len(x.shape) - 1)))
-            x_adv = self.get_x_adv(x, theta, steps_done_batch)
-            distances = self.distance(x, x_adv)
-            updated_simulated_counter = updated_simulated_counter.increase(attack_phase, success, distances)
-        # But use it to update the one after the search to to keep the real results
-        return replace(queries_counter_to_update, simulated_counter=updated_simulated_counter)
+        return final_lbd, second_search_queries_counter, None, lower_b, upper_b
 
     def _line_search_body(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None,
                           theta: torch.Tensor, queries_counter: QueriesCounter, initial_lbd: float, phase: AttackPhase,
@@ -491,7 +477,9 @@ class OPT(DirectionAttack):
                                   initial_lbd: float,
                                   phase: AttackPhase,
                                   step_size: float,
-                                  batch_size: int = MAX_BATCH_SIZE) -> tuple[float, QueriesCounter, bool]:
+                                  batch_size: int = MAX_BATCH_SIZE,
+                                  equivalent_simulated_queries: int = 0,
+                                  count_equivalent_if_unsafe: bool = False) -> tuple[float, QueriesCounter, bool]:
         success = torch.tensor([True])
         batch_idx = 0
         lbds_inner_shape = tuple([1] * (len(x.shape) - 1))
@@ -511,7 +499,8 @@ class OPT(DirectionAttack):
             # Compute advex and query the model
             batch = self.get_x_adv(x, theta, torch.from_numpy(lbds).float().to(device=x.device))
             success, queries_counter = self.is_correct_boundary_side_batched(model, batch, y, target, queries_counter,
-                                                                             phase, x)
+                                                                             phase, x, equivalent_simulated_queries,
+                                                                             count_equivalent_if_unsafe)
             batch_idx += 1
 
         assert lbds is not None
