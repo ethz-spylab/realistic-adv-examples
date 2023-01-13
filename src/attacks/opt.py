@@ -196,7 +196,7 @@ class OPT(DirectionAttack):
                 lbd_factors.append(lbd_factor)
             gradient = 1.0 / q * gradient
 
-            if (i + 1) % 1 == 0:
+            if (i + 1) % 10 == 0:
                 dist = (g2 * theta).norm().item()
                 self.log((f"Iteration {i + 1:3d} distortion {dist:.4f} num_queries {queries_counter.total_queries}, "
                           f"unsafe queries: {queries_counter.total_unsafe_queries}"))
