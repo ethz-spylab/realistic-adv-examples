@@ -71,7 +71,7 @@ class OPT(DirectionAttack):
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
                  queries_limit: int | None, unsafe_queries_limit: int | None, max_iter: int, alpha: float, beta: float,
                  search: SearchMode, grad_estimation_search: SearchMode, step_size_search: SearchMode, n_searches: int,
-                 max_search_steps: int):
+                 max_search_steps: int, batch_size: int | None):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.num_directions = 100 if distance == l2 else 500
         self.iterations = max_iter
@@ -80,6 +80,7 @@ class OPT(DirectionAttack):
         self.n_searches = n_searches
         self.max_search_steps = max_search_steps
         self.grad_estimation_search_type = grad_estimation_search
+        self.batch_size = batch_size if batch_size is not None else MAX_BATCH_SIZE
 
         if SearchMode.eggs_dropping in {search, grad_estimation_search, step_size_search}:
             raise ValueError("eggs dropping search not available for OPT and SignOPT")
@@ -397,7 +398,7 @@ class OPT(DirectionAttack):
             search_max_steps = math.ceil(math.sqrt(self.max_search_steps))
         else:
             search_max_steps = self.max_search_steps
-        search_batch_size = min(search_max_steps, MAX_BATCH_SIZE)
+        search_batch_size = min(search_max_steps, self.batch_size)
         first_search_step_size = (lbd - lower_lbd) / search_max_steps
         # first_search_step_size = max(first_search_step_size, tol * search_max_steps)
 
@@ -454,12 +455,13 @@ class OPT(DirectionAttack):
         success = torch.ones_like(steps_done).to(torch.bool)
         success[-1] = False
         # Compute the distances given the steps done
-        x_adv = self.get_x_adv(x, theta, steps_done.reshape(-1, *tuple([1] * (len(x.shape) - 1))))
-        distances = self.distance(x, x_adv)
-        # Update the simulated query counter prior to the search
-        updated_simulated_counter = original_queries_counter.simulated_counter.increase(
-            attack_phase, success, distances)
-        # But use it to update the one after the search to to keep the real results 
+        updated_simulated_counter = original_queries_counter.simulated_counter
+        for i in range(0, steps_done.shape[0], self.batch_size):
+            steps_done_batch = steps_done[i:i + self.batch_size].reshape(-1, *tuple([1] * (len(x.shape) - 1)))
+            x_adv = self.get_x_adv(x, theta, steps_done_batch)
+            distances = self.distance(x, x_adv)
+            updated_simulated_counter = updated_simulated_counter.increase(attack_phase, success, distances)
+        # But use it to update the one after the search to to keep the real results
         return replace(queries_counter_to_update, simulated_counter=updated_simulated_counter)
 
     def _line_search_body(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None,

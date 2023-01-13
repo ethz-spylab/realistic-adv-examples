@@ -119,7 +119,8 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "grad_estimation_search": opt_grad_estimation_search,
         "step_size_search": opt_step_size_search,
         "n_searches": args.opt_n_searches,
-        "max_search_steps": args.opt_max_search_steps
+        "max_search_steps": args.opt_max_search_steps,
+        "batch_size": args.opt_bs,
     }
     if args.attack == "rays":
         if args.rays_flip_squares == '1' and args.rays_flip_rand_pixels == '1':
@@ -147,7 +148,6 @@ def setup_attack(args: Namespace) -> BaseAttack:
     if args.attack == "sign_opt":
         attack_kwargs = {
             "num_grad_queries": args.sign_opt_num_grad_queries,
-            "grad_batch_size": args.sign_opt_grad_bs,
             "momentum": args.sign_opt_momentum
         }
         return SignOPT(**base_attack_kwargs, **opt_kwargs, **attack_kwargs)

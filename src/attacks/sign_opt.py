@@ -32,15 +32,15 @@ class SignOPT(OPT):
         n_searches: int,
         max_search_steps: int,
         momentum: float = 0.,
-        grad_batch_size: int | None = None,
+        batch_size: int | None = None,
     ):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit, max_iter, alpha,
-                         beta, search, grad_estimation_search, step_size_search, n_searches, max_search_steps)
+                         beta, search, grad_estimation_search, step_size_search, n_searches, max_search_steps, batch_size)
         self.num_grad_queries = num_grad_queries  # Num queries for grad estimate (default: 200)
         self.num_directions = 100
         self.momentum = momentum  # (default: 0)
-        if grad_batch_size is not None:
-            self.grad_batch_size = min(grad_batch_size, self.num_grad_queries)
+        if batch_size is not None:
+            self.grad_batch_size = min(batch_size, self.num_grad_queries)
         else:
             self.grad_batch_size = self.num_grad_queries
 
