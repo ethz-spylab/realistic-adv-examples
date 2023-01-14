@@ -127,6 +127,8 @@ class QueriesCounter:
         updated_distances = []
         best_distance = self.best_distance
         for safe, distance in zip(safe_list.tolist(), distance_list.tolist()):
+            if isinstance(distance, list):
+                distance = distance[0]
             if safe and distance < best_distance:
                 best_distance = distance
             updated_distances.append(
