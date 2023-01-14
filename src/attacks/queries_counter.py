@@ -61,6 +61,14 @@ class QueriesCounter:
         return sum(self._queries.values())
 
     @property
+    def total_simulated_queries(self) -> int:
+        return sum(map(lambda x: x.equivalent_simulated_queries, self._distances))
+
+    @property
+    def total_simulated_unsafe_queries(self) -> int:
+        return sum(map(lambda x: x.equivalent_simulated_queries, filter(lambda x: not x.safe, self._distances)))
+
+    @property
     def queries(self) -> dict[AttackPhase, int]:
         return self._queries
 
@@ -96,12 +104,15 @@ class QueriesCounter:
                                    _distances=updated_distances,
                                    _best_distance=best_distance)
 
-    def expand_simulated_distances(self) -> "QueriesCounter":
+    def expand_simulated_distances(self, decompress_safe: bool = False) -> "QueriesCounter":
         expanded_distances: list[CurrentDistanceInfo] = []
         for distance_info in self.distances:
             expanded_distances += distance_info.expand_equivalent_queries()
         safe_distances, unsafe_distances = partition(lambda x: x.safe, expanded_distances)
-        expanded_queries = dict(Counter(map(lambda x: x.phase, safe_distances)))
+        if decompress_safe:
+            expanded_queries = dict(Counter(map(lambda x: x.phase, safe_distances)))
+        else:
+            expanded_queries = self.queries
         expanded_unsafe_queries = dict(Counter(map(lambda x: x.phase, unsafe_distances)))
         return dataclasses.replace(self,
                                    _distances=expanded_distances,

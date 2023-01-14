@@ -25,7 +25,7 @@ def main(args):
     model, test_loader = setup_model_and_data(args, device)
     exp_out_dir = setup_out_dir(args)
     attack = setup_attack(args)
-    attack_results = AttackResults()
+    attack_results = AttackResults(exp_out_dir)
 
     seeds = np.random.randint(10000, size=10000)
 
@@ -77,12 +77,12 @@ def main(args):
 
         count += 1
         attack_results.log_results(i)
-        attack_results.save_results(exp_out_dir)
+        attack_results.save_results(verbose=True)
         if attack_results.has_simulated_counters:
             print("Simulated results:")
             attack_results.simulated_self.log_results(i)
 
-    attack_results.save_results(exp_out_dir, verbose=True)
+    attack_results.save_results(verbose=True)
 
 
 if __name__ == "__main__":

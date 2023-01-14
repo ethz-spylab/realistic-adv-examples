@@ -4,12 +4,14 @@ from pathlib import Path
 
 import numpy as np
 
+from src.json_list import JSONList
 from src.attacks.base import ExtraResultsDict, ExtraResultsDictContent
 from src.attacks.queries_counter import QueriesCounter
 
 
 @dataclasses.dataclass
 class AttackResults:
+    path: Path
     successes: int = 0
     distances: list[float] = dataclasses.field(default_factory=list)
     queries_counters: list[QueriesCounter] = dataclasses.field(default_factory=list)
@@ -18,6 +20,12 @@ class AttackResults:
     failed_distances: list[float] = dataclasses.field(default_factory=list)
     failed_queries_counters: list[QueriesCounter] = dataclasses.field(default_factory=list)
     failed_extra_results: list[ExtraResultsDict] = dataclasses.field(default_factory=list)
+    _distances_traces_jsonlist: JSONList = dataclasses.field(init=False)
+    _failed_distances_traces_jsonlist: JSONList = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        self._distances_traces_jsonlist = JSONList(self.path / "distances_traces.json")
+        self._failed_distances_traces_jsonlist = JSONList(self.path / "failed_distances_traces.json")
 
     def update_with_success(self, distance: float, queries_counter: QueriesCounter,
                             extra_results: ExtraResultsDict) -> "AttackResults":
@@ -35,13 +43,13 @@ class AttackResults:
                                    failed_queries_counters=self.failed_queries_counters + [queries_counter],
                                    failed_extra_results=self.failed_extra_results + [extra_results])
 
-    def log_results(self, idx: int):
+    def log_results(self, idx: int, simulated: bool = False):
         print(f"index: {idx:4d} avg dist: {np.mean(np.array(self.distances)):.4f} "
               f"median dist: {np.median(np.array(self.distances)):.4f} "
-              f"avg queries: {np.mean(np.array(self._get_overall_queries())):.4f} "
-              f"median queries: {np.median(np.array(self._get_overall_queries())):.4f} "
-              f"avg bad queries: {np.mean(np.array(self._get_overall_unsafe_queries())):.4f} "
-              f"median bad queries: {np.median(np.array(self._get_overall_unsafe_queries())):.4f} "
+              f"avg queries: {np.mean(np.array(self._get_overall_queries(simulated))):.4f} "
+              f"median queries: {np.median(np.array(self._get_overall_queries(simulated))):.4f} "
+              f"avg bad queries: {np.mean(np.array(self._get_overall_unsafe_queries(simulated))):.4f} "
+              f"median bad queries: {np.median(np.array(self._get_overall_unsafe_queries(simulated))):.4f} "
               f"asr: {np.mean(np.array(self.asr)):.4f} \n")
 
     @property
@@ -89,36 +97,26 @@ class AttackResults:
 
         return results_dict
 
-    def save_results(self, out_dir: Path, verbose: bool = False):
-        import time
-        if not out_dir.exists():
-            out_dir.mkdir()
-        with open(out_dir / "aggregated_results.json", 'w') as f:
+    def save_results(self, verbose: bool = True):
+        if not self.path.exists():
+            self.path.mkdir()
+        with open(self.path / "aggregated_results.json", 'w') as f:
             json.dump(self.get_aggregated_results_dict(), f, indent=4)
-        with open(out_dir / "full_results.json", 'w') as f:
+        with open(self.path / "full_results.json", 'w') as f:
             json.dump(self.get_full_results_dict(), f, indent=4)
-        np.save(out_dir / "distances.npy", np.array(self.distances))
-        np.save(out_dir / "queries.npy", np.array(self._get_overall_queries()))
-        np.save(out_dir / "unsafe_queries.npy", np.array(self._get_overall_unsafe_queries()))
-        np.save(out_dir / "failed_distances.npy", np.array(self.failed_distances))
-        np.save(out_dir / "failed_queries.npy", np.array(self._get_overall_failed_queries()))
-        np.save(out_dir / "failed_unsafe_queries.npy", np.array(self._get_overall_failed_unsafe_queries()))
-        with open(out_dir / "distances_traces.json", 'w') as f:
-            start = time.time()
-            distances_list = list(
-                map(lambda qc: list(map(lambda distance_info: distance_info.__dict__, qc.distances)),
-                    self.queries_counters))
-            print(f"Computing {len(distances_list[0])} distances traces took {time.time() - start:.2f} seconds")
-            start = time.time()
-            json.dump(distances_list, f)
-            print(f"Dumping {len(distances_list[0])} distances traces took {time.time() - start:.2f} seconds")
-        with open(out_dir / "failed_distances_traces.json", 'w') as f:
-            distances_list = list(
-                map(lambda qc: list(map(lambda distance_info: distance_info.__dict__, qc.distances)),
-                    self.failed_queries_counters))
-            json.dump(distances_list, f)
+        np.save(self.path / "distances.npy", np.array(self.distances))
+        np.save(self.path / "queries.npy", np.array(self._get_overall_queries()))
+        np.save(self.path / "unsafe_queries.npy", np.array(self._get_overall_unsafe_queries()))
+        np.save(self.path / "failed_distances.npy", np.array(self.failed_distances))
+        np.save(self.path / "failed_queries.npy", np.array(self._get_overall_failed_queries()))
+        if self.queries_counters:
+            self._distances_traces_jsonlist.append(
+                list(map(lambda distance_info: distance_info.__dict__, self.queries_counters[-1].distances)))
+        if self.failed_queries_counters:
+            self._failed_distances_traces_jsonlist.append(
+                list(map(lambda distance_info: distance_info.__dict__, self.failed_queries_counters[-1].distances)))
         if verbose:
-            print(f"Saved results to {out_dir}")
+            print(f"Saved results to {self.path}")
 
     def get_full_results_dict(self) -> dict[str, float | list[float]]:
         d = {
@@ -142,16 +140,24 @@ class AttackResults:
     def asr(self) -> float:
         return self.successes / (self.successes + self.failures)
 
-    def _get_overall_queries(self) -> list[int]:
+    def _get_overall_queries(self, simulated: bool = False) -> list[int]:
+        if simulated:
+            return list(map(lambda counter: counter.total_simulated_queries, self.queries_counters))
         return list(map(lambda counter: counter.total_queries, self.queries_counters))
 
-    def _get_overall_failed_queries(self) -> list[int]:
+    def _get_overall_failed_queries(self, simulated: bool = False) -> list[int]:
+        if simulated:
+            return list(map(lambda counter: counter.total_simulated_queries, self.failed_queries_counters))
         return list(map(lambda counter: counter.total_queries, self.failed_queries_counters))
 
-    def _get_overall_unsafe_queries(self) -> list[int]:
+    def _get_overall_unsafe_queries(self, simulated: bool = False) -> list[int]:
+        if simulated:
+            return list(map(lambda counter: counter.total_simulated_unsafe_queries, self.queries_counters))
         return list(map(lambda counter: counter.total_unsafe_queries, self.queries_counters))
 
-    def _get_overall_failed_unsafe_queries(self) -> list[int]:
+    def _get_overall_failed_unsafe_queries(self, simulated: bool = False) -> list[int]:
+        if simulated:
+            return list(map(lambda counter: counter.total_simulated_unsafe_queries, self.failed_queries_counters))
         return list(map(lambda counter: counter.total_unsafe_queries, self.failed_queries_counters))
 
 

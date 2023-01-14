@@ -52,17 +52,17 @@ def test_queries_counter_expand():
 
     updated_counter = counter.increase(phase, success, distance, equivalent_simulated_queries)
 
-    expanded_distances = [CurrentDistanceInfo(phase, True, 0.5, 0.5, 0)] * equivalent_simulated_queries
+    expanded_distances = [CurrentDistanceInfo(phase, True, 0.5, 0.5, 1)] * equivalent_simulated_queries
     assert updated_counter.expand_simulated_distances().distances == expanded_distances
 
     success = torch.tensor([False])
     distance = torch.tensor([0.4])
     equivalent_simulated_queries = 1
     new_updated_counter = updated_counter.increase(phase, success, distance, equivalent_simulated_queries)
-    new_expanded_distances = expanded_distances + [CurrentDistanceInfo(phase, False, 0.4, 0.5, 0)]
+    new_expanded_distances = expanded_distances + [CurrentDistanceInfo(phase, False, 0.4, 0.5, 1)]
     assert new_updated_counter.expand_simulated_distances().distances == new_expanded_distances
 
 
 def test_current_distance_info_expand():
     distance_info = CurrentDistanceInfo(DummyAttackPhase.test, True, 0.5, 0.5, 3)
-    assert distance_info.expand_equivalent_queries() == [replace(distance_info, equivalent_simulated_queries=0)] * 3
+    assert distance_info.expand_equivalent_queries() == [replace(distance_info, equivalent_simulated_queries=1)] * 3
