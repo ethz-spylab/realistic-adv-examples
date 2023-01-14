@@ -413,7 +413,7 @@ class OPT(DirectionAttack):
             # Here we count each query of the first search as equivalent to search_max_steps queries of when we do 1
             equivalent_simulated_queries=search_max_steps,
             # But we don't count the queries from the last batch as they will be counted in the second search
-            count_equivalent_if_unsafe=False)
+            count_last_batch_for_sim=False)
 
         if first_query_failed:
             lbd_to_return = lbd * 2
@@ -438,7 +438,7 @@ class OPT(DirectionAttack):
                 # Here each query has the same step size as if we were doing one search only
                 equivalent_simulated_queries=1,
                 # And we count the queries from the last batch as they are not counted in the first search
-                count_equivalent_if_unsafe=True)
+                count_last_batch_for_sim=True)
         else:
             second_search_queries_counter = first_search_queries_counter
             final_lbd = first_search_lbd
@@ -478,8 +478,8 @@ class OPT(DirectionAttack):
                                   phase: AttackPhase,
                                   step_size: float,
                                   batch_size: int = MAX_BATCH_SIZE,
-                                  equivalent_simulated_queries: int = 0,
-                                  count_equivalent_if_unsafe: bool = False) -> tuple[float, QueriesCounter, bool]:
+                                  equivalent_simulated_queries: int = 1,
+                                  count_last_batch_for_sim: bool = False) -> tuple[float, QueriesCounter, bool]:
         success = torch.tensor([True])
         batch_idx = 0
         lbds_inner_shape = tuple([1] * (len(x.shape) - 1))
@@ -500,7 +500,7 @@ class OPT(DirectionAttack):
             batch = self.get_x_adv(x, theta, torch.from_numpy(lbds).float().to(device=x.device))
             success, queries_counter = self.is_correct_boundary_side_batched(model, batch, y, target, queries_counter,
                                                                              phase, x, equivalent_simulated_queries,
-                                                                             count_equivalent_if_unsafe)
+                                                                             count_last_batch_for_sim, batch_idx == 0)
             batch_idx += 1
 
         assert lbds is not None

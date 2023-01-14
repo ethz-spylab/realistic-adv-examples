@@ -40,7 +40,10 @@ class BaseAttack(abc.ABC):
         else:
             success = model.predict_label(x_adv) != y
         distance = self.distance(original_x, x_adv)
-        return success, queries_counter.increase(attack_phase, safe=success, distance=distance)
+        return success, queries_counter.increase(attack_phase,
+                                                 safe=success,
+                                                 distance=distance,
+                                                 equivalent_simulated_queries=1)
 
     def is_correct_boundary_side_batched(
             self,
@@ -52,7 +55,8 @@ class BaseAttack(abc.ABC):
             attack_phase: AttackPhase,
             original_x: torch.Tensor,
             equivalent_simulated_queries: int = 0,
-            count_equivalent_if_unsafe: bool = False) -> tuple[torch.Tensor, QueriesCounter]:
+            count_simulated_if_unsafe: bool = False,
+            first_batch: bool = False) -> tuple[torch.Tensor, QueriesCounter]:
         # Get success vector but ignore queries counter because we will update it later
         success, _ = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, attack_phase, original_x)
         # If we hit the boundary, then we we consider the output up to the first unsafe query inclusive
@@ -64,32 +68,27 @@ class BaseAttack(abc.ABC):
                 attack_phase,
                 safe=success,
                 distance=distance,
-                equivalent_simulated_queries=equivalent_simulated_queries * len(x_adv))
+                equivalent_simulated_queries=equivalent_simulated_queries)
             return success, updated_queries_counter
 
-        if count_equivalent_if_unsafe:
-            equivalent_simulated_queries = equivalent_simulated_queries
-        else:
-            # We should not count these queries if it is from the last step of the coarse search
-            equivalent_simulated_queries = 0
-        first_unsafe_query_idx = torch.argmin(success.to(torch.int))
-        if first_unsafe_query_idx > 0:
-            relevant_success = success[:first_unsafe_query_idx]
-            distance = self.distance(original_x, x_adv[:first_unsafe_query_idx])
-            updated_queries_counter = queries_counter.increase(attack_phase,
-                                                            safe=relevant_success,
-                                                            distance=distance,
-                                                            equivalent_simulated_queries=equivalent_simulated_queries *
-                                                            len(relevant_success))
-        else:
-            updated_queries_counter = queries_counter
-            relevant_success = torch.tensor([], device=success.device, dtype=success.dtype)
-        
-        if count_equivalent_if_unsafe:
+        if count_simulated_if_unsafe or (first_batch and not success[0].item()):
             equivalent_unsafe_simulated_queries = 1
         else:
-            # We should not count this unsafe query if it is from the last step of the coarse search
             equivalent_unsafe_simulated_queries = 0
+
+        first_unsafe_query_idx = torch.argmin(success.to(torch.int))
+        if first_unsafe_query_idx > 0:
+            # Let's get only the safe queries for now
+            safe_success = success[:first_unsafe_query_idx]
+            distance = self.distance(original_x, x_adv[:first_unsafe_query_idx])
+            updated_queries_counter = queries_counter.increase(
+                attack_phase,
+                safe=safe_success,
+                distance=distance,
+                equivalent_simulated_queries=equivalent_simulated_queries)
+        else:
+            updated_queries_counter = queries_counter
+            safe_success = torch.tensor([], device=success.device, dtype=success.dtype)
 
         # Add the unsafe query
         unsafe_distance = self.distance(original_x, x_adv[first_unsafe_query_idx]).unsqueeze(0)
@@ -98,7 +97,7 @@ class BaseAttack(abc.ABC):
             safe=success[first_unsafe_query_idx].unsqueeze(0),
             distance=unsafe_distance,
             equivalent_simulated_queries=equivalent_unsafe_simulated_queries)
-        relevant_success = torch.cat([relevant_success, success[first_unsafe_query_idx].unsqueeze(0)])
+        relevant_success = torch.cat([safe_success, success[first_unsafe_query_idx].unsqueeze(0)])
 
         return relevant_success, updated_queries_counter_with_unsafe
 

@@ -1,6 +1,8 @@
+from dataclasses import replace
+
 import torch
 
-from src.attacks.queries_counter import AttackPhase, QueriesCounter
+from src.attacks.queries_counter import AttackPhase, CurrentDistanceInfo, QueriesCounter
 
 
 class DummyAttackPhase(AttackPhase):
@@ -39,3 +41,28 @@ def test_queries_counter_out_of_queries():
     updated_counter = counter.increase(phase, success, distance)
 
     assert updated_counter.is_out_of_queries()
+
+
+def test_queries_counter_expand():
+    counter = QueriesCounter(10)
+    phase = DummyAttackPhase.test
+    success = torch.tensor([True])
+    distance = torch.tensor([0.5])
+    equivalent_simulated_queries = 2
+
+    updated_counter = counter.increase(phase, success, distance, equivalent_simulated_queries)
+
+    expanded_distances = [CurrentDistanceInfo(phase, True, 0.5, 0.5, 0)] * equivalent_simulated_queries
+    assert updated_counter.expand_simulated_distances().distances == expanded_distances
+
+    success = torch.tensor([False])
+    distance = torch.tensor([0.4])
+    equivalent_simulated_queries = 1
+    new_updated_counter = updated_counter.increase(phase, success, distance, equivalent_simulated_queries)
+    new_expanded_distances = expanded_distances + [CurrentDistanceInfo(phase, False, 0.4, 0.5, 0)]
+    assert new_updated_counter.expand_simulated_distances().distances == new_expanded_distances
+
+
+def test_current_distance_info_expand():
+    distance_info = CurrentDistanceInfo(DummyAttackPhase.test, True, 0.5, 0.5, 3)
+    assert distance_info.expand_equivalent_queries() == [replace(distance_info, equivalent_simulated_queries=0)] * 3

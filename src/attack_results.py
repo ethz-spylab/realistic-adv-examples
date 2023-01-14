@@ -46,10 +46,23 @@ class AttackResults:
 
     @property
     def simulated_self(self) -> "AttackResults":
-        ...
+        if not self.has_simulated_counters:
+            raise ValueError("No simulated counters to expand")
+        simulated_queries_counters = map(lambda c: c.expand_simulated_distances(), self.queries_counters)
+        simulated_failed_queries_counters = map(lambda c: c.expand_simulated_distances(), self.failed_queries_counters)
+        return dataclasses.replace(self,
+                                   queries_counters=list(simulated_queries_counters),
+                                   failed_queries_counters=list(simulated_failed_queries_counters))
 
     @property
     def has_simulated_counters(self) -> bool:
+        if self.queries_counters:
+            return (len(list(filter(lambda d: d.equivalent_simulated_queries > 0, self.queries_counters[0].distances)))
+                    > 1)
+        if self.failed_queries_counters:
+            return (len(
+                list(filter(lambda d: d.equivalent_simulated_queries > 0, self.failed_queries_counters[0].distances))) >
+                    1)
         return False
 
     def get_aggregated_results_dict(self) -> dict[str, float]:
