@@ -78,9 +78,9 @@ def main(args):
         count += 1
         attack_results.log_results(i)
         attack_results.save_results(verbose=True)
-        if attack_results.has_simulated_counters:
-            print("Simulated results:")
-            attack_results.simulated_self.log_results(i)
+        # if attack_results.has_simulated_counters:
+        #     print("Simulated results:")
+        #     attack_results.simulated_self.log_results(i)
 
     attack_results.save_results(verbose=True)
 

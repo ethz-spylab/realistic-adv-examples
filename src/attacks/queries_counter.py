@@ -128,6 +128,7 @@ class QueriesCounter:
         best_distance = self.best_distance
         for safe, distance in zip(safe_list.tolist(), distance_list.tolist()):
             if isinstance(distance, list):
+                # TODO: remove this hack and understand where it comes from
                 distance = distance[0]
             if safe and distance < best_distance:
                 best_distance = distance
