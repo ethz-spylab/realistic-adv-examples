@@ -24,6 +24,7 @@ reportUnknownVariableType = false
 reportUnknownMemberType = false
 reportUnknownArgumentType = false
 reportIncompatibleMethodOverride = true
+reportPrivateImportUsage = false
 
 pythonVersion = "3.10"
 pythonPlatform = "Linux"

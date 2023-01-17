@@ -51,12 +51,12 @@ class BoundaryAttack(PerturbationAttack):
             label: torch.Tensor,
             target: torch.Tensor | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
 
-        x, restore_type = ep.astensor_(x)
+        x_ep, restore_type = ep.astensor_(x)
         queries_counter = self._make_queries_counter()
 
         is_adversarial: Callable[[ep.Tensor, QueriesCounter, AttackPhase], tuple[torch.Tensor, QueriesCounter]]
-        is_adversarial = lambda x_, queries_counter_, attack_phase: self.is_correct_boundary_side(
-            model, restore_type(x_), label, target, queries_counter_, attack_phase, x)
+        is_adversarial = lambda x_adv_, queries_counter_, attack_phase: self.is_correct_boundary_side(
+            model, x_adv_.raw, label, target, queries_counter_, attack_phase, x_ep.raw)
         init_attack = LinearSearchBlendedUniformNoiseAttack(self.epsilon,
                                                             self.distance,
                                                             self.bounds,
@@ -65,7 +65,8 @@ class BoundaryAttack(PerturbationAttack):
                                                             None,
                                                             BoundaryAttackPhase.initialization,
                                                             steps=50)
-        best_advs = init_attack(model, x, label)
+        best_advs_torch, queries_counter, _, _, _ = init_attack(model, x, label)
+        best_advs = ep.astensor(best_advs_torch)
         is_adv_torch, queries_counter = is_adversarial(best_advs, queries_counter, BoundaryAttackPhase.initialization)
         is_adv = ep.astensor(is_adv_torch)
 
@@ -74,17 +75,19 @@ class BoundaryAttack(PerturbationAttack):
             print("Failed to find adversarial examples for {} samples".format(failed))
             return x, queries_counter, float("inf"), False, {}
 
-        n_samples = len(x)
-        ndim = x.ndim
-        spherical_steps = ep.ones(x, n_samples) * self.spherical_step
-        source_steps = ep.ones(x, n_samples) * self.source_step
+        print("Found initial perturbation")
+
+        n_samples = len(x_ep)
+        ndim = x_ep.ndim
+        spherical_steps = ep.ones(x_ep, n_samples) * self.spherical_step
+        source_steps = ep.ones(x_ep, n_samples) * self.source_step
 
         # create two queues for each sample to track success rates
         # (used to update the hyperparameters)
         stats_spherical_adversarial = ArrayQueue(maxlen=100, n_samples=n_samples)
         stats_step_adversarial = ArrayQueue(maxlen=30, n_samples=n_samples)
 
-        bounds = model.bounds
+        bounds = self.bounds
 
         for step in range(1, self.steps + 1):
             converged = source_steps < self.source_step_convergance
@@ -92,7 +95,7 @@ class BoundaryAttack(PerturbationAttack):
                 break  # pragma: no cover
             converged = atleast_kd(converged, ndim)
 
-            unnormalized_source_directions = x - best_advs
+            unnormalized_source_directions = x_ep - best_advs
             source_norms = ep.norms.l2(flatten(unnormalized_source_directions), axis=-1)
             source_directions = unnormalized_source_directions / atleast_kd(source_norms, ndim)
 
@@ -101,7 +104,7 @@ class BoundaryAttack(PerturbationAttack):
 
             candidates, spherical_candidates = draw_proposals(
                 bounds,
-                x,
+                x_ep,
                 best_advs,
                 unnormalized_source_directions,
                 source_directions,
@@ -122,7 +125,7 @@ class BoundaryAttack(PerturbationAttack):
 
             # in theory, we are closer per construction
             # but limited numerical precision might break this
-            distances = ep.norms.l2(flatten(x - candidates), axis=-1)
+            distances = ep.norms.l2(flatten(x_ep - candidates), axis=-1)
             closer = distances < source_norms
             is_best_adv = ep.logical_and(is_adv, closer)
             is_best_adv = atleast_kd(is_best_adv, ndim)
@@ -154,8 +157,12 @@ class BoundaryAttack(PerturbationAttack):
             if queries_counter.is_out_of_queries():
                 print("Out of queries")
                 break
+            if (step + 1) % 500 == 0:
+                distance = ep.norms.l2(flatten(x_ep - best_advs), axis=-1).item()
+                print(f"Iteration {step + 1:3d} distortion {distance:.4f} num_queries {queries_counter.total_queries}, "
+                      f"unsafe queries: {queries_counter.total_unsafe_queries}")
 
-        distance = ep.norms.l2(flatten(x - best_advs), axis=-1).item()
+        distance = ep.norms.l2(flatten(x_ep - best_advs), axis=-1).item()
 
         return restore_type(best_advs), queries_counter, distance, True, {}
 
@@ -190,7 +197,7 @@ class ArrayQueue:
             self.tensor = dims  # pragma: no cover
         dims = dims.numpy()
         assert dims.shape == (self.n_samples, )
-        assert dims.dtype == np.bool
+        assert dims.dtype == bool
         self.data[:, dims] = np.nan
 
     def mean(self) -> ep.Tensor:

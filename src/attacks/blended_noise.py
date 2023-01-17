@@ -8,12 +8,10 @@ import numpy as np
 import torch
 from foolbox.distances import LpDistance
 
-from model_wrappers import ModelWrapper
 from src.attacks.base import Bounds, ExtraResultsDict, PerturbationAttack
-
-from . import QueriesCounter
-from .queries_counter import AttackPhase
-from .utils import atleast_kd
+from src.attacks.queries_counter import AttackPhase, QueriesCounter
+from src.attacks.utils import atleast_kd
+from src.model_wrappers import ModelWrapper
 
 
 class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
@@ -51,14 +49,14 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
         target: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
 
-        x, restore_type = ep.astensor_(x)
+        x_ep, restore_type = ep.astensor_(x)
         queries_counter = self._make_queries_counter()
 
         is_adversarial: Callable[[ep.Tensor, QueriesCounter], tuple[torch.Tensor, QueriesCounter]]
-        is_adversarial = lambda x_, queries_counter_: self.is_correct_boundary_side(model, restore_type(
-            x_), label, target, queries_counter_, self.attack_phase, x)
+        is_adversarial = lambda x_adv_, queries_counter_: self.is_correct_boundary_side(
+            model, x_adv_.raw, label, target, queries_counter_, self.attack_phase, x_ep.raw)
 
-        min_, max_ = model.bounds
+        min_, max_ = self.bounds
 
         n_samples = len(x)
 
@@ -68,9 +66,9 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
             # random noise inputs tend to be classified into the same class,
             # so we might need to make very many draws if the original class
             # is that one
-            random_ = ep.uniform(x, x.shape, min_, max_)
+            random_ = ep.uniform(x_ep, x_ep.shape, min_, max_)
             success, queries_counter = is_adversarial(random_, queries_counter)
-            is_adv_, queries_counter = atleast_kd(ep.astensor(success), x.ndim)
+            is_adv_ = atleast_kd(ep.astensor(success), x_ep.ndim)
 
             if j == 0:
                 random = random_
@@ -87,16 +85,16 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
         if not is_adv.all():
             warnings.warn(f"{self.__class__.__name__} failed to draw sufficient random"
                           f" inputs that are adversarial ({is_adv.sum()} / {n_samples}).")
-            return restore_type(x), queries_counter, np.nan, False, {}
+            return x_ep.raw, queries_counter, np.nan, False, {}
 
-        x0 = x
+        x0 = x_ep
 
         epsilons = np.linspace(0, 1, num=self.steps + 1, dtype=np.float32)
-        best = ep.ones(x, (n_samples, ))
+        best = ep.ones(x_ep, (n_samples, ))
 
         for epsilon in epsilons:
-            x = (1 - epsilon) * x0 + epsilon * random
-            is_adv, queries_counter = is_adversarial(x, queries_counter)
+            x_ep = (1 - epsilon) * x0 + epsilon * random
+            is_adv, queries_counter = is_adversarial(x_ep, queries_counter)
 
             epsilon = epsilon.item()
 
@@ -109,4 +107,4 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
         x_adv = (1 - best) * x0 + best * random
         distance = self.distance(restore_type(x0), restore_type(x_adv)).item()
 
-        return restore_type(x_adv), queries_counter, distance, True, {}
+        return x_adv.raw, queries_counter, distance, True, {}
