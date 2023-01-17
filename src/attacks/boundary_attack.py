@@ -161,6 +161,7 @@ class BoundaryAttack(PerturbationAttack):
 
 
 class ArrayQueue:
+
     def __init__(self, maxlen: int, n_samples: int):
         # we use NaN as an indicator for missing data
         self.data = np.full((maxlen, n_samples), np.nan)

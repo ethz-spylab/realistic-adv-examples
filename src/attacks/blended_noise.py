@@ -24,6 +24,7 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
         steps : Number of blending steps between the original image and the random
             directions.
     """
+
     def __init__(self,
                  epsilon: float | None,
                  distance: LpDistance,

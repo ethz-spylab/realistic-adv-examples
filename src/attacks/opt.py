@@ -19,6 +19,7 @@ class OPTAttackPhase(AttackPhase):
 
 
 class EMAValue:
+
     def __init__(self, init_value: float, alpha: float = 0.9995, percentile: float = 95):
         self.alpha = alpha
         self.percentile = percentile

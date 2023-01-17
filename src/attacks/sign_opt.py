@@ -14,6 +14,7 @@ start_learning_rate = 1.0
 
 
 class SignOPT(OPT):
+
     def __init__(
         self,
         epsilon: float | None,

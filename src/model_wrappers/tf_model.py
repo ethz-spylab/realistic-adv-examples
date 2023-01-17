@@ -5,6 +5,7 @@ from src.model_wrappers.general_model import MeanStdType, ModelWrapper
 
 
 class TFModelWrapper(ModelWrapper):
+
     def __init__(self,
                  model: tf.keras.Model,
                  n_class: int = 10,
