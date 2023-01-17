@@ -45,18 +45,17 @@ class BaseAttack(abc.ABC):
                                                  distance=distance,
                                                  equivalent_simulated_queries=1)
 
-    def is_correct_boundary_side_batched(
-            self,
-            model: ModelWrapper,
-            x_adv: torch.Tensor,
-            y: torch.Tensor,
-            target: torch.Tensor | None,
-            queries_counter: QueriesCounter,
-            attack_phase: AttackPhase,
-            original_x: torch.Tensor,
-            equivalent_simulated_queries: int = 0,
-            count_simulated_if_unsafe: bool = False,
-            first_batch: bool = False) -> tuple[torch.Tensor, QueriesCounter]:
+    def is_correct_boundary_side_batched(self,
+                                         model: ModelWrapper,
+                                         x_adv: torch.Tensor,
+                                         y: torch.Tensor,
+                                         target: torch.Tensor | None,
+                                         queries_counter: QueriesCounter,
+                                         attack_phase: AttackPhase,
+                                         original_x: torch.Tensor,
+                                         equivalent_simulated_queries: int = 0,
+                                         count_simulated_if_unsafe: bool = False,
+                                         first_batch: bool = False) -> tuple[torch.Tensor, QueriesCounter]:
         # Get success vector but ignore queries counter because we will update it later
         success, _ = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, attack_phase, original_x)
         # If we hit the boundary, then we we consider the output up to the first unsafe query inclusive

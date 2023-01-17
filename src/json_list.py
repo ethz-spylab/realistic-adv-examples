@@ -6,7 +6,7 @@ from pathlib import Path
 class JSONList:
     def __init__(self, path: Path) -> None:
         self.path: Path = path
-    
+
     def append(self, item: list[dict]) -> None:
         if not self.path.exists():
             first_element = True

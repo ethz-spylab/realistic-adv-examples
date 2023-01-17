@@ -3,6 +3,7 @@ from pathlib import Path
 
 from src.json_list import JSONList
 
+
 def test_json_list(tmp_path: Path):
     path = tmp_path / "test.json"
     json_list = JSONList(path)

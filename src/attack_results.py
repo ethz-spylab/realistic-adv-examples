@@ -4,9 +4,9 @@ from pathlib import Path
 
 import numpy as np
 
-from src.json_list import JSONList
 from src.attacks.base import ExtraResultsDict, ExtraResultsDictContent
 from src.attacks.queries_counter import QueriesCounter
+from src.json_list import JSONList
 
 
 @dataclasses.dataclass

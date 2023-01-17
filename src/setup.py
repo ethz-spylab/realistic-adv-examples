@@ -14,7 +14,7 @@ from torchvision.models import ResNet50_Weights
 
 from src import dataset
 from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, google_nsfw_model, resnet50_cifar10
-from src.attacks import HSJA, OPT, RayS, SignOPT
+from src.attacks import HSJA, OPT, BoundaryAttack, RayS, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
 from src.model_wrappers import (EdenAIModelWrapper, GoogleNSFWModelWrapper, ModelWrapper, TFModelWrapper,
                                 TorchModelWrapper)
@@ -148,6 +148,8 @@ def setup_attack(args: Namespace) -> BaseAttack:
     if args.attack == "sign_opt":
         attack_kwargs = {"num_grad_queries": args.sign_opt_num_grad_queries, "momentum": args.sign_opt_momentum}
         return SignOPT(**base_attack_kwargs, **opt_kwargs, **attack_kwargs)
+    if args.attack == "boundary":
+        return BoundaryAttack(**base_attack_kwargs)
     else:
         raise ValueError(f"Invalid attack: `{args.attack}`")
 
