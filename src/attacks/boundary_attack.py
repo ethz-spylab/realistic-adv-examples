@@ -68,7 +68,7 @@ class BoundaryAttack(PerturbationAttack):
         best_advs_torch, queries_counter, _, _, _ = init_attack(model, x, label)
         best_advs = ep.astensor(best_advs_torch)
         is_adv_torch, queries_counter = is_adversarial(best_advs, queries_counter, BoundaryAttackPhase.initialization)
-        is_adv = ep.astensor(is_adv_torch)
+        is_adv = ep.astensor(is_adv_torch.flatten())
 
         if not is_adv.all():
             failed = is_adv.logical_not().float32().sum()
@@ -115,12 +115,12 @@ class BoundaryAttack(PerturbationAttack):
 
             is_adv_torch, queries_counter = is_adversarial(candidates, queries_counter,
                                                            BoundaryAttackPhase.candidates_test)
-            is_adv = ep.astensor(is_adv_torch)
+            is_adv = ep.astensor(is_adv_torch.flatten())
 
             if check_spherical_and_update_stats:
                 spherical_is_adv, queries_counter = is_adversarial(spherical_candidates, queries_counter,
                                                                    BoundaryAttackPhase.stats_update)
-                stats_spherical_adversarial.append(ep.astensor(spherical_is_adv))
+                stats_spherical_adversarial.append(ep.astensor(spherical_is_adv.flatten()))
                 stats_step_adversarial.append(is_adv)
 
             # in theory, we are closer per construction
