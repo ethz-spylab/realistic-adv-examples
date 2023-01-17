@@ -92,7 +92,8 @@ class BoundaryAttack(PerturbationAttack):
         for step in range(1, self.steps + 1):
             converged = source_steps < self.source_step_convergance
             if converged.all():
-                break  # pragma: no cover
+                # break  # pragma: no cover
+                ...
             converged = atleast_kd(converged, ndim)
 
             unnormalized_source_directions = x_ep - best_advs
