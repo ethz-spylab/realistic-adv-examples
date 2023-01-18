@@ -81,6 +81,9 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
 
             if is_adv.all():
                 break
+        
+        assert is_adv is not None
+        assert random is not None
 
         if not is_adv.all():
             warnings.warn(f"{self.__class__.__name__} failed to draw sufficient random"

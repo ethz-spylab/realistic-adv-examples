@@ -48,6 +48,15 @@ class CurrentDistanceInfo:
 
 
 @dataclasses.dataclass
+class WrongCurrentDistanceInfo:
+    phase: AttackPhase
+    safe: list[bool]
+    distance: float
+    best_distance: float
+    equivalent_simulated_queries: int = 1
+
+
+@dataclasses.dataclass
 class QueriesCounter:
     queries_limit: int | None
     unsafe_queries_limit: int | None = None
