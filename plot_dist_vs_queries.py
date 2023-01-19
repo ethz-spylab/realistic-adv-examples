@@ -48,7 +48,7 @@ def fix_distances(
         yield sample_distance_infos
 
 
-def fix_distances_traces(path: Path) -> Iterator[list[CurrentDistanceInfo]]:
+def fix_distances_traces(path: Path) -> None:
     print("Loading wrong distances")
     wrong_distances = load_wrong_distances(path)
     print("Loaded wrong distances, fixing distances")
@@ -56,7 +56,6 @@ def fix_distances_traces(path: Path) -> Iterator[list[CurrentDistanceInfo]]:
     print("Fixed distances, saving correct distances")
     save_correct_distances(path, fixed_distances)
     print("Saved correct distances")
-    return fixed_distances
 
 
 def are_distances_wrong(exp_path: Path) -> bool:
@@ -90,7 +89,7 @@ def convert_distances_to_array(distances: Iterator[list[CurrentDistanceInfo]], u
 
     best_distance_up_to_query = map(lambda sample_distances: [x.best_distance for x in sample_distances],
                                     queries_to_plot)
-    
+
     print("Converting distances to array")
     limited_queries_to_plot = np.fromiter(tqdm.tqdm((pad_to_len(l_, plot_up_to) for l_ in best_distance_up_to_query),
                                                     total=MAX_SAMPLES),
@@ -119,7 +118,8 @@ def load_distances_from_json(exp_path: Path, checksum_check: bool) -> Iterator[l
         recompute_fixed_distances = True
 
     if recompute_fixed_distances:
-        return fix_distances_traces(exp_path)
+        fix_distances_traces(exp_path)
+        return load_distances_from_json(exp_path, checksum_check=True)
 
     print("Loading fixed distances from `distances_traces_fixed.json`")
     f = fixed_distances_path.open("r")
@@ -133,8 +133,9 @@ def load_distances_from_array(exp_path: Path, unsafe_only: bool, check_checksum:
     recompute_array = not array_path.exists()
     if recompute_array:
         print("The distances array file does not exist. Reading distances_traces.json and re-creating the array.")
+    checksum_filename = f"distances_traces-to_numpy{'-unsafe_only' if unsafe_only else ''}.json.sha256"
     if check_checksum and array_path.exists() and sha256sum(exp_path / "distances_traces.json") != read_sha256sum(
-            exp_path / "distances_traces-to_numpy.json.sha256"):
+            exp_path / checksum_filename):
         print("The distances array is outdated. Re-reading distances_traces.json and re-creating the array.")
         recompute_array = True
     if recompute_array:
@@ -148,8 +149,8 @@ def load_distances_from_array(exp_path: Path, unsafe_only: bool, check_checksum:
 def save_distances_array(exp_path: Path, distances_array: np.ndarray, unsafe_only: bool, save_checksum: bool):
     np.save(exp_path / f"distances_array{'_unsafe_only' if unsafe_only else ''}.npy", distances_array)
     if save_checksum:
-        print("Saving checksum of distances_traces.json to distances_traces-to_numpy.json.sha256")
-        checksum_filename = f"distances_traces-to_numpy-{'unsafe_only' if unsafe_only else ''}.json.sha256"
+        checksum_filename = f"distances_traces-to_numpy{'-unsafe_only' if unsafe_only else ''}.json.sha256"
+        print(f"Saving checksum of distances_traces.json to {checksum_filename}")
         checksum_file_destination = exp_path / checksum_filename
         write_sha256sum(exp_path / "distances_traces.json", checksum_file_destination)
 
