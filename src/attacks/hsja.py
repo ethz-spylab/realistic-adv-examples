@@ -372,9 +372,11 @@ class HSJA(PerturbationAttack):
                                                                           original_sample)
             return success, updated_phi_queries_counter
 
-        while not (iter_result := phi(epsilon, queries_counter))[0]:
+        while True:
+            success, queries_counter = phi(epsilon, queries_counter)
+            if success:
+                break
             # TODO (@edoardo): make this a line search eventually
-            _, queries_counter = iter_result
             epsilon /= 2.0
 
         return epsilon, queries_counter
