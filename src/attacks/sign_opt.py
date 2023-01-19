@@ -1,3 +1,4 @@
+import itertools
 import warnings
 from typing import Tuple
 
@@ -23,7 +24,7 @@ class SignOPT(OPT):
         discrete: bool,
         queries_limit: int | None,
         unsafe_queries_limit: int | None,
-        max_iter: int,
+        max_iter: int | None,
         alpha: float,
         beta: float,
         num_grad_queries: int,
@@ -104,8 +105,13 @@ class SignOPT(OPT):
         vg = torch.zeros_like(xg)
         alpha, beta = self.alpha, self.beta
         search_lower_bound = EMAValue(1 - (INITIAL_OVERSHOOT_EMA_VALUE - 1), )
+        
+        if self.iterations is not None:
+            _range = range(self.iterations)
+        else:
+            _range = itertools.count()
 
-        for i in range(self.iterations):
+        for i in _range:
             sign_gradient, queries_counter = self.sign_grad_v2(model,
                                                                x.squeeze(0),
                                                                y,

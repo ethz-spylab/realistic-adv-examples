@@ -99,6 +99,13 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
 
 
 def setup_attack(args: Namespace) -> BaseAttack:
+    if args.attack in {'opt', 'sign_opt', 'hsja'} and args.max_iter is None and (args.max_queries is None
+                                                                                 or args.max_unsafe_queries is None):
+        raise ValueError("For iterative attacks, either max_iter or queries_limit or unsafe_queries_limit must be "
+                         "specified")
+    if args.attack == 'rays' and args.early == "0" and (args.max_queries is None or args.max_unsafe_queries is None):
+        raise ValueError(
+            "For RayS attack, either early stopping or queries_limit or unsafe_queries_limit must be specified")
     base_attack_kwargs = {
         "epsilon": args.epsilon,
         "distance": DISTANCES[args.norm],

@@ -138,7 +138,7 @@ if __name__ == "__main__":
                         default='0',
                         type=str,
                         help='Whether the attack should flip random pixels not chunks of a 1-d vector')
-    parser.add_argument('--max-iter', default=100, type=int, help='Number of iterations for HSJA, OPT and SignOPT')
+    parser.add_argument('--max-iter', default=None, type=int, help='Number of iterations for HSJA, OPT and SignOPT')
     parser.add_argument('--hsja-stepsize-search',
                         default='geometric_progression',
                         type=str,

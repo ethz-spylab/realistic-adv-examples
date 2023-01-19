@@ -1,3 +1,4 @@
+import itertools
 import math
 
 import torch
@@ -56,7 +57,7 @@ class HSJA(PerturbationAttack):
              clip_max: float = 1,
              clip_min: float = 0,
              distance: LpDistance = l2,
-             num_iterations: int = 40,
+             num_iterations: int | None = 40,
              gamma: float = 1.0,
              fixed_delta: float | None = None,
              target_label: torch.Tensor | None = None,
@@ -127,8 +128,13 @@ class HSJA(PerturbationAttack):
         perturbed, dist_post_update, queries_counter = self.binary_search_batch(sample, torch.unsqueeze(perturbed, 0),
                                                                                 model, params, queries_counter)
         dist = compute_distance(perturbed, sample.unsqueeze(0), distance).item()
+        
+        if params['num_iterations'] is not None:
+            _range = range(params['num_iterations'])
+        else:
+            _range = itertools.count()
 
-        for j in range(params['num_iterations']):
+        for j in _range:
             params['cur_iter'] = j + 1
 
             # Choose delta.

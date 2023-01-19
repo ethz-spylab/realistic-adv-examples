@@ -1,3 +1,4 @@
+import itertools
 import math
 from typing import Callable
 
@@ -69,9 +70,9 @@ class OPT(DirectionAttack):
         return self.attack_untargeted(model, x, label)
 
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
-                 queries_limit: int | None, unsafe_queries_limit: int | None, max_iter: int, alpha: float, beta: float,
-                 search: SearchMode, grad_estimation_search: SearchMode, step_size_search: SearchMode, n_searches: int,
-                 max_search_steps: int, batch_size: int | None):
+                 queries_limit: int | None, unsafe_queries_limit: int | None, max_iter: int | None, alpha: float,
+                 beta: float, search: SearchMode, grad_estimation_search: SearchMode, step_size_search: SearchMode,
+                 n_searches: int, max_search_steps: int, batch_size: int | None):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.num_directions = 100 if distance == l2 else 500
         self.iterations = max_iter
@@ -176,7 +177,13 @@ class OPT(DirectionAttack):
         assert best_theta is not None
         theta, g2 = best_theta, g_theta
         lbd_factors = []
-        for i in range(self.iterations):
+        
+        if self.iterations is not None:
+            _range = range(self.iterations)
+        else:
+            _range = itertools.count()
+        
+        for i in _range:
             q = 10
             min_g1 = float("inf")
             gradient = torch.zeros_like(theta)
