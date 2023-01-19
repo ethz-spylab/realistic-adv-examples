@@ -42,7 +42,7 @@ def main(args):
         else:
             xi, yi = batch
 
-        print(f"Sample {i}, class: {yi.item()}")
+        print(f"Sample {i}, class: {yi.item()}, attacks count: {count}")
         xi, yi = xi.to(device), yi.to(device)
 
         if model.n_class == 2 and yi.item() == 0:
@@ -75,9 +75,9 @@ def main(args):
         else:
             attack_results = attack_results.update_with_failure(dist, queries_counter, extra_results)
 
-        count += 1
-        attack_results.log_results(i)
+        attack_results.log_results(count)
         attack_results.save_results(verbose=True)
+        count += 1
         # if attack_results.has_simulated_counters:
         #     print("Simulated results:")
         #     attack_results.simulated_self.log_results(i)
