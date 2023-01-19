@@ -158,10 +158,11 @@ def save_distances_array(exp_path: Path, distances_array: np.ndarray, unsafe_onl
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     unsafe_only: bool, out_path: Path, checksum_check: bool):
     names = names or ["" for _ in exp_paths]
-    for exp_path, name in zip(exp_paths, names):
-        distances = load_distances_from_array(exp_path, unsafe_only, checksum_check)
+    distances_arrays = [load_distances_from_array(exp_path, unsafe_only, checksum_check) for exp_path in exp_paths]
+    n_samples_to_plot = min(len(distances_array) for distances_array in distances_arrays)
+    for distances, name in zip(distances_arrays, names):
         n_to_plot = max_queries or distances.shape[1]
-        median_distances = np.median(distances[:, :n_to_plot], axis=0)
+        median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
         plt.plot(median_distances, label=name)
     plt.title(f"Median distances per query {'(unsafe only)' if unsafe_only else ''}")
     plt.xlabel("Query number")
