@@ -1,7 +1,8 @@
 import argparse
+from decimal import Decimal
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 import ijson
 import matplotlib.pyplot as plt
@@ -16,12 +17,21 @@ OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
 
 
+def decimal_to_float(d: dict[str, Any]) -> dict[str, Any]:
+    assert isinstance(d["distance"], Decimal)
+    assert isinstance(d["best_distance"], Decimal)
+    d["distance"] = float(d["distance"])
+    d["best_distance"] = float(d["best_distance"])
+    return d
+    
+
+
 def load_wrong_distances(exp_path: Path) -> Iterator[list[WrongCurrentDistanceInfo]]:
     path = exp_path / "distances_traces.json"
     f = path.open("r")
     OPENED_FILES.append(f)
-    raw_results = ijson.items(f, "item", use_float=True)
-    return map(lambda x: list(map(lambda y: WrongCurrentDistanceInfo(**y), x)), raw_results)
+    raw_results = ijson.items(f, "item")
+    return map(lambda x: list(map(lambda y: WrongCurrentDistanceInfo(**decimal_to_float(y)), x)), raw_results)
 
 
 def save_correct_distances(exp_path: Path, distances: Iterator[list[CurrentDistanceInfo]]) -> None:
@@ -103,8 +113,8 @@ def load_distances_from_json(exp_path: Path, checksum_check: bool) -> Iterator[l
         path = exp_path / "distances_traces.json"
         f = path.open("r")
         OPENED_FILES.append(f)
-        raw_results = ijson.items(f, "item", use_float=True)
-        return map(lambda x: list(map(lambda y: CurrentDistanceInfo(**y), x)), raw_results)
+        raw_results = ijson.items(f, "item")
+        return map(lambda x: list(map(lambda y: CurrentDistanceInfo(**decimal_to_float(y)), x)), raw_results)
 
     print("Distances were originally wrong for the experiment")
     fixed_distances_path = (exp_path / "distances_traces_fixed.json")
