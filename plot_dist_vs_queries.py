@@ -1,30 +1,40 @@
 import argparse
-import json
+from io import TextIOWrapper
 from pathlib import Path
+from typing import Iterator
 
+import ijson
 import matplotlib.pyplot as plt
 import numpy as np
+import tqdm
 
 from src.attacks.queries_counter import CurrentDistanceInfo, WrongCurrentDistanceInfo
 from src.utils import sha256sum, read_sha256sum, write_sha256sum
+from src.json_list import JSONList
+
+OPENED_FILES: list[TextIOWrapper] = []
+MAX_SAMPLES = 1000
 
 
-def load_wrong_distances(exp_path: Path) -> list[list[WrongCurrentDistanceInfo]]:
-    with (exp_path / "distances_traces.json").open("r") as f:
-        raw_results = json.load(f)
-    return list(map(lambda x: list(map(lambda y: WrongCurrentDistanceInfo(**y), x)), raw_results))
+def load_wrong_distances(exp_path: Path) -> Iterator[list[WrongCurrentDistanceInfo]]:
+    path = exp_path / "distances_traces.json"
+    f = path.open("r")
+    OPENED_FILES.append(f)
+    raw_results = ijson.items(f, "item", use_float=True)
+    return map(lambda x: list(map(lambda y: WrongCurrentDistanceInfo(**y), x)), raw_results)
 
 
-def save_correct_distances(exp_path: Path, distances: list[list[CurrentDistanceInfo]]) -> None:
-    distances_dicts = list(map(lambda x: list(map(lambda y: y.__dict__, x)), distances))
-    with (exp_path / "distances_traces_fixed.json").open("w") as f:
-        json.dump(distances_dicts, f)
+def save_correct_distances(exp_path: Path, distances: Iterator[list[CurrentDistanceInfo]]) -> None:
+    distances_dicts = map(lambda x: [y.__dict__ for y in x], distances)
+    json_list = JSONList(exp_path / "distances_traces_fixed.json")
+    for distances_dict in tqdm.tqdm(distances_dicts, total=MAX_SAMPLES):
+        json_list.append(distances_dict)
     print("Saving checksum of distances_traces.json to distances_traces.json.sha256")
     write_sha256sum(exp_path / "distances_traces.json", exp_path / "distances_traces.json.sha256")
 
 
-def fix_distances(wrong_distance_infos: list[list[WrongCurrentDistanceInfo]]) -> list[list[CurrentDistanceInfo]]:
-    distance_infos: list[list[CurrentDistanceInfo]] = []
+def fix_distances(
+        wrong_distance_infos: Iterator[list[WrongCurrentDistanceInfo]]) -> Iterator[list[CurrentDistanceInfo]]:
 
     for sample_distances in wrong_distance_infos:
         best_distance = float("inf")
@@ -35,12 +45,10 @@ def fix_distances(wrong_distance_infos: list[list[WrongCurrentDistanceInfo]]) ->
             distance_info = CurrentDistanceInfo(wrong_info.phase, wrong_info.safe[0], wrong_info.distance,
                                                 best_distance, wrong_info.equivalent_simulated_queries)
             sample_distance_infos.append(distance_info)
-        distance_infos.append(sample_distance_infos)
-
-    return distance_infos
+        yield sample_distance_infos
 
 
-def fix_distances_traces(path: Path) -> list[list[CurrentDistanceInfo]]:
+def fix_distances_traces(path: Path) -> Iterator[list[CurrentDistanceInfo]]:
     print("Loading wrong distances")
     wrong_distances = load_wrong_distances(path)
     print("Loaded wrong distances, fixing distances")
@@ -57,25 +65,47 @@ def are_distances_wrong(exp_path: Path) -> bool:
     return t.split("\"safe\": ")[1][0] == "["
 
 
-def convert_distances_to_array(distances: list[list[CurrentDistanceInfo]], unsafe_only: bool) -> np.ndarray:
+def pad_to_len(list_: list[float], n: int) -> np.ndarray:
+    to_pad = n - len(list_)
+    if to_pad > 0:
+        return np.pad(np.asarray(list_), (0, to_pad), "edge")
+    return np.asarray(list_[:n])
+
+
+MAX_UNSAFE_QUERIES = 5000
+MAX_QUERIES = 20_000
+
+
+def convert_distances_to_array(distances: Iterator[list[CurrentDistanceInfo]], unsafe_only: bool) -> np.ndarray:
     if unsafe_only:
-        queries_to_plot = list(
-            map(lambda sample_distances: list(filter(lambda query: not query.safe, sample_distances)), distances))
+        queries_to_plot = map(lambda sample_distances: list(filter(lambda query: not query.safe, sample_distances)),
+                              distances)
     else:
         queries_to_plot = distances
-    plot_up_to = min(map(lambda sample_queries: len(sample_queries), queries_to_plot))
-    limited_queries_to_plot = list(map(lambda sample_distances: sample_distances[:plot_up_to], queries_to_plot))
-    best_distance_up_to_query = list(
-        map(lambda sample_distances: list(map(lambda x: x.best_distance, sample_distances)), limited_queries_to_plot))
-    return np.asarray(best_distance_up_to_query)
+
+    if not unsafe_only:
+        plot_up_to = MAX_QUERIES
+    else:
+        plot_up_to = MAX_UNSAFE_QUERIES
+
+    best_distance_up_to_query = map(lambda sample_distances: [x.best_distance for x in sample_distances],
+                                    queries_to_plot)
+    
+    print("Converting distances to array")
+    limited_queries_to_plot = np.fromiter(tqdm.tqdm((pad_to_len(l_, plot_up_to) for l_ in best_distance_up_to_query),
+                                                    total=MAX_SAMPLES),
+                                          dtype=np.dtype((float, plot_up_to)))
+    return limited_queries_to_plot
 
 
-def load_distances_from_json(exp_path: Path, checksum_check: bool) -> list[list[CurrentDistanceInfo]]:
+def load_distances_from_json(exp_path: Path, checksum_check: bool) -> Iterator[list[CurrentDistanceInfo]]:
     if not are_distances_wrong(exp_path):
         print("Loading distances from `distances_traces.json`")
-        with (exp_path / "distances_traces.json").open() as f:
-            raw_results = json.load(f)
-        return list(map(lambda x: list(map(lambda y: CurrentDistanceInfo(**y), x)), raw_results))
+        path = exp_path / "distances_traces.json"
+        f = path.open("r")
+        OPENED_FILES.append(f)
+        raw_results = ijson.items(f, "item", use_float=True)
+        return map(lambda x: list(map(lambda y: CurrentDistanceInfo(**y), x)), raw_results)
 
     print("Distances were originally wrong for the experiment")
     fixed_distances_path = (exp_path / "distances_traces_fixed.json")
@@ -92,9 +122,10 @@ def load_distances_from_json(exp_path: Path, checksum_check: bool) -> list[list[
         return fix_distances_traces(exp_path)
 
     print("Loading fixed distances from `distances_traces_fixed.json`")
-    with fixed_distances_path.open() as f:
-        raw_results = json.load(f)
-    return list(map(lambda x: list(map(lambda y: CurrentDistanceInfo(**y), x)), raw_results))
+    f = fixed_distances_path.open("r")
+    OPENED_FILES.append(f)
+    raw_results = ijson.items(f, "item", use_float=True)
+    return map(lambda x: list(map(lambda y: CurrentDistanceInfo(**y), x)), raw_results)
 
 
 def load_distances_from_array(exp_path: Path, unsafe_only: bool, check_checksum: bool) -> np.ndarray:
@@ -107,6 +138,7 @@ def load_distances_from_array(exp_path: Path, unsafe_only: bool, check_checksum:
         print("The distances array is outdated. Re-reading distances_traces.json and re-creating the array.")
         recompute_array = True
     if recompute_array:
+        print("Converting the distances to arrays")
         distances = convert_distances_to_array(load_distances_from_json(exp_path, check_checksum), unsafe_only)
         save_distances_array(exp_path, distances, unsafe_only, check_checksum)
         return distances
@@ -149,3 +181,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.unsafe_only, args.out_path,
                                     args.checksum_check)
+    for f in OPENED_FILES:
+        f.close()
