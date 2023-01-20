@@ -81,7 +81,7 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
 
             if is_adv.all():
                 break
-        
+
         assert is_adv is not None
         assert random is not None
 

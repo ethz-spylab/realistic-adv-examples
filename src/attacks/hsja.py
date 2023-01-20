@@ -128,7 +128,7 @@ class HSJA(PerturbationAttack):
         perturbed, dist_post_update, queries_counter = self.binary_search_batch(sample, torch.unsqueeze(perturbed, 0),
                                                                                 model, params, queries_counter)
         dist = compute_distance(perturbed, sample.unsqueeze(0), distance).item()
-        
+
         if params['num_iterations'] is not None:
             _range = range(params['num_iterations'])
         else:

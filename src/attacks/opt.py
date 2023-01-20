@@ -177,12 +177,12 @@ class OPT(DirectionAttack):
         assert best_theta is not None
         theta, g2 = best_theta, g_theta
         lbd_factors = []
-        
+
         if self.iterations is not None:
             _range = range(self.iterations)
         else:
             _range = itertools.count()
-        
+
         for i in _range:
             q = 10
             min_g1 = float("inf")

@@ -105,7 +105,7 @@ class SignOPT(OPT):
         vg = torch.zeros_like(xg)
         alpha, beta = self.alpha, self.beta
         search_lower_bound = EMAValue(1 - (INITIAL_OVERSHOOT_EMA_VALUE - 1), )
-        
+
         if self.iterations is not None:
             _range = range(self.iterations)
         else:

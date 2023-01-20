@@ -10,23 +10,19 @@ import tqdm
 from ijson.common import IncompleteJSONError
 
 from src.attacks.queries_counter import CurrentDistanceInfo, WrongCurrentDistanceInfo
-from src.utils import sha256sum, read_sha256sum, write_sha256sum
 from src.json_list import JSONList
+from src.utils import read_sha256sum, sha256sum, write_sha256sum
 
 OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
 
 
-def wrap_ijson_iterator(iterator: Iterator[Any]) -> Iterator[Any]:
+def wrap_ijson_iterator(iterator: Iterator[list[dict[str, Any]]]) -> Iterator[list[dict[str, Any]]]:
     try:
-        yield from iterator
+        for item in iterator:
+            yield item
     except IncompleteJSONError:
-        yield {
-            "phase": "direction_search",
-            "distance": float("inf"),
-            "safe": False,
-            "best_distance": float("inf"),
-        }
+        pass
 
 
 def load_wrong_distances(exp_path: Path) -> Iterator[list[WrongCurrentDistanceInfo]]:
