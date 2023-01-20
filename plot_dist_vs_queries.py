@@ -18,16 +18,15 @@ MAX_SAMPLES = 1000
 
 
 def wrap_ijson_iterator(iterator: Iterator[Any]) -> Iterator[Any]:
-    for item in iterator:    
-        try:
-            yield item
-        except IncompleteJSONError:
-            yield {
-                "phase": "direction_search",
-                "distance": float("inf"),
-                "safe": False,
-                "best_distance": float("inf"),
-            }
+    try:
+        yield from iterator
+    except IncompleteJSONError:
+        yield {
+            "phase": "direction_search",
+            "distance": float("inf"),
+            "safe": False,
+            "best_distance": float("inf"),
+        }
 
 
 def load_wrong_distances(exp_path: Path) -> Iterator[list[WrongCurrentDistanceInfo]]:
