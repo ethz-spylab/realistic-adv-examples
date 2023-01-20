@@ -18,6 +18,7 @@ MAX_SAMPLES = 1000
 
 
 def wrap_ijson_iterator(iterator: Iterator[Any]) -> Iterator[Any]:
+    for item in iterator:    
         try:
             yield item
         except IncompleteJSONError:
