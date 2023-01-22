@@ -2,6 +2,7 @@ import argparse
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, Iterator
+import warnings
 
 import ijson
 import matplotlib.pyplot as plt
@@ -164,23 +165,49 @@ def save_distances_array(exp_path: Path, distances_array: np.ndarray, unsafe_onl
         write_sha256sum(exp_path / "distances_traces.json", checksum_file_destination)
 
 
+COLORS_STYLES_MARKERS = {
+    "OPT": ("tab:blue", "-", None),
+    "Stealthy OPT": ("tab:blue", "--", None),
+    "SignOPT": ("tab:orange", "-", "x"),
+    "Stealthy SignOPT": ("tab:orange", "--", "x"),
+    "Boundary": ("tab:red", "-", "^"),
+    "HSJA": ("tab:green", "-", "o"),
+    "RayS": ("tab:blue", "-", None),
+    "Stealthy RayS": ("tab:blue", "--", None),
+    "k = 1.5": ("tab:blue", "-", None),
+    "k = 2": ("tab:orange", "-", "x"),
+    "k = 2.5": ("tab:green", "-", "o"),
+    "k = 3": ("tab:red", "-", "^"),
+}
+
+
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
-                                    unsafe_only: bool, out_path: Path, checksum_check: bool):
+                                    max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool):
     names = names or ["" for _ in exp_paths]
     distances_arrays = [load_distances_from_array(exp_path, unsafe_only, checksum_check) for exp_path in exp_paths]
     n_samples_to_plot = min(len(distances_array) for distances_array in distances_arrays)
+    n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
+    if max_samples is not None and n_samples_to_plot < max_samples:
+        warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
     for distances, name in zip(distances_arrays, names):
+        if name and name in COLORS_STYLES_MARKERS:
+            color, style, marker = COLORS_STYLES_MARKERS[name]
+        elif not name:
+            warnings.warn("Attack name not specified. Using default color, style and marker.")
+            color, style, marker = None, None, None
+        else:
+            warnings.warn(f"Could not find color, style, marker for {name}. Using default.")
+            color, style, marker = None, None, None
         n_to_plot = max_queries or distances.shape[1]
         median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
-        plt.plot(median_distances, label=name)
+        plt.plot(median_distances, label=name, color=color, linestyle=style, marker=marker)
     if "/l2/" in str(exp_paths[0]):
         plt.ylim(1e-0, 1e2)
     elif "/linf/" in str(exp_paths[0]):
         plt.ylim(1e-2, 1e0)
     plt.yscale("log")
-    plt.title(f"Median distances per query {'(unsafe only)' if unsafe_only else ''}")
-    plt.xlabel("Query number")
-    plt.ylabel("Distance")
+    plt.xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
+    plt.ylabel("Median distance")
     plt.legend()
     plt.savefig(out_path)
     plt.show()
@@ -193,9 +220,10 @@ if __name__ == "__main__":
     parser.add_argument("--out-path", type=Path, required=True)
     parser.add_argument("--unsafe-only", action="store_true", default=False)
     parser.add_argument("--max-queries", type=int, default=None)
+    parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--checksum-check", action="store_true", default=False)
     args = parser.parse_args()
-    plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.unsafe_only, args.out_path,
-                                    args.checksum_check)
+    plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples, args.unsafe_only,
+                                    args.out_path, args.checksum_check)
     for f in OPENED_FILES:
         f.close()
