@@ -92,12 +92,13 @@ class LinearSearchBlendedUniformNoiseAttack(PerturbationAttack):
 
         x0 = x_ep
 
-        epsilons = np.linspace(0, 1, num=self.steps + 1, dtype=np.float32)
+        initial_step = 1 / (self.steps)
+        epsilons = np.linspace(initial_step, 1, num=self.steps, dtype=np.float32)
         best = ep.ones(x_ep, (n_samples, ))
 
         for epsilon in epsilons:
-            x_ep = (1 - epsilon) * x0 + epsilon * random
-            is_adv, queries_counter = is_adversarial(x_ep, queries_counter)
+            x_adv = (1 - epsilon) * x0 + epsilon * random
+            is_adv, queries_counter = is_adversarial(x_adv, queries_counter)
 
             epsilon = epsilon.item()
 
