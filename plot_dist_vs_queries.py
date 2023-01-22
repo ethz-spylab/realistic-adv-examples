@@ -200,9 +200,9 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
             color, style, marker = None, None, None
         n_to_plot = max_queries or distances.shape[1]
         median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
-        plt.plot(median_distances, label=name, color=color, linestyle=style, marker=marker)
-    if "/l2/" in str(exp_paths[0]):
-        plt.ylim(1e-0, 1e2)
+        plt.plot(median_distances, label=name, color=color, linestyle=style, marker=marker, markevery=n_to_plot // 10)
+    if "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
+        plt.ylim(5e-0, 1e2)
     elif "/linf/" in str(exp_paths[0]):
         plt.ylim(1e-2, 1e0)
     plt.yscale("log")
