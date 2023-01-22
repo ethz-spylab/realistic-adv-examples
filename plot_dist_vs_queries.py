@@ -21,8 +21,8 @@ def wrap_ijson_iterator(iterator: Iterator[list[dict[str, Any]]]) -> Iterator[li
     try:
         for item in iterator:
             yield item
-    except IncompleteJSONError:
-        pass
+    except IncompleteJSONError as e:
+        raise e
 
 
 def load_wrong_distances(exp_path: Path) -> Iterator[list[WrongCurrentDistanceInfo]]:
@@ -108,7 +108,7 @@ def convert_distances_to_array(distances: Iterator[list[CurrentDistanceInfo]], u
 
 def load_distances_from_json(exp_path: Path, checksum_check: bool) -> Iterator[list[CurrentDistanceInfo]]:
     if not are_distances_wrong(exp_path):
-        print("Loading distances from `distances_traces.json`")
+        print(f"Loading distances from {exp_path / 'distances_traces.json'}")
         path = exp_path / "distances_traces.json"
         f = path.open("r")
         OPENED_FILES.append(f)
@@ -173,6 +173,11 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         n_to_plot = max_queries or distances.shape[1]
         median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
         plt.plot(median_distances, label=name)
+    if "/l2/" in str(exp_paths[0]):
+        plt.ylim(1e-0, 1e2)
+    elif "/linf/" in str(exp_paths[0]):
+        plt.ylim(1e-2, 1e0)
+    plt.yscale("log")
     plt.title(f"Median distances per query {'(unsafe only)' if unsafe_only else ''}")
     plt.xlabel("Query number")
     plt.ylabel("Distance")
