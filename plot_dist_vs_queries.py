@@ -225,12 +225,14 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
                                     to_simulate: list[int] | None):
     names = names or ["" for _ in exp_paths]
-    distances_arrays = [load_distances_from_array(exp_path, unsafe_only, checksum_check) for exp_path in exp_paths]
-    if to_simulate is not None:
-        for i in to_simulate:
-            simulated_array = get_simulated_array(exp_paths[i], unsafe_only)
-            distances_arrays.append(simulated_array)
-            names.append(f"Stealthy {names[i]}")
+    distances_arrays = []
+
+    for i, exp_path in enumerate(exp_paths):
+        if to_simulate is not None and i in to_simulate:
+            distances_array = get_simulated_array(exp_paths[i], unsafe_only)
+        else:
+            distances_array = load_distances_from_array(exp_path, unsafe_only, checksum_check)
+        distances_arrays.append(distances_array)
 
     n_samples_to_plot = min(len(distances_array) for distances_array in distances_arrays)
     n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
@@ -257,6 +259,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     plt.xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     plt.ylabel("Median distance")
     plt.legend()
+    plt.gca().set_aspect(3 / 4)
     plt.savefig(out_path)
     plt.show()
 
@@ -268,7 +271,7 @@ if __name__ == "__main__":
     parser.add_argument("--out-path", type=Path, required=True)
     parser.add_argument("--unsafe-only", action="store_true", default=False)
     parser.add_argument("--max-queries", type=int, default=None)
-    parser.add_argument("--max-samples", type=int, default=None)
+    parser.add_argument("--max-samples", type=int, default=500)
     parser.add_argument("--checksum-check", action="store_true", default=False)
     parser.add_argument("--to-simulate", type=int, nargs="+", required=False, default=None)
     args = parser.parse_args()
