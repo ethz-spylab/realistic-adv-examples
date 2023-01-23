@@ -25,9 +25,8 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         for distance in distances_list:
             if unsafe_only and distance["safe"]:
                 continue
-            for _ in range(distance["equivalent_simulated_queries"]):
-                distance_info = CurrentDistanceInfo(**(distance | {"equivalent_simulated_queries": 1}))  # type: ignore
-                simulated_distances.append(distance_info)
+            simulated_distance = CurrentDistanceInfo(**(distance | {"equivalent_simulated_queries": 1}))  # type: ignore
+            simulated_distances += [simulated_distance] * distance["equivalent_simulated_queries"]
             if unsafe_only and len(simulated_distances) >= MAX_UNSAFE_QUERIES:
                 break
             elif len(simulated_distances) >= MAX_QUERIES:
