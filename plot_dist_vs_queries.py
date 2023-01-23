@@ -18,6 +18,36 @@ OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
 
 
+def generate_simulated_distances(items: Iterator[list[dict[str, Any]]]) -> Iterator[list[CurrentDistanceInfo]]:
+    for distances_list in items:
+        simulated_distances = []
+        for distance in distances_list:
+            if distance["safe"]:
+                continue
+            for _ in range(distance["equivalent_simulated_queries"]):
+                distance_info = CurrentDistanceInfo(**(distance | {"equivalent_simulated_queries": 1}))  # type: ignore
+                simulated_distances.append(distance_info)
+        yield simulated_distances
+
+
+SIMULATED_DISTANCES_FILENAME = "simulated_distances_array.npy"
+
+
+def get_simulated_array(exp_path: Path) -> np.ndarray:
+    if (exp_path / SIMULATED_DISTANCES_FILENAME).exists():
+        print("Loading simulated distances from file")
+        return np.load(exp_path / SIMULATED_DISTANCES_FILENAME)
+    original_distances_filename = are_distances_wrong(
+        exp_path) and "distances_traces_fixed.json" or "distances_traces.json"
+    f = (exp_path / original_distances_filename).open("r")
+    OPENED_FILES.append(f)
+    raw_results = wrap_ijson_iterator(ijson.items(f, "item", use_float=True))
+    simulated_distances = generate_simulated_distances(raw_results)
+    array = convert_distances_to_array(simulated_distances, False)
+    save_distances_array(exp_path, array, True, False, SIMULATED_DISTANCES_FILENAME)
+    return array
+
+
 def wrap_ijson_iterator(iterator: Iterator[list[dict[str, Any]]]) -> Iterator[list[dict[str, Any]]]:
     try:
         for item in iterator:
@@ -156,8 +186,13 @@ def load_distances_from_array(exp_path: Path, unsafe_only: bool, check_checksum:
     return np.load(array_path)
 
 
-def save_distances_array(exp_path: Path, distances_array: np.ndarray, unsafe_only: bool, save_checksum: bool):
-    np.save(exp_path / f"distances_array{'_unsafe_only' if unsafe_only else ''}.npy", distances_array)
+def save_distances_array(exp_path: Path,
+                         distances_array: np.ndarray,
+                         unsafe_only: bool,
+                         save_checksum: bool,
+                         filename: str | None = None):
+    filename = filename or f"distances_array{'_unsafe_only' if unsafe_only else ''}.npy"
+    np.save(exp_path / filename, distances_array)
     if save_checksum:
         checksum_filename = f"distances_traces-to_numpy{'-unsafe_only' if unsafe_only else ''}.json.sha256"
         print(f"Saving checksum of distances_traces.json to {checksum_filename}")
@@ -182,11 +217,19 @@ COLORS_STYLES_MARKERS = {
 
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
-                                    max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool):
+                                    max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
+                                    to_simulate: list[int] | None):
     names = names or ["" for _ in exp_paths]
     distances_arrays = [load_distances_from_array(exp_path, unsafe_only, checksum_check) for exp_path in exp_paths]
+    if to_simulate is not None:
+        for i in to_simulate:
+            simulated_array = get_simulated_array(exp_paths[i])
+            distances_arrays.append(simulated_array)
+            names.append(f"Stealthy {names[i]}")
+
     n_samples_to_plot = min(len(distances_array) for distances_array in distances_arrays)
     n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
+
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
     for distances, name in zip(distances_arrays, names):
@@ -222,8 +265,9 @@ if __name__ == "__main__":
     parser.add_argument("--max-queries", type=int, default=None)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--checksum-check", action="store_true", default=False)
+    parser.add_argument("--to-simulate", type=int, nargs="+", required=False, default=None)
     args = parser.parse_args()
     plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples, args.unsafe_only,
-                                    args.out_path, args.checksum_check)
+                                    args.out_path, args.checksum_check, args.to_simulate)
     for f in OPENED_FILES:
         f.close()
