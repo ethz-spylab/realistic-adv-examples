@@ -7,6 +7,7 @@ import warnings
 import ijson
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import tqdm
 from ijson.common import IncompleteJSONError
 
@@ -249,6 +250,8 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     WIDTH = 6
     fig, ax = plt.subplots(figsize=(WIDTH, WIDTH * RATIO))
 
+    queries_per_epsilon_df = pd.DataFrame(columns=["attack", "epsilon", "n_queries"])
+
     attacks_distances_dict = {}
     for distances, name in zip(distances_arrays, names):
         attacks_distances_dict[name] = distances
@@ -263,12 +266,29 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         n_to_plot = max_queries or distances.shape[1]
         median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
         BASE_LINEWIDTH = 1.5
+        full_median_distances = np.median(distances[:n_samples_to_plot], axis=0)
         for epsilon in epsilons:
-            if (median_distances < epsilon).any():
-                n_queries_for_epsilon = np.argmax(median_distances < epsilon)
+            if ((full_median_distances) < epsilon).any():
+                queries_per_epsilon_df = pd.concat([
+                    queries_per_epsilon_df,
+                    pd.DataFrame({
+                        "attack": [name],
+                        "epsilon": [epsilon],
+                        "n_queries": [np.argmax(full_median_distances < epsilon)]
+                    })
+                ])
+                n_queries_for_epsilon = np.argmax(full_median_distances < epsilon)
                 print(f"Attack: {name}, epsilon = {epsilon}, n_queries = {n_queries_for_epsilon}")
             else:
                 print(f"Attack: {name} didn't reach epsilon = {epsilon}")
+                queries_per_epsilon_df = pd.concat([
+                    queries_per_epsilon_df,
+                    pd.DataFrame({
+                        "attack": [name],
+                        "epsilon": [epsilon],
+                        "n_queries": [np.inf]
+                    })
+                ])
 
         if "Stealthy" in name:
             linewidth = 1.5 * BASE_LINEWIDTH
@@ -281,14 +301,20 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
                 marker=marker,
                 markevery=n_to_plot // 10,
                 linewidth=linewidth)
+    
+    queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}.csv", index=False)
 
     for attack, distances in attacks_distances_dict.items():
         if "Stealthy" not in attack:
             continue
+        median_distances = np.median(distances[:n_samples_to_plot], axis=0)
         original_attack_name = attack.split("Stealthy ")[1]
-        original_attack_distances = attacks_distances_dict[original_attack_name]
-        maximum_improvement = 1 / np.max((original_attack_distances - distances) / original_attack_distances)
-        minimum_improvement = 1 / np.min((original_attack_distances - distances) / original_attack_distances)
+        original_attack_median_distances = np.median(attacks_distances_dict[original_attack_name][:n_samples_to_plot],
+                                                     axis=0)
+        maximum_improvement = 1 / np.max(
+            (original_attack_median_distances - median_distances) / original_attack_median_distances)
+        minimum_improvement = 1 / np.min(
+            (original_attack_median_distances - median_distances) / original_attack_median_distances)
         print(
             f"Attack: {attack}, maximum improvement = {maximum_improvement}, minimum improvement = {minimum_improvement}"
         )
