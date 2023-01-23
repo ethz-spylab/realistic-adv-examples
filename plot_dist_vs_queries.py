@@ -301,7 +301,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
                 marker=marker,
                 markevery=n_to_plot // 10,
                 linewidth=linewidth)
-    
+
     queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}.csv", index=False)
 
     for attack, distances in attacks_distances_dict.items():
@@ -313,10 +313,19 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
                                                      axis=0)
         maximum_improvement = 1 / np.max(
             (original_attack_median_distances - median_distances) / original_attack_median_distances)
+        maximum_improvement_query = np.argmax(original_attack_median_distances - median_distances)
+        maximum_improvement_distance_original = original_attack_median_distances[maximum_improvement_query]
+        maximum_improvement_distance = median_distances[maximum_improvement_query]
         minimum_improvement = 1 / np.min(
             (original_attack_median_distances - median_distances) / original_attack_median_distances)
+        minimum_improvement_query = np.argmin(original_attack_median_distances - median_distances)
+        minimum_improvement_distance_original = original_attack_median_distances[minimum_improvement_query]
+        minimum_improvement_distance = median_distances[minimum_improvement_query]
         print(
-            f"Attack: {attack}, maximum improvement = {maximum_improvement}, minimum improvement = {minimum_improvement}"
+            f"Attack: {attack}, maximum improvement = {maximum_improvement:.3f} at query {maximum_improvement_query} "
+            f"and distance {maximum_improvement_distance:.3f} (original attack distance {maximum_improvement_distance_original:.3f})\n"  # noqa
+            f"minimum improvement = {minimum_improvement:.3f} at query {minimum_improvement_query} and "
+            f"distance {minimum_improvement_distance:.3f} (original attack distance {minimum_improvement_distance_original:.3f})"  # noqa
         )
 
     if "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
