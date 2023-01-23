@@ -227,6 +227,11 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     names = names or ["" for _ in exp_paths]
     distances_arrays = []
 
+    if "/linf/" in str(exp_paths[0]):
+        epsilons = [4 / 255, 8 / 255, 16 / 255, 32 / 255, 64 / 255, 128 / 255]
+    else:
+        epsilons = [0.5, 1, 2, 5, 10, 20, 50, 100, 150]
+
     for i, exp_path in enumerate(exp_paths):
         if to_simulate is not None and i in to_simulate:
             distances_array = get_simulated_array(exp_paths[i], unsafe_only)
@@ -239,11 +244,14 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
 
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
-    
+
     RATIO = 3 / 4
-    WIDTH = 6 
+    WIDTH = 6
     fig, ax = plt.subplots(figsize=(WIDTH, WIDTH * RATIO))
+
+    attacks_distances_dict = {}
     for distances, name in zip(distances_arrays, names):
+        attacks_distances_dict[name] = distances
         if name and name in COLORS_STYLES_MARKERS:
             color, style, marker = COLORS_STYLES_MARKERS[name]
         elif not name:
@@ -254,12 +262,37 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
             color, style, marker = None, None, None
         n_to_plot = max_queries or distances.shape[1]
         median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
-        BASE_LINEWIDTH = 1.5 
+        BASE_LINEWIDTH = 1.5
+        for epsilon in epsilons:
+            if (median_distances < epsilon).any():
+                n_queries_for_epsilon = np.argmax(median_distances < epsilon)
+                print(f"Attack: {name}, epsilon = {epsilon}, n_queries = {n_queries_for_epsilon}")
+            else:
+                print(f"Attack: {name} didn't reach epsilon = {epsilon}")
+
         if "Stealthy" in name:
             linewidth = 1.5 * BASE_LINEWIDTH
         else:
             linewidth = 1 * BASE_LINEWIDTH
-        ax.plot(median_distances, label=name, color=color, linestyle=style, marker=marker, markevery=n_to_plot // 10, linewidth=linewidth)
+        ax.plot(median_distances,
+                label=name,
+                color=color,
+                linestyle=style,
+                marker=marker,
+                markevery=n_to_plot // 10,
+                linewidth=linewidth)
+
+    for attack, distances in attacks_distances_dict.items():
+        if "Stealthy" not in attack:
+            continue
+        original_attack_name = attack.split("Stealthy ")[1]
+        original_attack_distances = attacks_distances_dict[original_attack_name]
+        maximum_improvement = 1 / np.max((original_attack_distances - distances) / original_attack_distances)
+        minimum_improvement = 1 / np.min((original_attack_distances - distances) / original_attack_distances)
+        print(
+            f"Attack: {attack}, maximum improvement = {maximum_improvement}, minimum improvement = {minimum_improvement}"
+        )
+
     if "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
         ax.set_ylim(5e-0, 1e2)
     elif "/linf/" in str(exp_paths[0]):
