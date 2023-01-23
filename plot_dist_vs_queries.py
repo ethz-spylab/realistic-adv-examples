@@ -28,6 +28,10 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
             for _ in range(distance["equivalent_simulated_queries"]):
                 distance_info = CurrentDistanceInfo(**(distance | {"equivalent_simulated_queries": 1}))  # type: ignore
                 simulated_distances.append(distance_info)
+            if unsafe_only and len(simulated_distances) >= MAX_UNSAFE_QUERIES:
+                break
+            elif len(simulated_distances) >= MAX_QUERIES:
+                break
         yield simulated_distances
 
 
