@@ -311,16 +311,16 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         original_attack_name = attack.split("Stealthy ")[1]
         original_attack_median_distances = np.median(attacks_distances_dict[original_attack_name][:n_samples_to_plot],
                                                      axis=0)
-        maximum_improvement = 1 / np.max(
-            (original_attack_median_distances - median_distances) / original_attack_median_distances)
-        maximum_improvement_query = np.argmax(original_attack_median_distances - median_distances)
+        maximum_improvement = np.max(original_attack_median_distances / median_distances)
+        minimum_improvement = np.min(original_attack_median_distances / median_distances)
+        
+        maximum_improvement_query = np.argmax(original_attack_median_distances / median_distances)
         maximum_improvement_distance_original = original_attack_median_distances[maximum_improvement_query]
         maximum_improvement_distance = median_distances[maximum_improvement_query]
-        minimum_improvement = 1 / np.min(
-            (original_attack_median_distances - median_distances) / original_attack_median_distances)
-        minimum_improvement_query = np.argmin(original_attack_median_distances - median_distances)
-        minimum_improvement_distance_original = original_attack_median_distances[minimum_improvement_query]
+       
+        minimum_improvement_query = np.argmin(original_attack_median_distances / median_distances)
         minimum_improvement_distance = median_distances[minimum_improvement_query]
+        minimum_improvement_distance_original = original_attack_median_distances[minimum_improvement_query]
         print(
             f"Attack: {attack}, maximum improvement = {maximum_improvement:.3f} at query {maximum_improvement_query} "
             f"and distance {maximum_improvement_distance:.3f} (original attack distance {maximum_improvement_distance_original:.3f})\n"  # noqa
@@ -331,7 +331,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     if "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
         ax.set_ylim(5e-0, 1e2)
     elif "/linf/" in str(exp_paths[0]):
-        ax.set_ylim(1e-2, 1e0)
+        ax.set_ylim(2e-2, 1e0)
     ax.set_yscale("log")
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
