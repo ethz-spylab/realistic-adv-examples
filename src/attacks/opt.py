@@ -16,6 +16,7 @@ class OPTAttackPhase(AttackPhase):
     direction_probing = "direction_probing"
     gradient_estimation = "gradient_estimation"
     step_size_search = "step_size_search"
+    step_size_search_start = "step_size_search_start"
     search = "search"
 
 
@@ -100,9 +101,9 @@ class OPT(DirectionAttack):
 
         if grad_estimation_search == SearchMode.binary:
             self.grad_estimation_search_fn = (
-                lambda model, x, y, target, theta, queries_counter,
-                initial_lbd, tol, _lower_b, _upper_b: self.fine_grained_binary_search_local(
-                    model, x, y, target, theta, queries_counter, initial_lbd, OPTAttackPhase.gradient_estimation, tol))
+                lambda model, x, y, target, theta, queries_counter, initial_lbd, tol, _lower_b, _upper_b: self.
+                fine_grained_binary_search_local(model, x, y, target, theta, queries_counter, initial_lbd,
+                                                 OPTAttackPhase.gradient_estimation, None, tol))
         elif grad_estimation_search == SearchMode.line:
             self.grad_estimation_search_fn = (
                 lambda model, x, y, target, theta, queries_counter, initial_lbd, tol, lower_b, upper_b: self.
@@ -113,7 +114,8 @@ class OPT(DirectionAttack):
             self.step_size_search_search_fn = (
                 lambda model, x, y, target, theta,
                 queries_counter, initial_lbd, tol, _lower_b: self.fine_grained_binary_search_local(
-                    model, x, y, target, theta, queries_counter, initial_lbd, OPTAttackPhase.step_size_search, tol))
+                    model, x, y, target, theta, queries_counter, initial_lbd, OPTAttackPhase.step_size_search,
+                    OPTAttackPhase.step_size_search_start, tol))
         else:
             self.step_size_search_search_fn = (
                 lambda model, x, y, target, theta, queries_counter, initial_lbd, tol, lower_b: self.line_search(
@@ -288,6 +290,7 @@ class OPT(DirectionAttack):
             queries_counter: QueriesCounter,
             initial_lbd: float,
             phase: OPTAttackPhase,
+            first_step_phase: OPTAttackPhase | None = None,
             tol: float = DEFAULT_LINE_SEARCH_TOL) -> tuple[float, QueriesCounter, float, None, None]:
         lbd = initial_lbd
 
@@ -296,7 +299,9 @@ class OPT(DirectionAttack):
             return self.is_correct_boundary_side(model, x_adv_, y, target, qc, phase, x)
 
         x_adv = self.get_x_adv(x, theta, lbd)
-        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase, x)
+        initial_phase = first_step_phase or phase
+        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter,
+                                                                 initial_phase, x)
 
         if not success:
             lbd_lo = lbd
