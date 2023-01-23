@@ -18,11 +18,12 @@ OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
 
 
-def generate_simulated_distances(items: Iterator[list[dict[str, Any]]]) -> Iterator[list[CurrentDistanceInfo]]:
+def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
+                                 unsafe_only: bool) -> Iterator[list[CurrentDistanceInfo]]:
     for distances_list in items:
         simulated_distances = []
         for distance in distances_list:
-            if distance["safe"]:
+            if unsafe_only and distance["safe"]:
                 continue
             for _ in range(distance["equivalent_simulated_queries"]):
                 distance_info = CurrentDistanceInfo(**(distance | {"equivalent_simulated_queries": 1}))  # type: ignore
@@ -30,21 +31,22 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]]) -> Itera
         yield simulated_distances
 
 
-SIMULATED_DISTANCES_FILENAME = "simulated_distances_array.npy"
+SIMULATED_DISTANCES_FILENAME = "simulated_distances_array{}.npy"
 
 
-def get_simulated_array(exp_path: Path) -> np.ndarray:
-    if (exp_path / SIMULATED_DISTANCES_FILENAME).exists():
+def get_simulated_array(exp_path: Path, unsafe_only: bool) -> np.ndarray:
+    array_filename = SIMULATED_DISTANCES_FILENAME.format("_unsafe_only" if unsafe_only else "")
+    if (exp_path / array_filename).exists():
         print("Loading simulated distances from file")
-        return np.load(exp_path / SIMULATED_DISTANCES_FILENAME)
+        return np.load(exp_path / array_filename)
     original_distances_filename = are_distances_wrong(
         exp_path) and "distances_traces_fixed.json" or "distances_traces.json"
     f = (exp_path / original_distances_filename).open("r")
     OPENED_FILES.append(f)
     raw_results = wrap_ijson_iterator(ijson.items(f, "item", use_float=True))
-    simulated_distances = generate_simulated_distances(raw_results)
+    simulated_distances = generate_simulated_distances(raw_results, unsafe_only)
     array = convert_distances_to_array(simulated_distances, False)
-    save_distances_array(exp_path, array, True, False, SIMULATED_DISTANCES_FILENAME)
+    save_distances_array(exp_path, array, True, False, array_filename)
     return array
 
 
@@ -223,7 +225,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     distances_arrays = [load_distances_from_array(exp_path, unsafe_only, checksum_check) for exp_path in exp_paths]
     if to_simulate is not None:
         for i in to_simulate:
-            simulated_array = get_simulated_array(exp_paths[i])
+            simulated_array = get_simulated_array(exp_paths[i], unsafe_only)
             distances_arrays.append(simulated_array)
             names.append(f"Stealthy {names[i]}")
 
