@@ -45,7 +45,7 @@ def get_simulated_array(exp_path: Path, unsafe_only: bool) -> np.ndarray:
     OPENED_FILES.append(f)
     raw_results = wrap_ijson_iterator(ijson.items(f, "item", use_float=True))
     simulated_distances = generate_simulated_distances(raw_results, unsafe_only)
-    array = convert_distances_to_array(simulated_distances, False)
+    array = convert_distances_to_array(simulated_distances, unsafe_only)
     save_distances_array(exp_path, array, True, False, array_filename)
     return array
 
