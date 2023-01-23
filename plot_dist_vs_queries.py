@@ -240,7 +240,9 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
     
-    fig, ax = plt.subplots()
+    RATIO = 3 / 4
+    WIDTH = 6 
+    fig, ax = plt.subplots(figsize=(WIDTH, WIDTH * RATIO))
     for distances, name in zip(distances_arrays, names):
         if name and name in COLORS_STYLES_MARKERS:
             color, style, marker = COLORS_STYLES_MARKERS[name]
@@ -252,7 +254,12 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
             color, style, marker = None, None, None
         n_to_plot = max_queries or distances.shape[1]
         median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
-        ax.plot(median_distances, label=name, color=color, linestyle=style, marker=marker, markevery=n_to_plot // 10)
+        BASE_LINEWIDTH = 1.5 
+        if "Stealthy" in name:
+            linewidth = 1.5 * BASE_LINEWIDTH
+        else:
+            linewidth = 1 * BASE_LINEWIDTH
+        ax.plot(median_distances, label=name, color=color, linestyle=style, marker=marker, markevery=n_to_plot // 10, linewidth=linewidth)
     if "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
         ax.set_ylim(5e-0, 1e2)
     elif "/linf/" in str(exp_paths[0]):
@@ -261,7 +268,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
     ax.legend()
-    ax.set_aspect(3 / 4)
+    fig.tight_layout()
     fig.savefig(str(out_path))
     fig.show()
 
