@@ -293,6 +293,10 @@ COLORS_STYLES_MARKERS = {
 }
 
 
+PLOTS_HEIGHT = 3
+PLOTS_WIDTH = 4
+
+
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
                                     to_simulate: list[int] | None):
@@ -317,9 +321,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
 
-    RATIO = 3 / 4
-    WIDTH = 6
-    fig, ax = plt.subplots(figsize=(WIDTH, WIDTH * RATIO))
+    fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
 
     queries_per_epsilon_df = pd.DataFrame(columns=["attack", "epsilon", "n_queries"])
 
@@ -347,10 +349,9 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
                         "n_queries": [np.argmax(full_median_distances < epsilon)]
                     })
                 ])
-                n_queries_for_epsilon = np.argmax(full_median_distances < epsilon)
-                print(f"Attack: {name}, epsilon = {epsilon}, n_queries = {n_queries_for_epsilon}")
+                # print(f"Attack: {name}, epsilon = {epsilon}, n_queries = {n_queries_for_epsilon}")
             else:
-                print(f"Attack: {name} didn't reach epsilon = {epsilon}")
+                # print(f"Attack: {name} didn't reach epsilon = {epsilon}")
                 queries_per_epsilon_df = pd.concat([
                     queries_per_epsilon_df,
                     pd.DataFrame({
@@ -386,7 +387,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     ax.set_ylabel("Median distance")
     ax.legend()
     fig.tight_layout()
-    fig.savefig(str(out_path))
+    fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
 
@@ -405,9 +406,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
 
-    RATIO = 3 / 4
-    WIDTH = 6
-    fig, ax = plt.subplots(figsize=(WIDTH, WIDTH * RATIO))
+    fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
 
     for name, array in zip(names, arrays_to_plot):
         array = array[:n_samples_to_plot]
@@ -439,7 +438,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     ax.set_ylabel("Overall number of queries")
     ax.legend()
     fig.tight_layout()
-    fig.savefig(str(out_path))
+    fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
 
