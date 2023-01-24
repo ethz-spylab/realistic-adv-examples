@@ -385,7 +385,8 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     ax.set_yscale("log")
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
-    ax.legend()
+    if "/imagenet_nsfw/" in str(exp_paths[0]) and "k" not in names[0]:
+        ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
     fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
@@ -436,7 +437,8 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     ax.set_yscale("log")
     ax.set_xlabel("Number of bad queries")
     ax.set_ylabel("Overall number of queries")
-    ax.legend()
+    if "/imagenet_nsfw/" in str(exp_paths[0]):
+        ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
     fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
