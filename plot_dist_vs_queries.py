@@ -228,7 +228,7 @@ def load_distances_from_json(exp_path: Path, checksum_check: bool) -> Iterator[l
         fix_distances_traces(exp_path)
         return load_distances_from_json(exp_path, checksum_check=True)
 
-    print("Loading fixed distances from `distances_traces_fixed.json`")
+    print(f"Loading fixed distances from `{exp_path}/distances_traces_fixed.json`")
     f = fixed_distances_path.open("r")
     OPENED_FILES.append(f)
     raw_results = wrap_ijson_iterator(ijson.items(f, "item", use_float=True))
