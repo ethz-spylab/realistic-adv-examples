@@ -51,6 +51,7 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
 
 TRADEOFF_ARRAY_NAME = "tradeoff_array{}.npy"
 
+
 def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray:
     if simulated:
         array_name = TRADEOFF_ARRAY_NAME.format("_simulated")
@@ -59,7 +60,7 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
     if (exp_path / array_name).exists():
         print(f"Loading tradeoff array from {exp_path / array_name}")
         return np.load(exp_path / array_name)
-    
+
     print(f"Generating tradeoff array for {exp_path}")
     original_distances_filename = are_distances_wrong(
         exp_path) and "distances_traces_fixed.json" or "distances_traces.json"
@@ -70,10 +71,10 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
         arrays_iter = map(get_good_to_bad_queries_array_individual, items)
     else:
         arrays_iter = map(get_good_to_bad_queries_array_individual_simulated, items)
-    
+
     arrays_iter = filter(lambda x: len(x) == MAX_SAMPLES, arrays_iter)
     final_array = np.fromiter(tqdm.tqdm(arrays_iter, total=MAX_SAMPLES),
-                       dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
+                              dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
     np.save(exp_path / array_name, final_array)
     print(f"Saved tradeoff array to {exp_path / array_name}")
     return final_array
@@ -292,14 +293,13 @@ COLORS_STYLES_MARKERS = {
     "k = 3": ("tab:red", "-", "^"),
 }
 
-
 PLOTS_HEIGHT = 3
 PLOTS_WIDTH = 4
 
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
-                                    to_simulate: list[int] | None):
+                                    to_simulate: list[int] | None, draw_legend: str):
     names = names or ["" for _ in exp_paths]
     distances_arrays = []
 
@@ -376,7 +376,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
 
     queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}.csv", index=False)
 
-    if "google" in str(exp_paths[0]): 
+    if "google" in str(exp_paths[0]):
         ax.set_ylim(8e-2, 1.1)
     elif "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
         ax.set_ylim(5e-0, 1e2)
@@ -385,15 +385,17 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     ax.set_yscale("log")
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
-    if "/imagenet_nsfw/" in str(exp_paths[0]) and "k" not in names[0]:
+    if draw_legend == "tr":
         ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
+    elif draw_legend == "y":
+        ax.legend()
     fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
 
 def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out_path: Path, max_samples: int | None,
-                             to_simulate: list[int] | None) -> None:
+                             to_simulate: list[int] | None, draw_legend: str) -> None:
     names = names or ["" for _ in exp_paths]
     arrays_to_plot = []
 
@@ -437,8 +439,10 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     ax.set_yscale("log")
     ax.set_xlabel("Number of bad queries")
     ax.set_ylabel("Overall number of queries")
-    if "/imagenet_nsfw/" in str(exp_paths[0]):
+    if draw_legend == "tr":
         ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
+    elif draw_legend == "y":
+        ax.legend()
     fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
@@ -455,11 +459,14 @@ if __name__ == "__main__":
     parser.add_argument("--max-samples", type=int, default=500)
     parser.add_argument("--checksum-check", action="store_true", default=False)
     parser.add_argument("--to-simulate", type=int, nargs="+", required=False, default=None)
+    parser.add_argument("--draw-legend", type=str, required=False, default="")
     args = parser.parse_args()
     if args.plot_type == "distance":
         plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples,
-                                        args.unsafe_only, args.out_path, args.checksum_check, args.to_simulate)
+                                        args.unsafe_only, args.out_path, args.checksum_check, args.to_simulate,
+                                        args.draw_legend)
     else:
-        plot_bad_vs_good_queries(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate)
+        plot_bad_vs_good_queries(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
+                                 args.draw_legend)
     for f in OPENED_FILES:
         f.close()
