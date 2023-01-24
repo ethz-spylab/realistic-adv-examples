@@ -49,7 +49,14 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
     return np.arange(1, len(queries) + 1)[np.array(queries)]
 
 
+TRADEOFF_ARRAY_NAME = "tradeoff_array.npy"
+
 def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray:
+    if (exp_path / TRADEOFF_ARRAY_NAME).exists():
+        print(f"Loading tradeoff array from {exp_path / TRADEOFF_ARRAY_NAME}")
+        return np.load(exp_path / TRADEOFF_ARRAY_NAME)
+    
+    print(f"Generating tradeoff array for {exp_path}")
     original_distances_filename = are_distances_wrong(
         exp_path) and "distances_traces_fixed.json" or "distances_traces.json"
     f = (exp_path / original_distances_filename).open("r")
@@ -61,8 +68,11 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
         arrays_iter = map(get_good_to_bad_queries_array_individual_simulated, items)
     
     arrays_iter = filter(lambda x: len(x) == MAX_SAMPLES, arrays_iter)
-    return np.fromiter(tqdm.tqdm(arrays_iter, total=MAX_SAMPLES),
+    final_array = np.fromiter(tqdm.tqdm(arrays_iter, total=MAX_SAMPLES),
                        dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
+    np.save(exp_path / TRADEOFF_ARRAY_NAME, final_array)
+    print(f"Saved tradeoff array to {exp_path / TRADEOFF_ARRAY_NAME}")
+    return final_array
 
 
 def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
