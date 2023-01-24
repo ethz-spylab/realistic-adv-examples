@@ -376,7 +376,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
 
     queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}.csv", index=False)
 
-    if any("beta" in name for name in names):
+    if any("beta" in name or "k" in name for name in names):
         pass
     elif "google" in str(exp_paths[0]):
         ax.set_ylim(8e-2, 1.1)
