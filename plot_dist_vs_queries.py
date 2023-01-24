@@ -18,6 +18,47 @@ from src.utils import read_sha256sum, sha256sum, write_sha256sum
 OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
 
+MAX_BAD_QUERIES_TRADEOFF_PLOT = 1000
+
+
+def get_good_to_bad_queries_array_individual_simulated(distances: list[dict[str, Any]]) -> np.ndarray:
+    queries: list[bool] = []
+    n_unsafe_queries = 0
+    for distance in distances:
+        if distance["equivalent_simulated_queries"] == 0:
+            continue
+        if not distance["safe"]:
+            n_unsafe_queries += distance["equivalent_simulated_queries"]
+        queries += [distance["safe"]] * distance["equivalent_simulated_queries"]
+        if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
+            break
+    return np.cumsum(np.array(queries, dtype=int))
+
+
+def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) -> np.ndarray:
+    queries: list[bool] = []
+    n_unsafe_queries = 0
+    for distance in distances:
+        if not distance["safe"]:
+            n_unsafe_queries += 1
+        queries.append(distance["safe"])
+        if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
+            break
+    return np.cumsum(np.array(queries, dtype=int))
+
+
+def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray:
+    original_distances_filename = are_distances_wrong(
+        exp_path) and "distances_traces_fixed.json" or "distances_traces.json"
+    f = (exp_path / original_distances_filename).open("r")
+    OPENED_FILES.append(f)
+    items = ijson.items(f, "item", use_float=True)
+    if not simulated:
+        return np.fromiter(tqdm.tqdm(map(get_good_to_bad_queries_array_individual, items), total=MAX_SAMPLES),
+                           dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
+    return np.fromiter(tqdm.tqdm(map(get_good_to_bad_queries_array_individual_simulated, items), total=MAX_SAMPLES),
+                       dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
+
 
 def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
                                  unsafe_only: bool) -> Iterator[list[CurrentDistanceInfo]]:
@@ -208,12 +249,23 @@ def save_distances_array(exp_path: Path,
 
 COLORS_STYLES_MARKERS = {
     "OPT": ("tab:blue", "--", "s"),
+    "OPT (binary)": ("tab:blue", "--", "s"),
+    "OPT (line search)": ("tab:green", "-", "x"),
+    "OPT (ideal line search)": ("tab:orange", "-", "o"),
+    "OPT (2 line searches)": ("tab:red", "-", "^"),
     "Stealthy OPT": ("tab:blue", "-", "s"),
     "SignOPT": ("tab:orange", "--", "x"),
+    "SignOPT (Binary)": ("tab:blue", "--", "x"),
+    "SignOPT (line search)": ("tab:green", "-", "o"),
+    "SignOPT (2 line searches)": ("tab:red", "-", "^"),
     "Stealthy SignOPT": ("tab:orange", "-", "x"),
     "Boundary": ("tab:red", "--", "^"),
     "HSJA": ("tab:green", "--", "o"),
     "RayS": ("tab:blue", "--", "s"),
+    "RayS (binary)": ("tab:blue", "--", "s"),
+    "RayS (line search)": ("tab:green", "-", "x"),
+    "RayS (line search with early stopping)": ("tab:red", "-", "^"),
+    "RayS (2-eggs-dropping search)": ("tab:orange", "-", "o"),
     "Stealthy RayS": ("tab:blue", "-", "s"),
     "k = 1.5": ("tab:blue", "-", "s"),
     "k = 2": ("tab:orange", "-", "x"),
@@ -265,7 +317,6 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
             color, style, marker = None, None, None
         n_to_plot = max_queries or distances.shape[1]
         median_distances = np.median(distances[:n_samples_to_plot, :n_to_plot], axis=0)
-        BASE_LINEWIDTH = 1.5
         full_median_distances = np.median(distances[:n_samples_to_plot], axis=0)
         for epsilon in epsilons:
             if ((full_median_distances) < epsilon).any():
@@ -290,6 +341,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
                     })
                 ])
 
+        BASE_LINEWIDTH = 1.5
         if "Stealthy" in name:
             linewidth = 1.5 * BASE_LINEWIDTH
         else:
@@ -313,11 +365,11 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
                                                      axis=0)
         maximum_improvement = np.max(original_attack_median_distances / median_distances)
         minimum_improvement = np.min(original_attack_median_distances / median_distances)
-        
+
         maximum_improvement_query = np.argmax(original_attack_median_distances / median_distances)
         maximum_improvement_distance_original = original_attack_median_distances[maximum_improvement_query]
         maximum_improvement_distance = median_distances[maximum_improvement_query]
-       
+
         minimum_improvement_query = np.argmin(original_attack_median_distances / median_distances)
         minimum_improvement_distance = median_distances[minimum_improvement_query]
         minimum_improvement_distance_original = original_attack_median_distances[minimum_improvement_query]
@@ -341,8 +393,62 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     fig.show()
 
 
+def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out_path: Path, max_samples: int | None,
+                             to_simulate: list[int] | None) -> None:
+    names = names or ["" for _ in exp_paths]
+    arrays_to_plot = []
+
+    for i, exp_path in enumerate(exp_paths):
+        array_to_plot = get_good_to_bad_queries_array(exp_path, to_simulate is not None and i in to_simulate)
+        arrays_to_plot.append(array_to_plot)
+
+    n_samples_to_plot = min(len(distances_array) for distances_array in arrays_to_plot)
+    n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
+
+    if max_samples is not None and n_samples_to_plot < max_samples:
+        warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
+
+    RATIO = 3 / 4
+    WIDTH = 6
+    fig, ax = plt.subplots(figsize=(WIDTH, WIDTH * RATIO))
+
+    for name, array in zip(names, arrays_to_plot):
+        array = array[:n_samples_to_plot]
+        if name and name in COLORS_STYLES_MARKERS:
+            color, style, marker = COLORS_STYLES_MARKERS[name]
+        elif not name:
+            warnings.warn("Attack name not specified. Using default color, style and marker.")
+            color, style, marker = None, None, None
+        else:
+            warnings.warn(f"Could not find color, style, marker for {name}. Using default.")
+            color, style, marker = None, None, None
+
+        BASE_LINEWIDTH = 1.5
+        if "Stealthy" in name:
+            linewidth = 1.5 * BASE_LINEWIDTH
+        else:
+            linewidth = 1 * BASE_LINEWIDTH
+
+        ax.plot(np.mean(array, axis=0),
+                label=name,
+                color=color,
+                linestyle=style,
+                marker=marker,
+                markevery=MAX_BAD_QUERIES_TRADEOFF_PLOT // 10,
+                linewidth=linewidth)
+
+    ax.set_yscale("log")
+    ax.set_xlabel("Number of bad queries")
+    ax.set_ylabel("Number of good queries")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(str(out_path))
+    fig.show()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("plot_type", type=str, choices=["median_distances", "tradeoff"], default="median_distances")
     parser.add_argument("--exp-paths", type=Path, nargs="+", required=True)
     parser.add_argument("--names", type=str, nargs="+", required=False, default=None)
     parser.add_argument("--out-path", type=Path, required=True)
@@ -352,7 +458,10 @@ if __name__ == "__main__":
     parser.add_argument("--checksum-check", action="store_true", default=False)
     parser.add_argument("--to-simulate", type=int, nargs="+", required=False, default=None)
     args = parser.parse_args()
-    plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples, args.unsafe_only,
-                                    args.out_path, args.checksum_check, args.to_simulate)
+    if args.plot_type == "median_distances":
+        plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples,
+                                        args.unsafe_only, args.out_path, args.checksum_check, args.to_simulate)
+    else:
+        plot_bad_vs_good_queries(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate)
     for f in OPENED_FILES:
         f.close()
