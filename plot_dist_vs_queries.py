@@ -29,10 +29,10 @@ def get_good_to_bad_queries_array_individual_simulated(distances: list[dict[str,
             continue
         if not distance["safe"]:
             n_unsafe_queries += distance["equivalent_simulated_queries"]
-        queries += [distance["safe"]] * distance["equivalent_simulated_queries"]
+        queries += [not distance["safe"]] * distance["equivalent_simulated_queries"]
         if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
             break
-    return np.cumsum(np.array(queries, dtype=int))
+    return np.arange(1, len(queries) + 1)[np.array(queries)]
 
 
 def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) -> np.ndarray:
@@ -41,10 +41,10 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
     for distance in distances:
         if not distance["safe"]:
             n_unsafe_queries += 1
-        queries.append(distance["safe"])
+        queries.append(not distance["safe"])
         if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
             break
-    return np.cumsum(np.array(queries, dtype=int))
+    return np.arange(1, len(queries) + 1)[np.array(queries)]
 
 
 def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray:
@@ -439,7 +439,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
     ax.set_yscale("log")
     ax.set_xlabel("Number of bad queries")
-    ax.set_ylabel("Number of good queries")
+    ax.set_ylabel("Overall number of queries")
     ax.legend()
     fig.tight_layout()
     fig.savefig(str(out_path))
