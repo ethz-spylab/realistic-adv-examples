@@ -117,8 +117,8 @@ def pad_to_len(list_: list[float], n: int) -> np.ndarray:
     return np.asarray(list_[:n])
 
 
-MAX_UNSAFE_QUERIES = 5000
-MAX_QUERIES = 20_000
+MAX_UNSAFE_QUERIES = 15_000
+MAX_QUERIES = 50_000
 
 
 def convert_distances_to_array(distances: Iterator[list[CurrentDistanceInfo]], unsafe_only: bool) -> np.ndarray:
