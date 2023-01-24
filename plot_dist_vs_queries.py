@@ -375,34 +375,12 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
 
     queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}.csv", index=False)
 
-    for attack, distances in attacks_distances_dict.items():
-        if "Stealthy" not in attack:
-            continue
-        median_distances = np.median(distances[:n_samples_to_plot], axis=0)
-        original_attack_name = attack.split("Stealthy ")[1]
-        original_attack_median_distances = np.median(attacks_distances_dict[original_attack_name][:n_samples_to_plot],
-                                                     axis=0)
-        maximum_improvement = np.max(original_attack_median_distances / median_distances)
-        minimum_improvement = np.min(original_attack_median_distances / median_distances)
-
-        maximum_improvement_query = np.argmax(original_attack_median_distances / median_distances)
-        maximum_improvement_distance_original = original_attack_median_distances[maximum_improvement_query]
-        maximum_improvement_distance = median_distances[maximum_improvement_query]
-
-        minimum_improvement_query = np.argmin(original_attack_median_distances / median_distances)
-        minimum_improvement_distance = median_distances[minimum_improvement_query]
-        minimum_improvement_distance_original = original_attack_median_distances[minimum_improvement_query]
-        print(
-            f"Attack: {attack}, maximum improvement = {maximum_improvement:.3f} at query {maximum_improvement_query} "
-            f"and distance {maximum_improvement_distance:.3f} (original attack distance {maximum_improvement_distance_original:.3f})\n"  # noqa
-            f"minimum improvement = {minimum_improvement:.3f} at query {minimum_improvement_query} and "
-            f"distance {minimum_improvement_distance:.3f} (original attack distance {minimum_improvement_distance_original:.3f})"  # noqa
-        )
-
-    if "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
+    if "google" in str(exp_paths[0]): 
+        ax.set_ylim(8e-2, 1.1)
+    elif "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
         ax.set_ylim(5e-0, 1e2)
     elif "/linf/" in str(exp_paths[0]):
-        ax.set_ylim(2e-2, 1e0)
+        ax.set_ylim(2e-2, 1.1)
     ax.set_yscale("log")
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
@@ -467,7 +445,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("plot_type", type=str, choices=["median_distances", "tradeoff"], default="median_distances")
+    parser.add_argument("plot_type", type=str, choices=["distance", "tradeoff"], default="median_distances")
     parser.add_argument("--exp-paths", type=Path, nargs="+", required=True)
     parser.add_argument("--names", type=str, nargs="+", required=False, default=None)
     parser.add_argument("--out-path", type=Path, required=True)
@@ -477,7 +455,7 @@ if __name__ == "__main__":
     parser.add_argument("--checksum-check", action="store_true", default=False)
     parser.add_argument("--to-simulate", type=int, nargs="+", required=False, default=None)
     args = parser.parse_args()
-    if args.plot_type == "median_distances":
+    if args.plot_type == "distance":
         plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples,
                                         args.unsafe_only, args.out_path, args.checksum_check, args.to_simulate)
     else:
