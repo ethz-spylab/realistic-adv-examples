@@ -44,6 +44,8 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
         queries.append(not distance["safe"])
         if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
             break
+    if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
+        warnings.warn(f"Only {n_unsafe_queries} unsafe queries found")
     return np.arange(1, len(queries) + 1)[np.array(queries)]
 
 
@@ -54,9 +56,12 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
     OPENED_FILES.append(f)
     items = ijson.items(f, "item", use_float=True)
     if not simulated:
-        return np.fromiter(tqdm.tqdm(map(get_good_to_bad_queries_array_individual, items), total=MAX_SAMPLES),
-                           dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
-    return np.fromiter(tqdm.tqdm(map(get_good_to_bad_queries_array_individual_simulated, items), total=MAX_SAMPLES),
+        arrays_iter = map(get_good_to_bad_queries_array_individual, items)
+    else:
+        arrays_iter = map(get_good_to_bad_queries_array_individual_simulated, items)
+    
+    arrays_iter = filter(lambda x: len(x) == MAX_SAMPLES, arrays_iter)
+    return np.fromiter(tqdm.tqdm(arrays_iter, total=MAX_SAMPLES),
                        dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
 
 
