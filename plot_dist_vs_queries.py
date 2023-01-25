@@ -338,22 +338,22 @@ COLORS_STYLES_MARKERS = {
     "Stealthy OPT": ("royalblue", "-", "s"),
     "Stealthy OPT (ideal search)": ("royalblue", "--", None),
     "SignOPT": ("goldenrod", "dotted", "x"),
-    "SignOPT (Binary)": ("goldenrod", "dotted", "x"),
-    "SignOPT (line search)": ("darkgoldenrod", "-", "o"),
-    "SignOPT (2 line searches)": ("darkgoldenrod", "-", "^"),
+    "SignOPT (Binary)": ("tab:green", "dotted", "x"),
+    "SignOPT (line search)": ("tab:blue", "-", "o"),
+    "SignOPT (2 line searches)": ("tab:orange", "-", "^"),
     "Stealthy SignOPT": ("darkgoldenrod", "-", "x"),
     "Boundary": ("tab:red", "dotted", "^"),
     "HSJA": ("tab:green", "dotted", "o"),
     "RayS": ("darkviolet", "dotted", "s"),
-    "RayS (binary)": ("darkviolet", "dotted", "s"),
-    "RayS (line search)": ("indigo", "-", "x"),
-    "RayS (line search with early stopping)": ("indigo", "-", "^"),
-    "RayS (2 line searches)": ("indigo", "-", "o"),
+    "RayS (binary)": ("tab:green", "dotted", "s"),
+    "RayS (line search)": ("tab:blue", "-", "x"),
+    "RayS (line search with early stopping)": ("tab:orange", "-", "^"),
+    "RayS (2 line searches)": ("tab:red", "-", "o"),
     "Stealthy RayS": ("indigo", "-", "s"),
-    "k = 1.5": ("darkgoldenrod", "-", "s"),
-    "k = 2": ("darkgoldenrod", "-", "x"),
-    "k = 2.5": ("darkgoldenrod", "-", "o"),
-    "k = 3": ("darkgoldenrod", "-", "^"),
+    "k = 1.5": ("tab:green", "-", "s"),
+    "k = 2": ("tab:blue", "-", "x"),
+    "k = 2.5": ("tab:orange", "-", "o"),
+    "k = 3": ("tab:red", "-", "^"),
 }
 
 PLOTS_HEIGHT = 3
@@ -394,7 +394,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     attacks_distances_dict = {}
     for i, (distances, name) in enumerate(zip(distances_arrays, names)):
         attacks_distances_dict[name] = distances
-        if "google" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
+        if "google" in str(out_path.stem):
             print("Ignoring color")
             color = None
             if name in COLORS_STYLES_MARKERS:
@@ -502,7 +502,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
         queries_to_plot = max_queries or array.shape[1]
         array = array[:n_samples_to_plot, :queries_to_plot]
-        if "sign_opt" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
+        if "google" in str(out_path):
             print("Ignoring color")
             color = None
             if name in COLORS_STYLES_MARKERS:
