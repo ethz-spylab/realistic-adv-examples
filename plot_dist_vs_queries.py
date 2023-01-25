@@ -359,6 +359,9 @@ COLORS_STYLES_MARKERS = {
 PLOTS_HEIGHT = 3
 PLOTS_WIDTH = 4
 
+RAYS_PLOTS_HEIGHT = 2.25 
+RAYS_PLOTS_WIDTH = 3
+
 TOT_MARKERS = 5
 
 
@@ -387,8 +390,10 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
 
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
-
-    fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
+    if "rays" in out_path.stem:
+        fig, ax = plt.subplots(figsize=(RAYS_PLOTS_WIDTH, RAYS_PLOTS_HEIGHT))
+    else:
+        fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
     queries_per_epsilon_df = pd.DataFrame(columns=["attack", "epsilon", "n_queries"])
 
     attacks_distances_dict = {}
@@ -498,7 +503,11 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
 
-    fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
+    if "rays" in out_path.stem:
+        fig, ax = plt.subplots(figsize=(RAYS_PLOTS_WIDTH, RAYS_PLOTS_HEIGHT))
+    else:
+        fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
+    
     for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
         queries_to_plot = max_queries or array.shape[1]
         array = array[:n_samples_to_plot, :queries_to_plot]
