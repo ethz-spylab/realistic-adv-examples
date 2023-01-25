@@ -336,6 +336,7 @@ COLORS_STYLES_MARKERS = {
     "OPT (ideal line search)": ("royalblue", "-", "o"),
     "OPT (2 line searches)": ("royalblue", "-", "^"),
     "Stealthy OPT": ("royalblue", "-", "s"),
+    "Stealthy OPT (ideal search)": ("royalblue", "--", None),
     "SignOPT": ("goldenrod", "dotted", "x"),
     "SignOPT (Binary)": ("goldenrod", "dotted", "x"),
     "SignOPT (line search)": ("darkgoldenrod", "-", "o"),
@@ -460,7 +461,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     elif draw_legend == "y":
         ax.legend(fontsize='small')
     if any("ideal" in name for name in names):
-        ax.annotate("Ideal line search", xy=(0.5, 0.45), xytext=(0.1, 0.1))
+        ax.annotate(name, xy=(0.5, 0.45), xytext=(0.1, 0.1))
     
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
