@@ -317,6 +317,7 @@ COLORS_STYLES_MARKERS = {
 PLOTS_HEIGHT = 3
 PLOTS_WIDTH = 4
 
+TOT_MARKERS = 7
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
@@ -346,7 +347,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     queries_per_epsilon_df = pd.DataFrame(columns=["attack", "epsilon", "n_queries"])
 
     attacks_distances_dict = {}
-    for distances, name in zip(distances_arrays, names):
+    for i, (distances, name) in enumerate(zip(distances_arrays, names)):
         attacks_distances_dict[name] = distances
         if name and name in COLORS_STYLES_MARKERS:
             color, style, marker = COLORS_STYLES_MARKERS[name]
@@ -386,12 +387,14 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
             linewidth = 1.5 * BASE_LINEWIDTH
         else:
             linewidth = 1 * BASE_LINEWIDTH
+        markers_frequency = n_to_plot // TOT_MARKERS
+        marker_start = markers_frequency // len(names) * i
         ax.plot(median_distances,
                 label=name,
                 color=color,
                 linestyle=style,
                 marker=marker,
-                markevery=n_to_plot // 10,
+                markevery=(marker_start, markers_frequency),
                 linewidth=linewidth)
 
     if "ablation" not in str(out_path):
@@ -432,7 +435,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
 
     fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
-    for name, array in zip(names, arrays_to_plot):
+    for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
         array = array[:n_samples_to_plot]
         if name and name in COLORS_STYLES_MARKERS:
             color, style, marker = COLORS_STYLES_MARKERS[name]
@@ -449,12 +452,14 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         else:
             linewidth = 1 * BASE_LINEWIDTH
 
+        markers_frequency = MAX_BAD_QUERIES_TRADEOFF_PLOT // TOT_MARKERS
+        marker_start = markers_frequency // len(names) * i
         ax.plot(np.mean(array, axis=0),
                 label=name,
                 color=color,
                 linestyle=style,
                 marker=marker,
-                markevery=MAX_BAD_QUERIES_TRADEOFF_PLOT // 10,
+                markevery=(marker_start, markers_frequency),
                 linewidth=linewidth)
 
     ax.set_yscale("log")
