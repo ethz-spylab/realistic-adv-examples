@@ -25,7 +25,7 @@ MAX_BAD_QUERIES_TRADEOFF_PLOT = 1000
 
 def expand_array_with_interpolation(array: np.ndarray, total_entries: int, last_k: int = 100) -> np.ndarray:
     to_expand = total_entries - len(array)
-    linear_regression_results = linregress(np.arange(len(array))[:-last_k], array[:-last_k])
+    linear_regression_results = linregress(np.arange(len(array))[-last_k:], array[-last_k:])
     range_to_expand = np.arange(len(array), len(array) + to_expand)
     expansion = range_to_expand * linear_regression_results.slope + linear_regression_results.intercept  # type: ignore
     full_array = np.concatenate((array, expansion))
@@ -394,7 +394,8 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     attacks_distances_dict = {}
     for i, (distances, name) in enumerate(zip(distances_arrays, names)):
         attacks_distances_dict[name] = distances
-        if "sign_opt" in str(out_path) or "rays" in str(out_path) or "opt" in str(out_path):
+        if "sign_opt" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
+            print("Ignoring color")
             color = None
             _, style, marker = COLORS_STYLES_MARKERS[name]
         elif name and name in COLORS_STYLES_MARKERS:
