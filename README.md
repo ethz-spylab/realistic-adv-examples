@@ -14,7 +14,7 @@ This should install all the libraries needed to run the code. Please note that t
 
 ## Running the experiments
 
-The entry point to run the attacks is the main `main.py` file. In particular, the file supports several arguments to run different attacks with different parameters on different datasets.
+The entry point to run the attacks is the main [`main.py`](main.py) file. In particular, the file supports several arguments to run different attacks with different parameters on different datasets.
 
 ### ImageNet $\ell_2$ (Fig. 3.a)
 
@@ -51,7 +51,7 @@ Please note that the attacks generate quite large logs (up to 13GB per experimen
 
 ## Plotting
 
-The file [plot_dist_vs_queries.py](plot_dist_vs_queries.py) can be used to plot the results generated from the attacks. In particular, after running the commands above, Fig. 3.a can be plotted with the following command:
+The file [`plot_dist_vs_queries.py`](plot_dist_vs_queries.py) can be used to plot the results generated from the attacks. In particular, after running the commands above, Fig. 3.a can be plotted with the following command:
 
 ```sh
 python plot_dist_vs_queries.py distance --exp-paths $BOUNDARY_RESULTS_PATH $OPT_RESULTS_PATH $STEALTHY_OPT_RESULTS_PATH $SIGNOPT_RESULTS_PATH $STEALTHY_SIGNOPT_RESULTS_PATH $HSJA_RESULTS_PATH --names Boundary OPT "Stealthy OPT" SignOPT "Stealthy SignOPT" "HSJA" --to-simulate 2 4 --unsafe-only --max-queries 1000 --max-samples 500 --out-path plots/imagenet_l2.pdf
