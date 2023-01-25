@@ -15,6 +15,7 @@ from scipy.stats import linregress
 from src.attacks.queries_counter import CurrentDistanceInfo, WrongCurrentDistanceInfo
 from src.json_list import JSONList
 from src.utils import read_sha256sum, sha256sum, write_sha256sum
+from src.attacks.opt import OPTAttackPhase
 
 OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
@@ -62,7 +63,7 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
             break
     if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
         warnings.warn(f"Only {n_unsafe_queries} unsafe queries found")
-    
+
     tot_queries_per_bad_query = np.arange(1, len(queries) + 1)[np.array(queries)]
     if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
         tot_queries_per_bad_query = expand_array_with_interpolation(tot_queries_per_bad_query,
@@ -117,11 +118,45 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         yield simulated_distances
 
 
-SIMULATED_DISTANCES_FILENAME = "simulated_distances_array{}.npy"
+def make_dummy_distance_info(phase: OPTAttackPhase, distance: float, best_distance: float) -> CurrentDistanceInfo:
+    return CurrentDistanceInfo(phase, False, distance, best_distance)
 
 
-def get_simulated_array(exp_path: Path, unsafe_only: bool) -> np.ndarray:
-    array_filename = SIMULATED_DISTANCES_FILENAME.format("_unsafe_only" if unsafe_only else "")
+def generate_ideal_line_simulated_distances(
+        items: Iterator[list[dict[str, Any]]]) -> Iterator[list[CurrentDistanceInfo]]:
+    for distance_list in items:
+        simulated_distances = []
+        previous_phase = None
+        for distance in distance_list:
+            if distance["phase"] == OPTAttackPhase.direction_search:
+                # One unsafe query is done for the initial research, whether it is for the direction test
+                # or to measure the boundary distance along the direction
+                simulated_distances.append(
+                    make_dummy_distance_info(OPTAttackPhase.direction_search, distance["distance"],
+                                             distance["best_distance"]))
+            elif distance["phase"] == OPTAttackPhase.step_size_search_start:
+                # One unsafe query is done for the step size search
+                simulated_distances.append(
+                    make_dummy_distance_info(OPTAttackPhase.step_size_search_start, distance["distance"],
+                                             distance["best_distance"]))
+            if (distance["phase"] == OPTAttackPhase.gradient_estimation
+                    and previous_phase != OPTAttackPhase.gradient_estimation):
+                # 10 unsafe queries are done for the overall gradient estimation
+                simulated_distances += [
+                    make_dummy_distance_info(OPTAttackPhase.step_size_search_start, distance["distance"],
+                                             distance["best_distance"])
+                ] * 10
+            previous_phase = distance["phase"]
+
+        yield simulated_distances
+
+
+SIMULATED_DISTANCES_FILENAME = "{}simulated_distances_array{}.npy"
+
+
+def get_simulated_array(exp_path: Path, unsafe_only: bool, simulate_ideal_line: bool = False) -> np.ndarray:
+    array_filename = SIMULATED_DISTANCES_FILENAME.format("ideal_line_" if simulate_ideal_line else "",
+                                                         "_unsafe_only" if unsafe_only else "")
     if (exp_path / array_filename).exists():
         print("Loading simulated distances from file")
         return np.load(exp_path / array_filename)
@@ -130,7 +165,13 @@ def get_simulated_array(exp_path: Path, unsafe_only: bool) -> np.ndarray:
     f = (exp_path / original_distances_filename).open("r")
     OPENED_FILES.append(f)
     raw_results = wrap_ijson_iterator(ijson.items(f, "item", use_float=True))
-    simulated_distances = generate_simulated_distances(raw_results, unsafe_only)
+    if not simulate_ideal_line:
+        print("Generating simulated distances")
+        simulated_distances = generate_simulated_distances(raw_results, unsafe_only)
+    else:
+        assert unsafe_only
+        print("Generating simulated distances with ideal line search")
+        simulated_distances = generate_ideal_line_simulated_distances(raw_results)
     array = convert_distances_to_array(simulated_distances, unsafe_only)
     save_distances_array(exp_path, array, True, False, array_filename)
     return array
@@ -319,9 +360,10 @@ PLOTS_WIDTH = 4
 
 TOT_MARKERS = 5
 
+
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
-                                    to_simulate: list[int] | None, draw_legend: str):
+                                    to_simulate: list[int] | None, to_simulate_ideal: int | None, draw_legend: str):
     names = names or ["" for _ in exp_paths]
     distances_arrays = []
 
@@ -333,6 +375,8 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     for i, exp_path in enumerate(exp_paths):
         if to_simulate is not None and i in to_simulate:
             distances_array = get_simulated_array(exp_paths[i], unsafe_only)
+        elif to_simulate_ideal is not None and i == to_simulate_ideal:
+            distances_array = get_simulated_array(exp_paths[i], unsafe_only, simulate_ideal_line=True)
         else:
             distances_array = load_distances_from_array(exp_path, unsafe_only, checksum_check)
         distances_arrays.append(distances_array)
@@ -412,9 +456,9 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
     if draw_legend == "tr":
-        ax.legend(fontsize='x-small', bbox_to_anchor=(1.04, 1), loc="upper left")
+        ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
-        ax.legend(fontsize='x-small')
+        ax.legend(fontsize='small')
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
@@ -466,9 +510,9 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     ax.set_xlabel("Number of bad queries")
     ax.set_ylabel("Overall number of queries")
     if draw_legend == "tr":
-        ax.legend(fontsize='x-small', bbox_to_anchor=(1.04, 1), loc="upper left")
+        ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
-        ax.legend(fontsize='x-small')
+        ax.legend(fontsize='small')
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
@@ -484,12 +528,13 @@ if __name__ == "__main__":
     parser.add_argument("--max-samples", type=int, default=500)
     parser.add_argument("--checksum-check", action="store_true", default=False)
     parser.add_argument("--to-simulate", type=int, nargs="+", required=False, default=None)
+    parser.add_argument("--to-simulate-ideal", type=int, required=False, default=None)
     parser.add_argument("--draw-legend", type=str, required=False, default="")
     args = parser.parse_args()
     if args.plot_type == "distance":
         plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples,
                                         args.unsafe_only, args.out_path, args.checksum_check, args.to_simulate,
-                                        args.draw_legend)
+                                        args.to_simulate_ideal, args.draw_legend)
     else:
         plot_bad_vs_good_queries(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
                                  args.draw_legend)
