@@ -347,7 +347,7 @@ COLORS_STYLES_MARKERS = {
     "RayS": ("darkviolet", "dotted", "s"),
     "RayS (binary)": ("tab:green", "dotted", "s"),
     "RayS (line search)": ("tab:blue", "-", "x"),
-    "RayS (line search with early stopping)": ("tab:orange", "-", "^"),
+    "RayS (early stopping)": ("tab:orange", "-", "^"),
     "RayS (2 line searches)": ("tab:red", "-", "o"),
     "Stealthy RayS": ("indigo", "-", "s"),
     "k = 1.5": ("tab:green", "-", "s"),
@@ -545,13 +545,17 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
     ax.set_yscale("log")
     ax.set_xlabel("Number of bad queries")
-    ax.set_ylabel("Overall number of queries")
+    ax.set_ylabel("Total number of queries")
     if draw_legend == "tr":
         ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
         ax.legend(fontsize='small')
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
+
+
+def make_cost_plot(exp_paths: list[Path], query_cost: float, bad_query_cost: float):
+    ...
 
 
 if __name__ == "__main__":
