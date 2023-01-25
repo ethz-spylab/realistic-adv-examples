@@ -289,35 +289,35 @@ def save_distances_array(exp_path: Path,
 
 
 COLORS_STYLES_MARKERS = {
-    "OPT": ("tab:blue", "dotted", "s"),
-    "OPT (binary)": ("tab:blue", "dotted", "s"),
-    "OPT (line search)": ("tab:blue", "-", "x"),
-    "OPT (ideal line search)": ("tab:blue", "-", "o"),
-    "OPT (2 line searches)": ("tab:blue", "-", "^"),
-    "Stealthy OPT": ("tab:blue", "-", "s"),
-    "SignOPT": ("tab:orange", "dotted", "x"),
-    "SignOPT (Binary)": ("tab:orange", "dotted", "x"),
-    "SignOPT (line search)": ("tab:orange", "-", "o"),
-    "SignOPT (2 line searches)": ("tab:orange", "-", "^"),
-    "Stealthy SignOPT": ("tab:orange", "-", "x"),
+    "OPT": ("cornflowerblue", "dotted", "s"),
+    "OPT (binary)": ("cornflowerblue", "dotted", "s"),
+    "OPT (line search)": ("cornflowerblue", "-", "x"),
+    "OPT (ideal line search)": ("cornflowerblue", "-", "o"),
+    "OPT (2 line searches)": ("cornflowerblue", "-", "^"),
+    "Stealthy OPT": ("darkblue", "-", "s"),
+    "SignOPT": ("tan", "dotted", "x"),
+    "SignOPT (Binary)": ("darkorange", "dotted", "x"),
+    "SignOPT (line search)": ("darkorange", "-", "o"),
+    "SignOPT (2 line searches)": ("darkorange", "-", "^"),
+    "Stealthy SignOPT": ("darkorange", "-", "x"),
     "Boundary": ("tab:red", "dotted", "^"),
     "HSJA": ("tab:green", "dotted", "o"),
-    "RayS": ("tab:purple", "dotted", "s"),
-    "RayS (binary)": ("tab:purple", "dotted", "s"),
-    "RayS (line search)": ("tab:purple", "-", "x"),
-    "RayS (line search with early stopping)": ("tab:purple", "-", "^"),
-    "RayS (2-eggs-dropping search)": ("tab:purple", "-", "o"),
-    "Stealthy RayS": ("tab:purple", "-", "s"),
-    "k = 1.5": ("tab:orange", "-", "s"),
-    "k = 2": ("tab:orange", "-", "x"),
-    "k = 2.5": ("tab:orange", "-", "o"),
-    "k = 3": ("tab:orange", "-", "^"),
+    "RayS": ("darkviolet", "dotted", "s"),
+    "RayS (binary)": ("indigo", "dotted", "s"),
+    "RayS (line search)": ("indigo", "-", "x"),
+    "RayS (line search with early stopping)": ("indigo", "-", "^"),
+    "RayS (2-eggs-dropping search)": ("indigo", "-", "o"),
+    "Stealthy RayS": ("indigo", "-", "s"),
+    "k = 1.5": ("darkorange", "-", "s"),
+    "k = 2": ("darkorange", "-", "x"),
+    "k = 2.5": ("darkorange", "-", "o"),
+    "k = 3": ("darkorange", "-", "^"),
 }
 
 PLOTS_HEIGHT = 3
 PLOTS_WIDTH = 4
 
-TOT_MARKERS = 7
+TOT_MARKERS = 5
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
