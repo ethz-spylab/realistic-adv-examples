@@ -295,7 +295,6 @@ COLORS_STYLES_MARKERS = {
 
 PLOTS_HEIGHT = 3
 PLOTS_WIDTH = 4
-LEGEND_RATIO = 1.45
 
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
@@ -322,11 +321,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
 
-    if draw_legend != "tr":
-        fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
-    else:
-        fig, ax = plt.subplots(figsize=(PLOTS_WIDTH * LEGEND_RATIO, PLOTS_HEIGHT))
-
+    fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
     queries_per_epsilon_df = pd.DataFrame(columns=["attack", "epsilon", "n_queries"])
 
     attacks_distances_dict = {}
@@ -415,11 +410,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
 
-    if draw_legend != "tr":
-        fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
-    else:
-        fig, ax = plt.subplots(figsize=(PLOTS_WIDTH * LEGEND_RATIO, PLOTS_HEIGHT))
-
+    fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
     for name, array in zip(names, arrays_to_plot):
         array = array[:n_samples_to_plot]
         if name and name in COLORS_STYLES_MARKERS:
