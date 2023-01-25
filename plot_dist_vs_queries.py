@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import tqdm
 from ijson.common import IncompleteJSONError
+from scipy.stats import linregress
 
 from src.attacks.queries_counter import CurrentDistanceInfo, WrongCurrentDistanceInfo
 from src.json_list import JSONList
@@ -19,6 +20,16 @@ OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
 
 MAX_BAD_QUERIES_TRADEOFF_PLOT = 1000
+
+
+def expand_array_with_interpolation(array: np.ndarray, total_entries: int, last_k: int = 100) -> np.ndarray:
+    to_expand = total_entries - len(array)
+    linear_regression_results = linregress(np.arange(len(array))[:-last_k], array[:-last_k])
+    range_to_expand = np.arange(len(array), len(array) + to_expand + 1)
+    expansion = range_to_expand * linear_regression_results.slope + linear_regression_results.intercept  # type: ignore
+    full_array = np.concatenate((array, expansion))
+    assert len(full_array) == total_entries
+    return full_array
 
 
 def get_good_to_bad_queries_array_individual_simulated(distances: list[dict[str, Any]]) -> np.ndarray:
@@ -32,7 +43,12 @@ def get_good_to_bad_queries_array_individual_simulated(distances: list[dict[str,
         queries += [not distance["safe"]] * distance["equivalent_simulated_queries"]
         if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
             break
-    return np.arange(1, len(queries) + 1)[np.array(queries)]
+
+    tot_queries_per_bad_query = np.arange(1, len(queries) + 1)[np.array(queries)]
+    if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
+        tot_queries_per_bad_query = expand_array_with_interpolation(tot_queries_per_bad_query,
+                                                                    MAX_BAD_QUERIES_TRADEOFF_PLOT)
+    return tot_queries_per_bad_query
 
 
 def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) -> np.ndarray:
@@ -46,7 +62,12 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
             break
     if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
         warnings.warn(f"Only {n_unsafe_queries} unsafe queries found")
-    return np.arange(1, len(queries) + 1)[np.array(queries)]
+    
+    tot_queries_per_bad_query = np.arange(1, len(queries) + 1)[np.array(queries)]
+    if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
+        tot_queries_per_bad_query = expand_array_with_interpolation(tot_queries_per_bad_query,
+                                                                    MAX_BAD_QUERIES_TRADEOFF_PLOT)
+    return tot_queries_per_bad_query
 
 
 TRADEOFF_ARRAY_NAME = "tradeoff_array{}.npy"
