@@ -466,7 +466,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         ax.legend(fontsize='small')
     if any("ideal" in name for name in names):
         print("Annotating")
-        ax.annotate("Stealthy SignOPT\nwith ideal search", xy=(400, 22), xytext=(50, 8), fontsize="small", arrowprops={"arrowstyle": "simple", "color": "black", "lw": 0.1})
+        ax.annotate("Stealthy SignOPT (Sim)", xy=(400, 22), xytext=(50, 8), fontsize="small", arrowprops={"arrowstyle": "simple", "color": "black", "lw": 0.1})
     
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
@@ -490,7 +490,14 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
     for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
         array = array[:n_samples_to_plot]
-        if name and name in COLORS_STYLES_MARKERS:
+        if "sign_opt" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
+            print("Ignoring color")
+            color = None
+            if name in COLORS_STYLES_MARKERS:
+                _, style, marker = COLORS_STYLES_MARKERS[name]
+            else:
+                style, marker = None, None
+        elif name and name in COLORS_STYLES_MARKERS:
             color, style, marker = COLORS_STYLES_MARKERS[name]
         elif not name:
             warnings.warn("Attack name not specified. Using default color, style and marker.")
