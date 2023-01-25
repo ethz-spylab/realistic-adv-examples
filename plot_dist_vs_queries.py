@@ -347,8 +347,8 @@ COLORS_STYLES_MARKERS = {
     "RayS": ("darkviolet", "dotted", "s"),
     "RayS (binary)": ("tab:green", "dotted", "s"),
     "RayS (line search)": ("tab:blue", "-", "x"),
-    "RayS (early stopping)": ("tab:orange", "-", "^"),
-    "RayS (2 line searches)": ("tab:red", "-", "o"),
+    "RayS (line search + early stop)": ("tab:orange", "-", "^"),
+    "RayS (2 line searches + early stop)": ("tab:red", "-", "o"),
     "Stealthy RayS": ("indigo", "-", "s"),
     "k = 1.5": ("tab:green", "-", "s"),
     "k = 2": ("tab:blue", "-", "x"),
@@ -446,6 +446,10 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
             linewidth = 1 * BASE_LINEWIDTH
         markers_frequency = n_to_plot // TOT_MARKERS
         marker_start = markers_frequency // len(names) * i
+        if "rays" in out_path.stem:
+            name = name.replace("RayS (", "").replace(")", "")
+        if "opt" in out_path.stem:
+            name = name.replace("OPT (", "").replace(")", "")
         ax.plot(median_distances,
                 label=name if "ideal" not in name else None,
                 color=color,
