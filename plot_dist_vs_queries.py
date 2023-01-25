@@ -562,6 +562,6 @@ if __name__ == "__main__":
                                         args.to_simulate_ideal, args.draw_legend)
     else:
         plot_bad_vs_good_queries(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
-                                 args.draw_legend)
+                                 args.draw_legend, args.max_queries)
     for f in OPENED_FILES:
         f.close()
