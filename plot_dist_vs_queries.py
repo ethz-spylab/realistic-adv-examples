@@ -25,7 +25,7 @@ MAX_BAD_QUERIES_TRADEOFF_PLOT = 1000
 def expand_array_with_interpolation(array: np.ndarray, total_entries: int, last_k: int = 100) -> np.ndarray:
     to_expand = total_entries - len(array)
     linear_regression_results = linregress(np.arange(len(array))[:-last_k], array[:-last_k])
-    range_to_expand = np.arange(len(array), len(array) + to_expand + 1)
+    range_to_expand = np.arange(len(array), len(array) + to_expand)
     expansion = range_to_expand * linear_regression_results.slope + linear_regression_results.intercept  # type: ignore
     full_array = np.concatenate((array, expansion))
     assert len(full_array) == total_entries
