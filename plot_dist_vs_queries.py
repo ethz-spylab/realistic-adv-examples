@@ -140,7 +140,7 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(OPTAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
             elif (distance["phase"] == OPTAttackPhase.gradient_estimation
-                    and previous_phase != OPTAttackPhase.gradient_estimation):
+                  and previous_phase != OPTAttackPhase.gradient_estimation):
                 # 10 unsafe queries are done for the overall gradient estimation
                 simulated_distances += [
                     make_dummy_distance_info(OPTAttackPhase.gradient_estimation, distance["distance"],
@@ -466,8 +466,16 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         ax.legend(fontsize='small')
     if any("ideal" in name for name in names):
         print("Annotating")
-        ax.annotate("Stealthy SignOPT (Sim)", xy=(400, 22), xytext=(50, 8), fontsize="small", arrowprops={"arrowstyle": "simple", "color": "black", "lw": 0.1})
-    
+        ax.annotate("Stealthy SignOPT (Sim)",
+                    xy=(400, 22),
+                    xytext=(50, 8),
+                    fontsize="small",
+                    arrowprops={
+                        "arrowstyle": "simple",
+                        "color": "black",
+                        "lw": 0.1
+                    })
+
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
