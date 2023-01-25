@@ -461,7 +461,8 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     elif draw_legend == "y":
         ax.legend(fontsize='small')
     if any("ideal" in name for name in names):
-        ax.annotate(name, xy=(0.5, 0.45), xytext=(0.1, 0.1))
+        print(f"Annotating")
+        ax.annotate("Stealthy SignOPT\nwith ideal search", xy=(400, 22), xytext=(50, 8), fontsize="small", arrowprops={"arrowstyle": "simple", "color": "black", "lw": 0.1})
     
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
