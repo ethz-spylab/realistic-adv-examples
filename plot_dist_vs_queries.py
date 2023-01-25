@@ -348,7 +348,7 @@ COLORS_STYLES_MARKERS = {
     "RayS (binary)": ("darkviolet", "dotted", "s"),
     "RayS (line search)": ("indigo", "-", "x"),
     "RayS (line search with early stopping)": ("indigo", "-", "^"),
-    "RayS (2-eggs-dropping search)": ("indigo", "-", "o"),
+    "RayS (2 line searches)": ("indigo", "-", "o"),
     "Stealthy RayS": ("indigo", "-", "s"),
     "k = 1.5": ("darkgoldenrod", "-", "s"),
     "k = 2": ("darkgoldenrod", "-", "x"),
@@ -461,7 +461,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     elif draw_legend == "y":
         ax.legend(fontsize='small')
     if any("ideal" in name for name in names):
-        print(f"Annotating")
+        print("Annotating")
         ax.annotate("Stealthy SignOPT\nwith ideal search", xy=(400, 22), xytext=(50, 8), fontsize="small", arrowprops={"arrowstyle": "simple", "color": "black", "lw": 0.1})
     
     fig.savefig(str(out_path), bbox_inches="tight")
