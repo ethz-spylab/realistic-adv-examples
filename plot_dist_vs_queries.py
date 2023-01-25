@@ -268,21 +268,21 @@ def save_distances_array(exp_path: Path,
 
 
 COLORS_STYLES_MARKERS = {
-    "OPT": ("tab:blue", "loosely dashed", "s"),
-    "OPT (binary)": ("tab:blue", "loosely dashed", "s"),
+    "OPT": ("tab:blue", (0, (5, 10)), "s"),
+    "OPT (binary)": ("tab:blue", (0, (5, 10)), "s"),
     "OPT (line search)": ("tab:blue", "-", "x"),
     "OPT (ideal line search)": ("tab:blue", "-", "o"),
     "OPT (2 line searches)": ("tab:blue", "-", "^"),
     "Stealthy OPT": ("tab:blue", "-", "s"),
-    "SignOPT": ("tab:orange", "loosely dashed", "x"),
-    "SignOPT (Binary)": ("tab:orange", "loosely dashed", "x"),
+    "SignOPT": ("tab:orange", (0, (5, 10)), "x"),
+    "SignOPT (Binary)": ("tab:orange", (0, (5, 10)), "x"),
     "SignOPT (line search)": ("tab:orange", "-", "o"),
     "SignOPT (2 line searches)": ("tab:orange", "-", "^"),
     "Stealthy SignOPT": ("tab:orange", "-", "x"),
-    "Boundary": ("tab:red", "loosely dashed", "^"),
-    "HSJA": ("tab:green", "loosely dashed", "o"),
-    "RayS": ("tab:purple", "loosely dashed", "s"),
-    "RayS (binary)": ("tab:purple", "loosely dashed", "s"),
+    "Boundary": ("tab:red", (0, (5, 10)), "^"),
+    "HSJA": ("tab:green", (0, (5, 10)), "o"),
+    "RayS": ("tab:purple", (0, (5, 10)), "s"),
+    "RayS (binary)": ("tab:purple", (0, (5, 10)), "s"),
     "RayS (line search)": ("tab:purple", "-", "x"),
     "RayS (line search with early stopping)": ("tab:purple", "-", "^"),
     "RayS (2-eggs-dropping search)": ("tab:purple", "-", "o"),
@@ -396,7 +396,6 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         ax.legend(fontsize='x-small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
         ax.legend(fontsize='x-small')
-    fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
@@ -453,7 +452,6 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         ax.legend(fontsize='x-small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
         ax.legend(fontsize='x-small')
-    fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
