@@ -20,7 +20,7 @@ from src.attacks.opt import OPTAttackPhase
 OPENED_FILES: list[TextIOWrapper] = []
 MAX_SAMPLES = 1000
 
-MAX_BAD_QUERIES_TRADEOFF_PLOT = 1000
+MAX_BAD_QUERIES_TRADEOFF_PLOT = 5000
 
 
 def expand_array_with_interpolation(array: np.ndarray, total_entries: int, last_k: int = 100) -> np.ndarray:
