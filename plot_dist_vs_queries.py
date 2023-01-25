@@ -481,7 +481,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
 
 
 def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out_path: Path, max_samples: int | None,
-                             to_simulate: list[int] | None, draw_legend: str) -> None:
+                             to_simulate: list[int] | None, draw_legend: str, max_queries: int | None) -> None:
     names = names or ["" for _ in exp_paths]
     arrays_to_plot = []
 
@@ -497,7 +497,8 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
     fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
     for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
-        array = array[:n_samples_to_plot]
+        queries_to_plot = max_queries or array.shape[1]
+        array = array[:n_samples_to_plot, :queries_to_plot]
         if "sign_opt" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
             print("Ignoring color")
             color = None
