@@ -268,21 +268,21 @@ def save_distances_array(exp_path: Path,
 
 
 COLORS_STYLES_MARKERS = {
-    "OPT": ("tab:blue", "--", "s"),
-    "OPT (binary)": ("tab:blue", "--", "s"),
+    "OPT": ("tab:blue", "loosely dashed", "s"),
+    "OPT (binary)": ("tab:blue", "loosely dashed", "s"),
     "OPT (line search)": ("tab:blue", "-", "x"),
     "OPT (ideal line search)": ("tab:blue", "-", "o"),
     "OPT (2 line searches)": ("tab:blue", "-", "^"),
     "Stealthy OPT": ("tab:blue", "-", "s"),
-    "SignOPT": ("tab:orange", "--", "x"),
-    "SignOPT (Binary)": ("tab:orange", "--", "x"),
+    "SignOPT": ("tab:orange", "loosely dashed", "x"),
+    "SignOPT (Binary)": ("tab:orange", "loosely dashed", "x"),
     "SignOPT (line search)": ("tab:orange", "-", "o"),
     "SignOPT (2 line searches)": ("tab:orange", "-", "^"),
     "Stealthy SignOPT": ("tab:orange", "-", "x"),
-    "Boundary": ("tab:red", "--", "^"),
-    "HSJA": ("tab:green", "--", "o"),
-    "RayS": ("tab:purple", "--", "s"),
-    "RayS (binary)": ("tab:purple", "--", "s"),
+    "Boundary": ("tab:red", "loosely dashed", "^"),
+    "HSJA": ("tab:green", "loosely dashed", "o"),
+    "RayS": ("tab:purple", "loosely dashed", "s"),
+    "RayS (binary)": ("tab:purple", "loosely dashed", "s"),
     "RayS (line search)": ("tab:purple", "-", "x"),
     "RayS (line search with early stopping)": ("tab:purple", "-", "^"),
     "RayS (2-eggs-dropping search)": ("tab:purple", "-", "o"),
@@ -393,9 +393,9 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
     if draw_legend == "tr":
-        ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
+        ax.legend(fontsize='x-small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
-        ax.legend()
+        ax.legend(fontsize='x-small')
     fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
@@ -450,9 +450,9 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     ax.set_xlabel("Number of bad queries")
     ax.set_ylabel("Overall number of queries")
     if draw_legend == "tr":
-        ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
+        ax.legend(fontsize='x-small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
-        ax.legend()
+        ax.legend(fontsize='x-small')
     fig.tight_layout()
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
