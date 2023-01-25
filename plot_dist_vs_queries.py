@@ -394,7 +394,10 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     attacks_distances_dict = {}
     for i, (distances, name) in enumerate(zip(distances_arrays, names)):
         attacks_distances_dict[name] = distances
-        if name and name in COLORS_STYLES_MARKERS:
+        if "sign_opt" in str(out_path) or "rays" in str(out_path) or "opt" in str(out_path):
+            color = None
+            _, style, marker = COLORS_STYLES_MARKERS[name]
+        elif name and name in COLORS_STYLES_MARKERS:
             color, style, marker = COLORS_STYLES_MARKERS[name]
         elif not name:
             warnings.warn("Attack name not specified. Using default color, style and marker.")
