@@ -137,13 +137,13 @@ def generate_ideal_line_simulated_distances(
             elif distance["phase"] == OPTAttackPhase.step_size_search_start:
                 # One unsafe query is done for the step size search
                 simulated_distances.append(
-                    make_dummy_distance_info(OPTAttackPhase.step_size_search_start, distance["distance"],
+                    make_dummy_distance_info(OPTAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
-            if (distance["phase"] == OPTAttackPhase.gradient_estimation
+            elif (distance["phase"] == OPTAttackPhase.gradient_estimation
                     and previous_phase != OPTAttackPhase.gradient_estimation):
                 # 10 unsafe queries are done for the overall gradient estimation
                 simulated_distances += [
-                    make_dummy_distance_info(OPTAttackPhase.step_size_search_start, distance["distance"],
+                    make_dummy_distance_info(OPTAttackPhase.gradient_estimation, distance["distance"],
                                              distance["best_distance"])
                 ] * 10
             previous_phase = distance["phase"]
@@ -434,7 +434,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         markers_frequency = n_to_plot // TOT_MARKERS
         marker_start = markers_frequency // len(names) * i
         ax.plot(median_distances,
-                label=name,
+                label=name if "ideal" not in name else None,
                 color=color,
                 linestyle=style,
                 marker=marker,
@@ -459,6 +459,9 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
         ax.legend(fontsize='small')
+    if any("ideal" in name for name in names):
+        ax.annotate("Ideal line search", xy=(0.5, 0.45), xytext=(0.1, 0.1))
+    
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
