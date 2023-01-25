@@ -394,7 +394,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     attacks_distances_dict = {}
     for i, (distances, name) in enumerate(zip(distances_arrays, names)):
         attacks_distances_dict[name] = distances
-        if "sign_opt" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
+        if "google" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
             print("Ignoring color")
             color = None
             if name in COLORS_STYLES_MARKERS:
