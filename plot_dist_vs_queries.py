@@ -397,7 +397,10 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         if "sign_opt" in str(out_path.stem) or "rays" in str(out_path.stem) or "opt" in str(out_path.stem):
             print("Ignoring color")
             color = None
-            _, style, marker = COLORS_STYLES_MARKERS[name]
+            if name in COLORS_STYLES_MARKERS:
+                _, style, marker = COLORS_STYLES_MARKERS[name]
+            else:
+                style, marker = None, None
         elif name and name in COLORS_STYLES_MARKERS:
             color, style, marker = COLORS_STYLES_MARKERS[name]
         elif not name:
