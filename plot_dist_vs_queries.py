@@ -536,7 +536,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
     ax.set_yscale("log")
     ax.set_xlabel("Number of bad queries")
-    ax.set_ylabel("Overall number of queries")
+    ax.set_ylabel("Total number of queries")
     if draw_legend == "tr":
         ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
