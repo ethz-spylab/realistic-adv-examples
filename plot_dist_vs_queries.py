@@ -560,7 +560,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
 def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_path: Path, max_samples: int | None,
                            to_simulate: list[int] | None, to_simulate_ideal: bool, draw_legend: str,
-                           max_queries: int | None, query_cost: float, bad_query_cost: float, checksum_check: bool):
+                           max_queries: int, query_cost: float, bad_query_cost: float, checksum_check: bool):
     names = names or ["" for _ in exp_paths]
     arrays_to_plot = []
 
@@ -607,11 +607,17 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
             linewidth = 1.5 * BASE_LINEWIDTH
         else:
             linewidth = 1 * BASE_LINEWIDTH
-        markers_frequency = int((1 / TOT_MARKERS) * XLIM / (max(np.median(cost_array[:n_samples_to_plot], axis=0)) // XLIM))
-        marker_start = XLIM // TOT_MARKERS // len(names) * i
-        print(name, marker_start, markers_frequency)
-        ax.plot(np.median(cost_array[:n_samples_to_plot], axis=0),
-                np.median(distances_array[:n_samples_to_plot], axis=0),
+        
+        markers_frequency = XLIM // TOT_MARKERS
+        marker_start = markers_frequency // len(names) * i
+        
+        median_cost = np.median(cost_array[:n_samples_to_plot], axis=0)
+        median_distance = np.median(distances_array[:n_samples_to_plot], axis=0)
+        plot_range = np.arange(1, XLIM + 1)
+        median_cost_interpolated = np.interp(plot_range, median_cost, median_distance)
+        
+        ax.plot(plot_range,
+                median_cost_interpolated,
                 label=name,
                 color=color,
                 linestyle=style,
