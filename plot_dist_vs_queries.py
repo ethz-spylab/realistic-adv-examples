@@ -62,7 +62,7 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
         if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
             break
     if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
-        warnings.warn(f"Only {n_unsafe_queries} unsafe queries found")
+        ... # warnings.warn(f"Only {n_unsafe_queries} unsafe queries found")
 
     tot_queries_per_bad_query = np.arange(1, len(queries) + 1)[np.array(queries)]
     if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
@@ -94,7 +94,7 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
     else:
         arrays_iter = map(get_good_to_bad_queries_array_individual_simulated, items)
 
-    arrays_iter = filter(lambda x: len(x) == MAX_SAMPLES, arrays_iter)
+    arrays_iter = filter(lambda x: len(x) == MAX_BAD_QUERIES_TRADEOFF_PLOT, arrays_iter)
     final_array = np.fromiter(tqdm.tqdm(arrays_iter, total=MAX_SAMPLES),
                               dtype=np.dtype((float, MAX_BAD_QUERIES_TRADEOFF_PLOT)))
     np.save(exp_path / array_name, final_array)
