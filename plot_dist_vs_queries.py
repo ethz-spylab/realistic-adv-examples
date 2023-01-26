@@ -359,7 +359,7 @@ COLORS_STYLES_MARKERS = {
 PLOTS_HEIGHT = 3
 PLOTS_WIDTH = 4
 
-RAYS_PLOTS_HEIGHT = 2.25 
+RAYS_PLOTS_HEIGHT = 2.25
 RAYS_PLOTS_WIDTH = 3
 
 TOT_MARKERS = 5
@@ -511,7 +511,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         fig, ax = plt.subplots(figsize=(RAYS_PLOTS_WIDTH, RAYS_PLOTS_HEIGHT))
     else:
         fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
-    
+
     for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
         queries_to_plot = max_queries or array.shape[1]
         array = array[:n_samples_to_plot, :queries_to_plot]
@@ -539,7 +539,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
         markers_frequency = MAX_BAD_QUERIES_TRADEOFF_PLOT // TOT_MARKERS
         marker_start = markers_frequency // len(names) * i
-        ax.plot(np.mean(array, axis=0),
+        ax.plot(np.median(array, axis=0),
                 label=name,
                 color=color,
                 linestyle=style,
@@ -558,13 +558,84 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     fig.show()
 
 
-def make_cost_plot(exp_paths: list[Path], query_cost: float, bad_query_cost: float):
-    ...
+def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_path: Path, max_samples: int | None,
+                           to_simulate: list[int] | None, to_simulate_ideal: bool, draw_legend: str,
+                           max_queries: int | None, query_cost: float, bad_query_cost: float, checksum_check: bool):
+    names = names or ["" for _ in exp_paths]
+    arrays_to_plot = []
+
+    for i, exp_path in enumerate(exp_paths):
+        tradeoff_array = get_good_to_bad_queries_array(exp_path, to_simulate is not None and i in to_simulate)
+        if to_simulate is not None and i in to_simulate:
+            distances_array = get_simulated_array(exp_paths[i], unsafe_only=True)
+        elif to_simulate_ideal is not None and i == to_simulate_ideal:
+            distances_array = get_simulated_array(exp_paths[i], unsafe_only=True, simulate_ideal_line=True)
+        else:
+            distances_array = load_distances_from_array(exp_path, unsafe_only=True, check_checksum=checksum_check)
+        bad_cost_array = np.arange(1, distances_array.shape[1] + 1) * bad_query_cost
+        overall_queries_cost_array = tradeoff_array[:, :distances_array.shape[1]] * query_cost
+        cost_array = overall_queries_cost_array + bad_cost_array
+        arrays_to_plot.append((cost_array, distances_array))
+
+    n_samples_to_plot = min(len(distances_array) for distances_array in arrays_to_plot)
+    n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
+
+    if max_samples is not None and n_samples_to_plot < max_samples:
+        warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
+    fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
+
+    for i, (name, (cost_array, distances_array)) in enumerate(zip(names, arrays_to_plot)):
+        queries_to_plot = max_queries or cost_array.shape[1]
+        cost_array = cost_array[:n_samples_to_plot, :queries_to_plot]
+        distances_array = distances_array[:n_samples_to_plot, :queries_to_plot]
+
+        if "google" in str(out_path):
+            print("Ignoring color")
+            color = None
+            if name in COLORS_STYLES_MARKERS:
+                _, style, marker = COLORS_STYLES_MARKERS[name]
+            else:
+                style, marker = None, None
+        elif name and name in COLORS_STYLES_MARKERS:
+            color, style, marker = COLORS_STYLES_MARKERS[name]
+        elif not name:
+            warnings.warn("Attack name not specified. Using default color, style and marker.")
+            color, style, marker = None, None, None
+        else:
+            warnings.warn(f"Could not find color, style, marker for {name}. Using default.")
+            color, style, marker = None, None, None
+
+        BASE_LINEWIDTH = 1.5
+        if "Stealthy" in name:
+            linewidth = 1.5 * BASE_LINEWIDTH
+        else:
+            linewidth = 1 * BASE_LINEWIDTH
+
+        markers_frequency = MAX_BAD_QUERIES_TRADEOFF_PLOT // TOT_MARKERS
+        marker_start = markers_frequency // len(names) * i
+        ax.plot(np.median(cost_array, axis=0),
+                np.median(distances_array, axis=0),
+                label=name,
+                color=color,
+                linestyle=style,
+                marker=marker,
+                markevery=(marker_start, markers_frequency),
+                linewidth=linewidth)
+
+    ax.set_yscale("log")
+    ax.set_xlabel(f"Cost ({query_cost:.2f} * queries + {bad_query_cost:.2f} * bad queries)")
+    ax.set_ylabel("Distance")
+    if draw_legend == "tr":
+        ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
+    elif draw_legend == "y":
+        ax.legend(fontsize='small')
+    fig.savefig(str(out_path), bbox_inches="tight")
+    fig.show()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("plot_type", type=str, choices=["distance", "tradeoff"], default="median_distances")
+    parser.add_argument("plot_type", type=str, choices=["distance", "tradeoff", "cost"], default="median_distances")
     parser.add_argument("--exp-paths", type=Path, nargs="+", required=True)
     parser.add_argument("--names", type=str, nargs="+", required=False, default=None)
     parser.add_argument("--out-path", type=Path, required=True)
@@ -575,13 +646,25 @@ if __name__ == "__main__":
     parser.add_argument("--to-simulate", type=int, nargs="+", required=False, default=None)
     parser.add_argument("--to-simulate-ideal", type=int, required=False, default=None)
     parser.add_argument("--draw-legend", type=str, required=False, default="")
+    parser.add_argument("--query-cost", type=float, required=False, default=None)
+    parser.add_argument("--bad-query-cost", type=float, required=False, default=None)
+
     args = parser.parse_args()
     if args.plot_type == "distance":
         plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples,
                                         args.unsafe_only, args.out_path, args.checksum_check, args.to_simulate,
                                         args.to_simulate_ideal, args.draw_legend)
-    else:
+    elif args.plot_type == "tradeoff":
         plot_bad_vs_good_queries(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
                                  args.draw_legend, args.max_queries)
+    elif args.plot_type == "cost":
+        assert args.query_cost is not None
+        assert args.bad_query_cost is not None
+        plot_distance_per_cost(args.exp_paths, args.names, args.max_samples, args.out_path,
+                               args.to_simulate, args.to_simulate_ideal, args.draw_legend, args.max_queries,
+                               args.query_cost, args.bad_query_cost, args.checksum_check)
+    else:
+        raise ValueError(f"Unknown plot type {args.plot_type}")
+    
     for f in OPENED_FILES:
         f.close()
