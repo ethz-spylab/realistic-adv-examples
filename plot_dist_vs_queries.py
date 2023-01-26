@@ -616,8 +616,7 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
         plot_range = np.arange(1, XLIM + 1)
         median_cost_interpolated = np.interp(plot_range, median_cost, median_distance)
         
-        ax.plot(plot_range,
-                median_cost_interpolated,
+        ax.plot(median_cost_interpolated,
                 label=name,
                 color=color,
                 linestyle=style,
@@ -636,7 +635,7 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
     ax.set_xlim(0, XLIM)
 
     ax.set_yscale("log")
-    ax.set_xlabel(f"Cost ($c_0$ = {query_cost:.4f}, $c_{{bad}}$ = {bad_query_cost:.2f})")
+    ax.set_xlabel(f"Cost ($c_0$ = {query_cost:.1e}, $c_{{bad}}$ = {bad_query_cost:.1f})")
     ax.set_ylabel("Distance")
     if draw_legend == "tr":
         ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
