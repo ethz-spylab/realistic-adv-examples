@@ -572,23 +572,20 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
             distances_array = get_simulated_array(exp_paths[i], unsafe_only=True, simulate_ideal_line=True)
         else:
             distances_array = load_distances_from_array(exp_path, unsafe_only=True, check_checksum=checksum_check)
-        bad_cost_array = np.arange(1, distances_array.shape[1] + 1) * bad_query_cost
-        overall_queries_cost_array = tradeoff_array[:, :distances_array.shape[1]] * query_cost
+        queries_to_plot = min(tradeoff_array.shape[1], max_queries, distances_array.shape[1])
+        bad_cost_array = np.arange(1, queries_to_plot + 1) * bad_query_cost
+        overall_queries_cost_array = tradeoff_array[:, :queries_to_plot] * query_cost
         cost_array = overall_queries_cost_array + bad_cost_array
-        arrays_to_plot.append((cost_array, distances_array))
+        arrays_to_plot.append((cost_array, distances_array[:, :queries_to_plot]))
 
-    n_samples_to_plot = min(len(distances_array) for distances_array in arrays_to_plot)
+    n_samples_to_plot = min(len(distances_array[0]) for distances_array in arrays_to_plot)
     n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
 
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
     fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
-
+    XLIM = 1000
     for i, (name, (cost_array, distances_array)) in enumerate(zip(names, arrays_to_plot)):
-        queries_to_plot = max_queries or cost_array.shape[1]
-        cost_array = cost_array[:n_samples_to_plot, :queries_to_plot]
-        distances_array = distances_array[:n_samples_to_plot, :queries_to_plot]
-
         if "google" in str(out_path):
             print("Ignoring color")
             color = None
@@ -610,11 +607,11 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
             linewidth = 1.5 * BASE_LINEWIDTH
         else:
             linewidth = 1 * BASE_LINEWIDTH
-
-        markers_frequency = MAX_BAD_QUERIES_TRADEOFF_PLOT // TOT_MARKERS
-        marker_start = markers_frequency // len(names) * i
-        ax.plot(np.median(cost_array, axis=0),
-                np.median(distances_array, axis=0),
+        markers_frequency = int((1 / TOT_MARKERS) * XLIM / (max(np.median(cost_array[:n_samples_to_plot], axis=0)) // XLIM))
+        marker_start = XLIM // TOT_MARKERS // len(names) * i
+        print(name, marker_start, markers_frequency)
+        ax.plot(np.median(cost_array[:n_samples_to_plot], axis=0),
+                np.median(distances_array[:n_samples_to_plot], axis=0),
                 label=name,
                 color=color,
                 linestyle=style,
@@ -622,8 +619,18 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
                 markevery=(marker_start, markers_frequency),
                 linewidth=linewidth)
 
+    if "ablation" in str(out_path):
+        pass
+    elif "google" in str(exp_paths[0]):
+        ax.set_ylim(8e-2, 1.1)
+    elif "/l2/" in str(exp_paths[0]) and "k" not in names[0]:
+        ax.set_ylim(5e-0, 1e2)
+    elif "/linf/" in str(exp_paths[0]):
+        ax.set_ylim(2e-2, 1.1)
+    ax.set_xlim(0, XLIM)
+
     ax.set_yscale("log")
-    ax.set_xlabel(f"Cost ({query_cost:.2f} * queries + {bad_query_cost:.2f} * bad queries)")
+    ax.set_xlabel(f"Cost ($c_0$ = {query_cost:.4f}, $c_{{bad}}$ = {bad_query_cost:.2f})")
     ax.set_ylabel("Distance")
     if draw_legend == "tr":
         ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
@@ -660,7 +667,7 @@ if __name__ == "__main__":
     elif args.plot_type == "cost":
         assert args.query_cost is not None
         assert args.bad_query_cost is not None
-        plot_distance_per_cost(args.exp_paths, args.names, args.max_samples, args.out_path,
+        plot_distance_per_cost(args.exp_paths, args.names, args.out_path, args.max_samples,
                                args.to_simulate, args.to_simulate_ideal, args.draw_legend, args.max_queries,
                                args.query_cost, args.bad_query_cost, args.checksum_check)
     else:
