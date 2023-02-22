@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Dict, Generic, List, Optional, Set, TypeVar
 
 import requests
-import tensorflow as tf
 import torch
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -254,8 +253,7 @@ class LAIONNSFWModel(EdenAINSFWModel[LAIONResponseLabel]):
         else:
             image = encode_decode(image, format='png')
         image = (image - self.mean) / self.std
-        image_tf = tf.constant(image.cpu())
-        likelihood = round(self.model(image_tf).numpy().item() * 5)
+        likelihood = round(self.model(image).cpu().item() * 5)
         response_item: ResponseItem[LAIONResponseLabel] = ResponseItem(label=LAIONResponseLabel.nsfw,
                                                                        likelihood=likelihood)
         return ProviderResponse[LAIONResponseLabel](status=ResponseStatus.success, items=[response_item])

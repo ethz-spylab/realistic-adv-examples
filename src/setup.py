@@ -13,11 +13,10 @@ from torchvision import models as models
 from torchvision.models import ResNet50_Weights
 
 from src import dataset
-from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, google_nsfw_model, resnet50_cifar10
+from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, google_nsfw_model
 from src.attacks import HSJA, OPT, BoundaryAttack, RayS, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
-from src.model_wrappers import (EdenAIModelWrapper, GoogleNSFWModelWrapper, ModelWrapper, TFModelWrapper,
-                                TorchModelWrapper)
+from src.model_wrappers import EdenAIModelWrapper, GoogleNSFWModelWrapper, ModelWrapper, TorchModelWrapper
 
 API_KEY_NAME = "EDENAI_API_KEY"
 load_dotenv()
@@ -28,17 +27,7 @@ DISTANCES = {"linf": linf, "l2": l2}
 
 
 def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWrapper, data.DataLoader]:
-    if args.dataset == 'resnet_cifar10':
-        input_size = 32
-        num_classes = 10
-        channel = 3
-        inner_model = resnet50_cifar10.resnet_v2(input_shape=(input_size, input_size, channel),
-                                                 depth=20,
-                                                 num_classes=num_classes)
-        inner_model.load_weights("checkpoints/resnet_cifar10.hdf5")
-        test_loader = dataset.load_cifar10_test_data(args.batch)
-        model = TFModelWrapper(inner_model, n_class=10, channels_last=True)
-    elif args.dataset == 'resnet_imagenet':
+    if args.dataset == 'resnet_imagenet':
         inner_model = models.__dict__["resnet50"](weights=ResNet50_Weights.IMAGENET1K_V1).to(device).eval()
         inner_model = torch.nn.DataParallel(inner_model, device_ids=[0])
         test_loader = dataset.load_imagenet_test_data(args.batch, args.data_dir)
@@ -53,12 +42,12 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
         test_loader = dataset.load_binary_imagenet_test_data(args.batch, args.data_dir)
         model = TorchModelWrapper(inner_model, n_class=2, im_mean=(0.485, 0.456, 0.406), im_std=(0.229, 0.224, 0.225))
     elif args.dataset == 'imagenet_nsfw':
-        inner_model = clip_laion_nsfw.CLIPNSFWDetector("b32", "checkpoints")
-        model = TFModelWrapper(inner_model,
-                               n_class=2,
-                               im_mean=(0.48145466, 0.4578275, 0.40821073),
-                               im_std=(0.26862954, 0.26130258, 0.27577711),
-                               take_sigmoid=False)
+        inner_model = clip_laion_nsfw.CLIPNSFWDetector("b32", "checkpoints").to(device).eval()
+        model = TorchModelWrapper(inner_model,
+                                  n_class=2,
+                                  im_mean=(0.48145466, 0.4578275, 0.40821073),
+                                  im_std=(0.26862954, 0.26130258, 0.27577711),
+                                  take_sigmoid=False)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
     elif args.dataset == 'google_nsfw':
         api_key = os.environ[API_KEY_NAME]

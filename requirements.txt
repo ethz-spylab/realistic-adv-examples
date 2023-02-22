@@ -1,11 +1,9 @@
-autokeras~=1.0.20
 dotenv
 foolbox~=3.3.3
 numpy~=1.23.3
 pydantic~=1.10.2
 pytorch_lightning
 requests~=2.25.1
-tensorflow~=2.10.0
 torch~=1.13.0
 torchvision~=0.14.0
 transformers~=4.24.0
