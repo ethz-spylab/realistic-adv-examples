@@ -82,8 +82,8 @@ def make_dataset_tuples(sample, image_name="image", sample_name="label"):
 
 def load_imagenet_nsfw_test_data(test_batch_size=1, indices_path: Optional[Path] = None) -> data.DataLoader:
     processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-    im_mean = torch.tensor(processor.feature_extractor.image_mean).view(1, 3, 1, 1)  # type: ignore
-    im_std = torch.tensor(processor.feature_extractor.image_std).view(1, 3, 1, 1)  # type: ignore
+    im_mean = torch.tensor(processor.image_processor.image_mean).view(1, 3, 1, 1)  # type: ignore
+    im_std = torch.tensor(processor.image_processor.image_std).view(1, 3, 1, 1)  # type: ignore
 
     def transform(batch):
         preprocessed_images = processor(images=batch["image"], return_tensors="pt", padding=True)["pixel_values"]

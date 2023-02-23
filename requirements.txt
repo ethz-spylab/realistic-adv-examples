@@ -1,13 +1,8 @@
-dotenv
 foolbox~=3.3.3
 numpy~=1.23.3
-pydantic~=1.10.2
-pytorch_lightning
-requests~=2.25.1
-torch~=1.13.0
-torchvision~=0.14.0
+pytorch_lightning~=1.8.1
+torch~=1.13.1
+torchvision~=0.14.1
 transformers~=4.24.0
-python-dotenv~=0.21.0
 matplotlib~=3.6.2
 datasets~=2.7.0
-Pillow~=9.2.0
