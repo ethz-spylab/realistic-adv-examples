@@ -605,3 +605,5 @@ cython_debug/
 checkpoints/
 imgs/
 .idea
+
+launch_experiment_slurm.sh

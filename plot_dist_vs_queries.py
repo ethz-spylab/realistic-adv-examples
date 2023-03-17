@@ -497,6 +497,11 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
                              to_simulate: list[int] | None, draw_legend: str, max_queries: int | None) -> None:
     names = names or ["" for _ in exp_paths]
     arrays_to_plot = []
+    
+    if "/linf/" in str(exp_paths[0]):
+        epsilons = [4 / 255, 8 / 255, 16 / 255, 32 / 255, 64 / 255, 128 / 255]
+    else:
+        epsilons = [0.5, 1, 2, 5, 10, 20, 50, 100, 150]
 
     for i, exp_path in enumerate(exp_paths):
         array_to_plot = get_good_to_bad_queries_array(exp_path, to_simulate is not None and i in to_simulate)
@@ -512,10 +517,12 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         fig, ax = plt.subplots(figsize=(RAYS_PLOTS_WIDTH, RAYS_PLOTS_HEIGHT))
     else:
         fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
+    
+    queries_per_epsilon_df = pd.DataFrame(columns=["attack", "epsilon", "n_queries"])
 
     for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
         queries_to_plot = max_queries or array.shape[1]
-        array = array[:n_samples_to_plot, :queries_to_plot]
+        distances = array[:n_samples_to_plot, :queries_to_plot]
         if "google" in str(out_path):
             print("Ignoring color")
             color = None
@@ -531,6 +538,29 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         else:
             warnings.warn(f"Could not find color, style, marker for {name}. Using default.")
             color, style, marker = None, None, None
+        
+        full_median_distances = np.median(array[:n_samples_to_plot], axis=0)
+        for epsilon in epsilons:
+            if ((full_median_distances) < epsilon).any():
+                queries_per_epsilon_df = pd.concat([
+                    queries_per_epsilon_df,
+                    pd.DataFrame({
+                        "attack": [name],
+                        "epsilon": [epsilon],
+                        "n_queries": [np.argmax(full_median_distances < epsilon)]
+                    })
+                ])
+                # print(f"Attack: {name}, epsilon = {epsilon}, n_queries = {n_queries_for_epsilon}")
+            else:
+                # print(f"Attack: {name} didn't reach epsilon = {epsilon}")
+                queries_per_epsilon_df = pd.concat([
+                    queries_per_epsilon_df,
+                    pd.DataFrame({
+                        "attack": [name],
+                        "epsilon": [epsilon],
+                        "n_queries": [np.inf]
+                    })
+                ])
 
         BASE_LINEWIDTH = 1.5
         if "Stealthy" in name:
@@ -540,13 +570,16 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
         markers_frequency = MAX_BAD_QUERIES_TRADEOFF_PLOT // TOT_MARKERS
         marker_start = markers_frequency // len(names) * i
-        ax.plot(np.median(array, axis=0),
+        ax.plot(np.median(distances, axis=0),
                 label=name,
                 color=color,
                 linestyle=style,
                 marker=marker,
                 markevery=(marker_start, markers_frequency),
                 linewidth=linewidth)
+    
+    if "ablation" not in str(out_path):
+        queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}_overall.csv", index=False)
 
     ax.set_yscale("log")
     ax.set_xlabel("Number of bad queries")

@@ -1,25 +1,20 @@
 import json
-import os
 import subprocess
 import uuid
 from argparse import Namespace
 from pathlib import Path
 
 import torch
-from dotenv import load_dotenv
 from foolbox.distances import l2, linf
 from torch.utils import data
 from torchvision import models as models
 from torchvision.models import ResNet50_Weights
 
 from src import dataset
-from src.arch import binary_resnet50, clip_laion_nsfw, edenai_model, google_nsfw_model
+from src.arch import binary_resnet50, clip_laion_nsfw
 from src.attacks import HSJA, OPT, BoundaryAttack, RayS, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
-from src.model_wrappers import EdenAIModelWrapper, GoogleNSFWModelWrapper, ModelWrapper, TorchModelWrapper
-
-API_KEY_NAME = "EDENAI_API_KEY"
-load_dotenv()
+from src.model_wrappers import ModelWrapper, TorchModelWrapper
 
 DEFAULT_BOUNDS = Bounds(0, 1)
 
@@ -49,36 +44,6 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
                                   im_std=(0.26862954, 0.26130258, 0.27577711),
                                   take_sigmoid=False)
         test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
-    elif args.dataset == 'google_nsfw':
-        api_key = os.environ[API_KEY_NAME]
-        inner_model = edenai_model.GoogleNSFWModel(device, api_key)
-        model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
-        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch,
-                                                           Path("nsfw_filters_results/google_racy_five_indices.npy"))
-    elif args.dataset == 'api4ai_nsfw':
-        api_key = os.environ[API_KEY_NAME]
-        inner_model = edenai_model.API4AINSFWModel(device, api_key)
-        model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
-        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch,
-                                                           Path("nsfw_filters_results/api4ai_nsfw_five_indices.npy"))
-    elif args.dataset == 'amazon_nsfw':
-        api_key = os.environ[API_KEY_NAME]
-        inner_model = edenai_model.AmazonNSFWModel(device, api_key)
-        model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
-        test_loader = dataset.load_imagenet_nsfw_test_data(
-            args.batch, Path("nsfw_filters_results/amazon_suggestive_five_indices.npy"))
-    elif args.dataset == 'laion_nsfw_mock':
-        api_key = os.environ[API_KEY_NAME]
-        inner_model = edenai_model.LAIONNSFWModel(device,
-                                                  api_key,
-                                                  strong_preprocessing=args.strong_preprocessing == '1')
-        model = EdenAIModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
-        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
-    elif args.dataset == 'google_cloud_nsfw':
-        inner_model = google_nsfw_model.GoogleNSFWModel(device)
-        model = GoogleNSFWModelWrapper(inner_model, n_class=2, threshold=args.model_threshold).to(device)
-        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch,
-                                                           Path("nsfw_filters_results/google_racy_five_indices.npy"))
     else:
         raise ValueError("Invalid model")
 
