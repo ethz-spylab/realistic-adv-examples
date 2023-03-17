@@ -62,7 +62,7 @@ def get_good_to_bad_queries_array_individual(distances: list[dict[str, Any]]) ->
         if n_unsafe_queries >= MAX_BAD_QUERIES_TRADEOFF_PLOT:
             break
     if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
-        ... # warnings.warn(f"Only {n_unsafe_queries} unsafe queries found")
+        ...  # warnings.warn(f"Only {n_unsafe_queries} unsafe queries found")
 
     tot_queries_per_bad_query = np.arange(1, len(queries) + 1)[np.array(queries)]
     if n_unsafe_queries < MAX_BAD_QUERIES_TRADEOFF_PLOT:
@@ -350,6 +350,7 @@ COLORS_STYLES_MARKERS = {
     "RayS (line search + early stop)": ("tab:orange", "-", "^"),
     "RayS (2 line searches + early stop)": ("tab:red", "-", "o"),
     "Stealthy RayS": ("indigo", "-", "s"),
+    "k = 1": ("indigo", "-", "*"),
     "k = 1.5": ("tab:green", "-", "s"),
     "k = 2": ("tab:blue", "-", "x"),
     "k = 2.5": ("tab:orange", "-", "o"),
@@ -386,7 +387,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         distances_arrays.append(distances_array)
 
     n_samples_to_plot = min(len(distances_array) for distances_array in distances_arrays)
-    n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
+    n_samples_to_plot = min(float("inf"), max_samples or n_samples_to_plot)
 
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
@@ -559,8 +560,8 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
 
 
 def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_path: Path, max_samples: int | None,
-                           to_simulate: list[int] | None, to_simulate_ideal: bool, draw_legend: str,
-                           max_queries: int, query_cost: float, bad_query_cost: float, checksum_check: bool):
+                           to_simulate: list[int] | None, to_simulate_ideal: bool, draw_legend: str, max_queries: int,
+                           query_cost: float, bad_query_cost: float, checksum_check: bool):
     names = names or ["" for _ in exp_paths]
     arrays_to_plot = []
 
@@ -578,8 +579,8 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
         cost_array = overall_queries_cost_array + bad_cost_array
         arrays_to_plot.append((cost_array, distances_array[:, :queries_to_plot]))
 
-    n_samples_to_plot = min(len(distances_array[0]) for distances_array in arrays_to_plot)
-    n_samples_to_plot = min(n_samples_to_plot, max_samples or n_samples_to_plot)
+    # n_samples_to_plot = min(len(distances_array[0]) for distances_array in arrays_to_plot)
+    n_samples_to_plot = min(float("inf"), max_samples or n_samples_to_plot)
 
     if max_samples is not None and n_samples_to_plot < max_samples:
         warnings.warn(f"Could not plot {max_samples} samples, only {n_samples_to_plot} were available.")
@@ -607,15 +608,15 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
             linewidth = 1.5 * BASE_LINEWIDTH
         else:
             linewidth = 1 * BASE_LINEWIDTH
-        
+
         markers_frequency = XLIM // TOT_MARKERS
         marker_start = markers_frequency // len(names) * i
-        
+
         median_cost = np.median(cost_array[:n_samples_to_plot], axis=0)
         median_distance = np.median(distances_array[:n_samples_to_plot], axis=0)
         plot_range = np.arange(1, XLIM + 1)
         median_cost_interpolated = np.interp(plot_range, median_cost, median_distance)
-        
+
         ax.plot(median_cost_interpolated,
                 label=name,
                 color=color,
@@ -672,11 +673,11 @@ if __name__ == "__main__":
     elif args.plot_type == "cost":
         assert args.query_cost is not None
         assert args.bad_query_cost is not None
-        plot_distance_per_cost(args.exp_paths, args.names, args.out_path, args.max_samples,
-                               args.to_simulate, args.to_simulate_ideal, args.draw_legend, args.max_queries,
-                               args.query_cost, args.bad_query_cost, args.checksum_check)
+        plot_distance_per_cost(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
+                               args.to_simulate_ideal, args.draw_legend, args.max_queries, args.query_cost,
+                               args.bad_query_cost, args.checksum_check)
     else:
         raise ValueError(f"Unknown plot type {args.plot_type}")
-    
+
     for f in OPENED_FILES:
         f.close()
