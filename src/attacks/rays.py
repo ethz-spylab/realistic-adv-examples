@@ -282,7 +282,7 @@ class RayS(DirectionAttack):
 
         # Do a regular line search with the second drop
         initial_d_end = d_end
-        for i in range(steps_done + 1, max_steps):
+        for i in range(1, max_steps - steps_done):
             d_end_tmp = initial_d_end - step_size * i
             x_adv = self.get_x_adv(x, direction, d_end_tmp)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
