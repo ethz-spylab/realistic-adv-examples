@@ -607,3 +607,5 @@ imgs/
 .idea
 
 launch_experiment_slurm.sh
+TODO.md
+queries_table.csv

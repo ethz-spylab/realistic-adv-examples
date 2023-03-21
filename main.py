@@ -1,5 +1,9 @@
 import argparse
 
+from lovely_tensors import monkey_patch
+
+monkey_patch()
+
 import numpy as np
 import torch
 
@@ -147,6 +151,10 @@ if __name__ == "__main__":
                         type=float,
                         help='Whether to use a fixed delta for gradient estimation in HSJA, '
                         'an adaptive delta is used if this is None')
+    parser.add_argument('--hsja-grad-est-mode',
+                        default='hsja',
+                        type=str,
+                        help='Gradient estimation mode for HSJA, one of `hsja`, `opt` or `sign_opt`')
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
     parser.add_argument('--opt-beta', default=0.001, type=float, help='beta parameter for OPT and Sign OPT')
     parser.add_argument(

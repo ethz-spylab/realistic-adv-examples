@@ -14,6 +14,7 @@ from src import dataset
 from src.arch import binary_resnet50, clip_laion_nsfw
 from src.attacks import HSJA, OPT, BoundaryAttack, RayS, SignOPT
 from src.attacks.base import BaseAttack, Bounds, SearchMode
+from src.attacks.hsja import GradientEstimationMode
 from src.model_wrappers import ModelWrapper, TorchModelWrapper
 
 DEFAULT_BOUNDS = Bounds(0, 1)
@@ -102,6 +103,7 @@ def setup_attack(args: Namespace) -> BaseAttack:
             "init_num_evals": args.hsja_init_num_evals,
             "gamma": args.hsja_gamma,
             "fixed_delta": args.hsja_delta,
+            "gradient_estimation_mode": GradientEstimationMode(args.hsja_grad_est_mode),
         }
         return HSJA(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "opt":

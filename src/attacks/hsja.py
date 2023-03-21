@@ -1,10 +1,13 @@
+from enum import Enum
 import itertools
 import math
+import numpy as np
 
 import torch
 from foolbox.distances import LpDistance, l2, linf
 
 from src.attacks.base import Bounds, ExtraResultsDict, PerturbationAttack
+from src.attacks.opt import normalize
 from src.attacks.queries_counter import AttackPhase, QueriesCounter
 from src.model_wrappers import ModelWrapper
 from src.utils import compute_distance
@@ -17,7 +20,15 @@ class HSJAttackPhase(AttackPhase):
     initialization = "initialization"
 
 
+class GradientEstimationMode(Enum):
+    hsja = "hsja"
+    opt = "opt"
+    sign_opt = "sign_opt"
+
+
 class HSJA(PerturbationAttack):
+    OPT_GRAD_EVALS = 10
+    GRAD_BOUNDARY_DISTANCE = 1e-3
 
     def __init__(self,
                  epsilon: float | None,
@@ -28,6 +39,8 @@ class HSJA(PerturbationAttack):
                  unsafe_queries_limit: int | None,
                  num_iterations: int,
                  gamma: float = 1.0,
+                 gradient_estimation_mode: GradientEstimationMode = GradientEstimationMode.hsja,
+                 grad_batch_size: int = 200,
                  fixed_delta: float | None = None,
                  stepsize_search: str = "geometric_progression",
                  max_num_evals: int = int(1e4),
@@ -39,6 +52,8 @@ class HSJA(PerturbationAttack):
         self.gamma = gamma
         self.num_iterations = num_iterations
         self.fixed_delta = fixed_delta
+        self.gradient_estimation_mode = gradient_estimation_mode
+        self.grad_batch_size = grad_batch_size
 
     def __call__(
             self,
@@ -110,6 +125,8 @@ class HSJA(PerturbationAttack):
             'init_num_evals': init_num_evals,
             'verbose': verbose,
             'fixed_delta': fixed_delta,
+            'opt_grad_evals': self.OPT_GRAD_EVALS,
+            'grad_boundary_distance': self.GRAD_BOUNDARY_DISTANCE,
         }
 
         # Set binary search threshold.
@@ -145,8 +162,16 @@ class HSJA(PerturbationAttack):
             num_evals = int(min([num_evals, params['max_num_evals']]))
 
             # approximate gradient.
-            gradf, queries_counter = self.approximate_gradient(model, perturbed, num_evals, delta, params,
-                                                               queries_counter, sample)
+            if self.gradient_estimation_mode == GradientEstimationMode.hsja:
+                gradf, queries_counter = self.approximate_gradient_hsja(model, perturbed, num_evals, delta, params,
+                                                                        queries_counter, sample)
+            elif self.gradient_estimation_mode == GradientEstimationMode.sign_opt:
+                gradf, queries_counter = self.approximate_gradient_sign_opt(model, perturbed, num_evals, delta, params,
+                                                                            queries_counter, sample)
+            else:
+                gradf, queries_counter = self.approximate_gradient_opt(model, perturbed, num_evals, delta, params,
+                                                                       queries_counter, sample)
+
             if params['distance'] == linf:
                 update = torch.sign(gradf)
             else:
@@ -181,8 +206,9 @@ class HSJA(PerturbationAttack):
             # compute new distance.
             dist = compute_distance(perturbed, sample.unsqueeze(0), distance).item()
             if verbose:
-                print('iteration: {:d}, {:f} distance {:.4f}, total queries {:.4f} total unsafe queries {:.4f}'.format(
-                    j + 1, distance.p, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
+                print(
+                    'iteration: {:d}, l{:.0f} distance {:.4f}, total queries {:.4f} total unsafe queries {:.4f}'.format(
+                        j + 1, distance.p, dist, queries_counter.total_queries, queries_counter.total_unsafe_queries))
 
             if queries_counter.is_out_of_queries():
                 print("Out of queries")
@@ -212,9 +238,9 @@ class HSJA(PerturbationAttack):
         # Clip an image, or an image batch, with upper and lower threshold.
         return torch.clamp(image, clip_min, clip_max)  # type: ignore
 
-    def approximate_gradient(self, model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta, params,
-                             queries_counter: QueriesCounter,
-                             original_sample: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
+    def approximate_gradient_hsja(self, model: ModelWrapper, sample: torch.Tensor, num_evals: int, delta, params,
+                                  queries_counter: QueriesCounter,
+                                  original_sample: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
         clip_max, clip_min = params['clip_max'], params['clip_min']
 
         # Generate random vectors.
@@ -251,6 +277,102 @@ class HSJA(PerturbationAttack):
 
         return gradf, updated_queries_counter
 
+    def approximate_gradient_opt(self, model: ModelWrapper, adv_sample: torch.Tensor, num_evals: int, delta, params,
+                                 queries_counter: QueriesCounter,
+                                 original_sample: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
+        clip_max, clip_min = params['clip_max'], params['clip_min']
+        perturbation_direction, _ = normalize(adv_sample - original_sample)
+        sample_est = adv_sample + params['grad_boundary_distance'] * perturbation_direction
+        g2 = params['theta']
+
+        gradf = torch.zeros_like(original_sample)
+        u = torch.randn((num_evals, ) + original_sample.shape,
+                        device=original_sample.device,
+                        dtype=original_sample.dtype)
+        u, _ = normalize(u, batch=True)
+        theta = -perturbation_direction
+        ttt = theta.unsqueeze(0) + delta * u
+        ttt, _ = normalize(ttt, batch=True)
+
+        test_sample = adv_sample - params['theta'] * perturbation_direction
+        clipped_test_sample = self.clip_image(test_sample, clip_min, clip_max)
+        assert (test_sample == clipped_test_sample).all()
+        decisions, _ = self.decision_function(model, clipped_test_sample, params, queries_counter,
+                                              HSJAttackPhase.gradient_estimation, original_sample)
+        assert not decisions.item()
+
+        for j in range(num_evals):
+            bad_side_sample = sample_est + 1.5 * g2 * ttt[j]
+            clipped_bad_side_sample = self.clip_image(bad_side_sample, clip_min, clip_max)
+            decisions, queries_counter = self.decision_function(model, clipped_bad_side_sample, params, queries_counter,
+                                                                HSJAttackPhase.gradient_estimation, original_sample)
+            print(decisions)
+            if decisions.item():
+                g1 = 2 * g2
+            else:
+                _, g1, queries_counter = self.binary_search_batch(
+                    original_sample,
+                    clipped_bad_side_sample,
+                    model,
+                    params,
+                    queries_counter,
+                    phase=HSJAttackPhase.gradient_estimation,
+                    invert_direction=True,
+                )
+            print(g1)
+            gradf += (g1 - g2) / delta * u[j]
+
+        gradf = 1.0 / num_evals * gradf
+        gradf = gradf / torch.linalg.norm(gradf, dim=None)
+
+        return gradf, queries_counter
+
+    def approximate_gradient_sign_opt(self, model: ModelWrapper, adv_sample: torch.Tensor, num_evals: int, delta,
+                                      params, queries_counter: QueriesCounter,
+                                      original_sample: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
+        """
+        Evaluate the sign of gradient by formulat
+        sign(g) = 1/Q [ \\sum_{q=1}^Q sign( g(theta+h*u_i) - g(theta) )u_i$ ]
+        """
+        clip_max, clip_min = params['clip_max'], params['clip_min']
+
+        theta, initial_lbd = normalize(original_sample - adv_sample)
+        x = original_sample
+        x = x.unsqueeze(0)
+        x_temp = self.get_x_adv(x, theta * initial_lbd)
+
+        u = torch.randn((num_evals, ) + theta.shape, dtype=theta.dtype, device=x.device)
+        u, _ = normalize(u, batch=True)
+
+        sign_v = torch.ones((num_evals, 1, 1, 1), device=x.device)
+        new_theta: torch.Tensor = theta + delta * u  # type: ignore
+        new_theta, _ = normalize(new_theta, batch=True)
+        x_ = self.get_x_adv(x, new_theta * initial_lbd)
+        u = x_ - x_temp
+        success, queries_counter = self.decision_function(model, x_, params, queries_counter,
+                                                            HSJAttackPhase.gradient_estimation, original_sample)
+        sign_v[success] = -1
+        
+        perturbed = x + new_theta * initial_lbd
+        perturbed = self.clip_image(perturbed, clip_min, clip_max)
+        rv = (perturbed - x) / initial_lbd
+
+        decision_shape = [len(success)] + [1] * len(params['shape'])
+        
+        fval = 2 * success.to(torch.float).reshape(decision_shape) - 1.0
+        # Baseline subtraction (when fval differs)
+        if torch.mean(fval) == 1.0:  # label changes.
+            sign_grad = torch.mean(rv, dim=0)
+        elif torch.mean(fval) == -1.0:  # label not change.
+            sign_grad = -torch.mean(rv, dim=0)
+        else:
+            fval -= torch.mean(fval)
+            sign_grad = torch.mean(fval * rv, dim=0)
+        
+        sign_grad = sign_grad / torch.linalg.norm(sign_grad, dim=None)
+
+        return sign_grad, queries_counter
+
     def project(self, original_image: torch.Tensor, perturbed_images: torch.Tensor, alphas: torch.Tensor,
                 params) -> torch.Tensor:
         alphas_shape = [len(alphas)] + [1] * len(params['shape'])
@@ -263,8 +385,14 @@ class HSJA(PerturbationAttack):
         else:
             raise ValueError(f'Unknown constraint {params["constraint"]}.')
 
-    def binary_search_batch(self, original_image: torch.Tensor, perturbed_images: torch.Tensor, model: ModelWrapper,
-                            params, queries_counter: QueriesCounter) -> tuple[torch.Tensor, float, QueriesCounter]:
+    def binary_search_batch(self,
+                            original_image: torch.Tensor,
+                            perturbed_images: torch.Tensor,
+                            model: ModelWrapper,
+                            params,
+                            queries_counter: QueriesCounter,
+                            phase: HSJAttackPhase = HSJAttackPhase.binary_search,
+                            invert_direction: bool = False) -> tuple[torch.Tensor, float, QueriesCounter]:
         """ Binary search to approach the boundary."""
 
         # Compute distance between each of perturbed image and original image.
@@ -293,10 +421,13 @@ class HSJA(PerturbationAttack):
             mid_images = self.project(original_image, perturbed_images, mids, params)
 
             # Update highs and lows based on model decisions.
-            decisions, queries_counter = self.decision_function(model, mid_images, params, queries_counter,
-                                                                HSJAttackPhase.binary_search, original_image)
+            decisions, queries_counter = self.decision_function(model, mid_images, params, queries_counter, phase,
+                                                                original_image)
             lows = torch.where(decisions == 0, mids, lows)  # type: ignore
             highs = torch.where(decisions == 1, mids, highs)  # type: ignore
+
+            if invert_direction:
+                lows, highs = highs, lows
 
             # check of there is no more progress due to numerical imprecision
             reached_numerical_precision = (old_mids == mids).all()
