@@ -264,7 +264,7 @@ class RayS(DirectionAttack):
         steps_done = 0
         # Do the search with the first drop. The search does: n steps, then if it is successful it does n-1, and so on.
         # If it fails, then it will continue with a regular line search
-        while steps_done <= max_steps:
+        while steps_done < max_steps:
             d_end_tmp = initial_d_end - step_size * min(steps_to_try + steps_done, max_steps)
             x_adv = self.get_x_adv(x, direction, d_end_tmp)
             success, updated_queries_counter = self.is_correct_boundary_side(model, x_adv, y, target,
