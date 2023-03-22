@@ -327,22 +327,25 @@ class HSJA(PerturbationAttack):
 
         return gradf, queries_counter
 
-    def approximate_gradient_sign_opt(self, model: ModelWrapper, adv_sample: torch.Tensor, num_evals: int, delta,
+    def approximate_gradient_sign_opt(self, model: ModelWrapper, x_bd: torch.Tensor, num_evals: int, delta,
                                       params, queries_counter: QueriesCounter,
-                                      original_sample: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
+                                      x: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
         """
         Evaluate the sign of gradient by formulat
         sign(g) = 1/Q [ \\sum_{q=1}^Q sign( g(theta+h*u_i) - g(theta) )u_i$ ]
         """
-        clip_max, clip_min = params['clip_max'], params['clip_min']
 
-        theta, initial_lbd = normalize(original_sample - adv_sample)
-        x = original_sample
+        theta, initial_lbd = normalize(x_bd - x)
+        x = x
         x = x.unsqueeze(0)
         x_temp = self.get_x_adv(x, theta * initial_lbd)
+        # assert torch.allclose(x_bd, x_temp)
+        delta /= initial_lbd
 
         u = torch.randn((num_evals, ) + theta.shape, dtype=theta.dtype, device=x.device)
         u, _ = normalize(u, batch=True)
+        # u = u / initial_lbd
+        direction_perturbations = u
 
         sign_v = torch.ones((num_evals, 1, 1, 1), device=x.device)
         new_theta: torch.Tensor = theta + delta * u  # type: ignore
@@ -350,28 +353,25 @@ class HSJA(PerturbationAttack):
         x_ = self.get_x_adv(x, new_theta * initial_lbd)
         u = x_ - x_temp
         success, queries_counter = self.decision_function(model, x_, params, queries_counter,
-                                                            HSJAttackPhase.gradient_estimation, original_sample)
-        sign_v[success] = -1
+                                                            HSJAttackPhase.gradient_estimation, x)
+        sign_v[torch.logical_not(success)] = -1.
         
-        perturbed = x + new_theta * initial_lbd
-        perturbed = self.clip_image(perturbed, clip_min, clip_max)
-        rv = (perturbed - x) / initial_lbd
-
-        decision_shape = [len(success)] + [1] * len(params['shape'])
-        
-        fval = 2 * success.to(torch.float).reshape(decision_shape) - 1.0
+        rv = direction_perturbations
+        fval = sign_v
         # Baseline subtraction (when fval differs)
         if torch.mean(fval) == 1.0:  # label changes.
-            sign_grad = torch.mean(rv, dim=0)
+            print("All samples are misclassified.")
+            gradf = torch.mean(rv, dim=0)
         elif torch.mean(fval) == -1.0:  # label not change.
-            sign_grad = -torch.mean(rv, dim=0)
+            print("No sample is misclassified.")
+            gradf = -torch.mean(rv, dim=0)
         else:
             fval -= torch.mean(fval)
-            sign_grad = torch.mean(fval * rv, dim=0)
+            gradf = torch.mean(fval * rv, dim=0)
         
-        sign_grad = sign_grad / torch.linalg.norm(sign_grad, dim=None)
+        gradf = gradf / torch.linalg.norm(gradf, dim=None)
 
-        return sign_grad, queries_counter
+        return gradf, queries_counter
 
     def project(self, original_image: torch.Tensor, perturbed_images: torch.Tensor, alphas: torch.Tensor,
                 params) -> torch.Tensor:
