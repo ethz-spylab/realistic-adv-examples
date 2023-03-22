@@ -277,58 +277,50 @@ class HSJA(PerturbationAttack):
 
         return gradf, updated_queries_counter
 
-    def approximate_gradient_opt(self, model: ModelWrapper, adv_sample: torch.Tensor, num_evals: int, delta, params,
+    def approximate_gradient_opt(self, model: ModelWrapper, x_bd: torch.Tensor, num_evals: int, delta, params,
                                  queries_counter: QueriesCounter,
-                                 original_sample: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
-        clip_max, clip_min = params['clip_max'], params['clip_min']
-        perturbation_direction, _ = normalize(adv_sample - original_sample)
-        sample_est = adv_sample + params['grad_boundary_distance'] * perturbation_direction
-        g2 = params['theta']
+                                 x: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
 
-        gradf = torch.zeros_like(original_sample)
-        u = torch.randn((num_evals, ) + original_sample.shape,
-                        device=original_sample.device,
-                        dtype=original_sample.dtype)
+        theta, initial_lbd = normalize(x_bd - x)
+        delta /= initial_lbd
+        expected_search_queries = math.log2(initial_lbd // params['theta'])
+        num_evals = int(num_evals / expected_search_queries)
+
+        gradf = torch.zeros_like(x)
+        u = torch.randn((num_evals, ) + x.shape, device=x.device, dtype=x.dtype)
         u, _ = normalize(u, batch=True)
-        theta = -perturbation_direction
-        ttt = theta.unsqueeze(0) + delta * u
-        ttt, _ = normalize(ttt, batch=True)
-
-        test_sample = adv_sample - params['theta'] * perturbation_direction
-        clipped_test_sample = self.clip_image(test_sample, clip_min, clip_max)
-        assert (test_sample == clipped_test_sample).all()
-        decisions, _ = self.decision_function(model, clipped_test_sample, params, queries_counter,
-                                              HSJAttackPhase.gradient_estimation, original_sample)
-        assert not decisions.item()
+        new_thetas = theta + delta * u
+        new_thetas, _ = normalize(new_thetas, batch=True)
+        
+        distances = torch.zeros(num_evals, device=x.device, dtype=x.dtype)
 
         for j in range(num_evals):
-            bad_side_sample = sample_est + 1.5 * g2 * ttt[j]
-            clipped_bad_side_sample = self.clip_image(bad_side_sample, clip_min, clip_max)
-            decisions, queries_counter = self.decision_function(model, clipped_bad_side_sample, params, queries_counter,
-                                                                HSJAttackPhase.gradient_estimation, original_sample)
-            print(decisions)
-            if decisions.item():
-                g1 = 2 * g2
-            else:
-                _, g1, queries_counter = self.binary_search_batch(
-                    original_sample,
-                    clipped_bad_side_sample,
-                    model,
-                    params,
-                    queries_counter,
-                    phase=HSJAttackPhase.gradient_estimation,
-                    invert_direction=True,
-                )
-            print(g1)
-            gradf += (g1 - g2) / delta * u[j]
+            g1, queries_counter = self.opt_binary_search(model, x, params['original_label'],
+                                                         params['target_label'], new_thetas[j], queries_counter,
+                                                         initial_lbd.item(), HSJAttackPhase.gradient_estimation,
+                                                         params['theta'])
+            gradf += (g1 - initial_lbd) / delta * u[j]
+            distances[j] = g1
 
         gradf = 1.0 / num_evals * gradf
+
+        rv = u
+        fval = distances
+        # Baseline subtraction (when fval differs)
+        if torch.all(distances < initial_lbd):  # label changes.
+            gradf = torch.mean(rv, dim=0)
+        elif torch.all(distances >= initial_lbd):  # label not change.
+            gradf = -torch.mean(rv, dim=0)
+        else:
+            fval -= torch.mean(fval)
+            gradf = torch.mean(fval.reshape(-1, 1, 1, 1) * rv, dim=0)
+
         gradf = gradf / torch.linalg.norm(gradf, dim=None)
 
-        return gradf, queries_counter
+        return -gradf, queries_counter
 
-    def approximate_gradient_sign_opt(self, model: ModelWrapper, x_bd: torch.Tensor, num_evals: int, delta,
-                                      params, queries_counter: QueriesCounter,
+    def approximate_gradient_sign_opt(self, model: ModelWrapper, x_bd: torch.Tensor, num_evals: int, delta, params,
+                                      queries_counter: QueriesCounter,
                                       x: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
         """
         Evaluate the sign of gradient by formulat
@@ -336,27 +328,21 @@ class HSJA(PerturbationAttack):
         """
 
         theta, initial_lbd = normalize(x_bd - x)
-        x = x
         x = x.unsqueeze(0)
-        x_temp = self.get_x_adv(x, theta * initial_lbd)
-        # assert torch.allclose(x_bd, x_temp)
         delta /= initial_lbd
 
         u = torch.randn((num_evals, ) + theta.shape, dtype=theta.dtype, device=x.device)
         u, _ = normalize(u, batch=True)
-        # u = u / initial_lbd
-        direction_perturbations = u
 
         sign_v = torch.ones((num_evals, 1, 1, 1), device=x.device)
         new_theta: torch.Tensor = theta + delta * u  # type: ignore
         new_theta, _ = normalize(new_theta, batch=True)
         x_ = self.get_x_adv(x, new_theta * initial_lbd)
-        u = x_ - x_temp
         success, queries_counter = self.decision_function(model, x_, params, queries_counter,
-                                                            HSJAttackPhase.gradient_estimation, x)
+                                                          HSJAttackPhase.gradient_estimation, x)
         sign_v[torch.logical_not(success)] = -1.
-        
-        rv = direction_perturbations
+
+        rv = u
         fval = sign_v
         # Baseline subtraction (when fval differs)
         if torch.mean(fval) == 1.0:  # label changes.
@@ -368,7 +354,7 @@ class HSJA(PerturbationAttack):
         else:
             fval -= torch.mean(fval)
             gradf = torch.mean(fval * rv, dim=0)
-        
+
         gradf = gradf / torch.linalg.norm(gradf, dim=None)
 
         return gradf, queries_counter
@@ -384,6 +370,52 @@ class HSJA(PerturbationAttack):
             return out_images
         else:
             raise ValueError(f'Unknown constraint {params["constraint"]}.')
+
+    def opt_binary_search(self, model: ModelWrapper, x: torch.Tensor, y: torch.Tensor, target: torch.Tensor | None,
+                          theta: torch.Tensor, queries_counter: QueriesCounter, initial_lbd: float,
+                          phase: HSJAttackPhase, tol: float) -> tuple[float, QueriesCounter]:
+
+        lbd = initial_lbd
+
+        def is_correct_boundary_side_local(lbd_: float, qc: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:
+            x_adv_ = self.get_x_adv(x, theta * lbd_)
+            return self.is_correct_boundary_side(model, x_adv_, y, target, qc, phase, x)
+
+        x_adv = self.get_x_adv(x, theta * lbd)
+        success, queries_counter = self.is_correct_boundary_side(model, x_adv, y, target, queries_counter, phase, x)
+
+        if not success:
+            lbd_lo = lbd
+            lbd_hi = lbd * 1.01
+            while not (iter_result := is_correct_boundary_side_local(lbd_hi, queries_counter))[0].item():
+                _, queries_counter = iter_result
+                lbd_hi *= 1.01
+                if lbd_hi > 20:
+                    # Here we return 2 * lbd_hi because inf breaks the attack
+                    return lbd_hi * 2, queries_counter
+        else:
+            lbd_hi = lbd
+            lbd_lo = lbd * 0.99
+            while (iter_result := is_correct_boundary_side_local(lbd_lo, queries_counter))[0].item():
+                _, queries_counter = iter_result
+                lbd_lo *= 0.99
+
+        diff = lbd_hi - lbd_lo
+        while diff > tol:
+            lbd_mid = (lbd_lo + lbd_hi) / 2
+            # EDIT: add a break condition
+            if lbd_mid == lbd_hi or lbd_mid == lbd_lo:
+                break
+            success, queries_counter = is_correct_boundary_side_local(lbd_mid, queries_counter)
+            if success.item():
+                lbd_hi = lbd_mid
+            else:
+                lbd_lo = lbd_mid
+            # EDIT: This is to avoid numerical issue with gpu tensor when diff is small
+            if diff <= lbd_hi - lbd_lo:
+                break
+            diff = lbd_hi - lbd_lo
+        return lbd_hi, queries_counter
 
     def binary_search_batch(self,
                             original_image: torch.Tensor,
