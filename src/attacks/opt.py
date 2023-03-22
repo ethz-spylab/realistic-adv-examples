@@ -72,8 +72,8 @@ class OPT(DirectionAttack):
 
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
                  queries_limit: int | None, unsafe_queries_limit: int | None, max_iter: int | None, alpha: float,
-                 beta: float, search: SearchMode, grad_estimation_search: SearchMode, step_size_search: SearchMode,
-                 n_searches: int, max_search_steps: int, batch_size: int | None):
+                 beta: float, search: SearchMode, num_grad_queries: int, grad_estimation_search: SearchMode,
+                 step_size_search: SearchMode, n_searches: int, max_search_steps: int, batch_size: int | None):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.num_directions = 100 if distance == l2 else 500
         self.iterations = max_iter
@@ -83,6 +83,7 @@ class OPT(DirectionAttack):
         self.max_search_steps = max_search_steps
         self.grad_estimation_search_type = grad_estimation_search
         self.batch_size = batch_size if batch_size is not None else MAX_BATCH_SIZE
+        self.num_grad_queries = num_grad_queries
 
         if SearchMode.eggs_dropping in {search, grad_estimation_search, step_size_search}:
             raise ValueError("eggs dropping search not available for OPT and SignOPT")
@@ -186,7 +187,7 @@ class OPT(DirectionAttack):
             _range = itertools.count()
 
         for i in _range:
-            q = 10
+            q = self.num_grad_queries
             min_g1 = float("inf")
             gradient = torch.zeros_like(theta)
             u = torch.randn((q, ) + theta.shape, device=theta.device)
