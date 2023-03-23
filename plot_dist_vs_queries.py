@@ -1,5 +1,6 @@
 import argparse
 from io import TextIOWrapper
+import math
 from pathlib import Path
 from typing import Any, Iterator
 import warnings
@@ -15,6 +16,7 @@ from scipy.stats import linregress
 from src.attacks.queries_counter import CurrentDistanceInfo, WrongCurrentDistanceInfo
 from src.json_list import JSONList
 from src.utils import read_sha256sum, sha256sum, write_sha256sum
+from src.attacks.hsja import HSJAttackPhase
 from src.attacks.opt import OPTAttackPhase
 
 OPENED_FILES: list[TextIOWrapper] = []
@@ -118,7 +120,8 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         yield simulated_distances
 
 
-def make_dummy_distance_info(phase: OPTAttackPhase, distance: float, best_distance: float) -> CurrentDistanceInfo:
+def make_dummy_distance_info(phase: OPTAttackPhase | HSJAttackPhase, distance: float,
+                             best_distance: float) -> CurrentDistanceInfo:
     return CurrentDistanceInfo(phase, False, distance, best_distance)
 
 
@@ -127,18 +130,17 @@ def generate_ideal_line_simulated_distances(
     for distance_list in items:
         simulated_distances = []
         previous_phase = None
+        iterations = 1
+        init_num_evals = 100
+        max_num_evals = int(1e4)
+        d = 3 * 224 * 224
+        theta = 10_000 / (math.sqrt(d) * d)
         for distance in distance_list:
-            if distance["phase"] == OPTAttackPhase.direction_search:
+            if distance["phase"] in {OPTAttackPhase.direction_search, HSJAttackPhase.initialization}:
                 # One unsafe query is done for the initial research, whether it is for the direction test
                 # or to measure the boundary distance along the direction
                 simulated_distances.append(
-                    make_dummy_distance_info(OPTAttackPhase.direction_search, distance["distance"],
-                                             distance["best_distance"]))
-            elif distance["phase"] == OPTAttackPhase.step_size_search_start:
-                # One unsafe query is done for the step size search
-                simulated_distances.append(
-                    make_dummy_distance_info(OPTAttackPhase.step_size_search, distance["distance"],
-                                             distance["best_distance"]))
+                    make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
             elif (distance["phase"] == OPTAttackPhase.gradient_estimation
                   and previous_phase != OPTAttackPhase.gradient_estimation):
                 # 10 unsafe queries are done for the overall gradient estimation
@@ -146,6 +148,29 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(OPTAttackPhase.gradient_estimation, distance["distance"],
                                              distance["best_distance"])
                 ] * 10
+            elif (distance["phase"] == HSJAttackPhase.gradient_estimation
+                  and previous_phase != HSJAttackPhase.gradient_estimation):
+                # 10 unsafe queries are done for the overall gradient estimation
+                num_evals = int(init_num_evals * math.sqrt(iterations))
+                num_evals = int(min([num_evals, max_num_evals]))
+                expected_search_queries = math.log2(distance["distance"] // theta)
+                num_evals = int(num_evals / expected_search_queries)
+                simulated_distances += [
+                    make_dummy_distance_info(HSJAttackPhase.gradient_estimation, distance["distance"],
+                                             distance["best_distance"])
+                ] * num_evals
+            elif distance["phase"] == OPTAttackPhase.step_size_search_start:
+                # One unsafe query is done for the step size search
+                simulated_distances.append(
+                    make_dummy_distance_info(OPTAttackPhase.step_size_search, distance["distance"],
+                                             distance["best_distance"]))
+            elif (distance["phase"] == HSJAttackPhase.step_size_search
+                  and previous_phase != HSJAttackPhase.step_size_search):
+                # One unsafe query is done for the step size search
+                simulated_distances.append(
+                    make_dummy_distance_info(HSJAttackPhase.step_size_search, distance["distance"],
+                                             distance["best_distance"]))
+                iterations += 1
             previous_phase = distance["phase"]
 
         yield simulated_distances
@@ -497,7 +522,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
                              to_simulate: list[int] | None, draw_legend: str, max_queries: int | None) -> None:
     names = names or ["" for _ in exp_paths]
     arrays_to_plot = []
-    
+
     if "/linf/" in str(exp_paths[0]):
         epsilons = [4 / 255, 8 / 255, 16 / 255, 32 / 255, 64 / 255, 128 / 255]
     else:
@@ -517,7 +542,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         fig, ax = plt.subplots(figsize=(RAYS_PLOTS_WIDTH, RAYS_PLOTS_HEIGHT))
     else:
         fig, ax = plt.subplots(figsize=(PLOTS_WIDTH, PLOTS_HEIGHT))
-    
+
     queries_per_epsilon_df = pd.DataFrame(columns=["attack", "epsilon", "n_queries"])
 
     for i, (name, array) in enumerate(zip(names, arrays_to_plot)):
@@ -538,7 +563,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         else:
             warnings.warn(f"Could not find color, style, marker for {name}. Using default.")
             color, style, marker = None, None, None
-        
+
         full_median_distances = np.median(array[:n_samples_to_plot], axis=0)
         for epsilon in epsilons:
             if ((full_median_distances) < epsilon).any():
@@ -577,7 +602,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
                 marker=marker,
                 markevery=(marker_start, markers_frequency),
                 linewidth=linewidth)
-    
+
     if "ablation" not in str(out_path):
         queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}_overall.csv", index=False)
 
