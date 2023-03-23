@@ -171,6 +171,13 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(HSJAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
                 iterations += 1
+            elif (distance["phase"] == HSJAttackPhase.binary_search
+                  and previous_phase != HSJAttackPhase.binary_search):
+                # One unsafe query is done for the step size search
+                simulated_distances.append(
+                    make_dummy_distance_info(HSJAttackPhase.binary_search, distance["distance"],
+                                             distance["best_distance"]))
+                iterations += 1
             previous_phase = distance["phase"]
 
         yield simulated_distances
