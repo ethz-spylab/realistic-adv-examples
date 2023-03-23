@@ -135,20 +135,25 @@ def generate_ideal_line_simulated_distances(
         max_num_evals = int(1e4)
         d = 3 * 224 * 224
         theta = 10_000 / (math.sqrt(d) * d)
+        attack = ""
         for distance in distance_list:
             if distance["phase"] in {OPTAttackPhase.direction_search, HSJAttackPhase.initialization}:
+                if distance["phase"] == OPTAttackPhase.direction_search:
+                    attack = "OPT"
+                elif distance["phase"] == HSJAttackPhase.initialization:
+                    attack = "HSJ"
                 # One unsafe query is done for the initial research, whether it is for the direction test
                 # or to measure the boundary distance along the direction
                 simulated_distances.append(
                     make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
-            elif (distance["phase"] == OPTAttackPhase.gradient_estimation
+            elif (attack == "OPT" and distance["phase"] == OPTAttackPhase.gradient_estimation
                   and previous_phase != OPTAttackPhase.gradient_estimation):
                 # 10 unsafe queries are done for the overall gradient estimation
                 simulated_distances += [
                     make_dummy_distance_info(OPTAttackPhase.gradient_estimation, distance["distance"],
                                              distance["best_distance"])
                 ] * 10
-            elif (distance["phase"] == HSJAttackPhase.gradient_estimation
+            elif (attack == "HSJ" and distance["phase"] == HSJAttackPhase.gradient_estimation
                   and previous_phase != HSJAttackPhase.gradient_estimation):
                 # 10 unsafe queries are done for the overall gradient estimation
                 num_evals = int(init_num_evals * math.sqrt(iterations))
@@ -171,8 +176,7 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(HSJAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
                 iterations += 1
-            elif (distance["phase"] == HSJAttackPhase.binary_search
-                  and previous_phase != HSJAttackPhase.binary_search):
+            elif (distance["phase"] == HSJAttackPhase.binary_search and previous_phase != HSJAttackPhase.binary_search):
                 # One unsafe query is done for the step size search
                 simulated_distances.append(
                     make_dummy_distance_info(HSJAttackPhase.binary_search, distance["distance"],
