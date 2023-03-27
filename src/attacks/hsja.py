@@ -1,7 +1,6 @@
 from enum import Enum
 import itertools
 import math
-import numpy as np
 
 import torch
 from foolbox.distances import LpDistance, l2, linf
@@ -280,18 +279,19 @@ class HSJA(PerturbationAttack):
     def approximate_gradient_opt(self, model: ModelWrapper, x_bd: torch.Tensor, num_evals: int, delta, params,
                                  queries_counter: QueriesCounter,
                                  x: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
-
         theta, initial_lbd = normalize(x_bd - x)
         delta /= initial_lbd
-        expected_search_queries = math.log2(initial_lbd // params['theta'])
-        num_evals = int(num_evals / expected_search_queries)
+        # SignOPT does 200 evaluations, and OPT does 10, so we get some sort of equivalent number
+        sign_opt_queries = 200
+        opt_queries = 10
+        num_evals = max(num_evals // sign_opt_queries, 1) * opt_queries
 
         gradf = torch.zeros_like(x)
         u = torch.randn((num_evals, ) + x.shape, device=x.device, dtype=x.dtype)
         u, _ = normalize(u, batch=True)
         new_thetas = theta + delta * u
         new_thetas, _ = normalize(new_thetas, batch=True)
-        
+
         distances = torch.zeros(num_evals, device=x.device, dtype=x.dtype)
 
         for j in range(num_evals):
