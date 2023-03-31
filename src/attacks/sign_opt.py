@@ -7,7 +7,7 @@ import torch
 from foolbox.distances import LpDistance
 
 from src.attacks.base import Bounds, ExtraResultsDict, SearchMode
-from src.attacks.opt import INITIAL_OVERSHOOT_EMA_VALUE, OPT, EMAValue, OPTAttackPhase, normalize
+from src.attacks.opt import OVERSHOOT_VALUE, OPT, OPTAttackPhase, normalize
 from src.attacks.queries_counter import QueriesCounter
 from src.model_wrappers import ModelWrapper
 
@@ -37,8 +37,8 @@ class SignOPT(OPT):
         batch_size: int | None = None,
     ):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit, max_iter, alpha,
-                         beta, search, num_grad_queries, grad_estimation_search, step_size_search, n_searches, max_search_steps,
-                         batch_size)
+                         beta, search, num_grad_queries, grad_estimation_search, step_size_search, n_searches,
+                         max_search_steps, batch_size)
         self.num_directions = 100
         self.momentum = momentum  # (default: 0)
         if batch_size is not None:
@@ -80,7 +80,7 @@ class SignOPT(OPT):
                                                                      OPTAttackPhase.direction_search, x)
             if success.item():
                 theta, initial_lbd = normalize(theta)
-                lbd, queries_counter, _, _, _ = self.fine_grained_search(model, x, y, target, theta, queries_counter,
+                lbd, queries_counter, _ = self.fine_grained_search(model, x, y, target, theta, queries_counter,
                                                                          initial_lbd.item(), g_theta)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
@@ -103,7 +103,7 @@ class SignOPT(OPT):
         best_pert = gg * xg
         vg = torch.zeros_like(xg)
         alpha, beta = self.alpha, self.beta
-        search_lower_bound = EMAValue(1 - (INITIAL_OVERSHOOT_EMA_VALUE - 1), )
+        search_lower_bound = 1 - (OVERSHOOT_VALUE - 1)
 
         if self.iterations is not None:
             _range = range(self.iterations)
@@ -131,7 +131,7 @@ class SignOPT(OPT):
                 else:
                     new_theta = xg - alpha * sign_gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter, _, search_lower_bound, _ = self.step_size_search_search_fn(
+                new_g2, queries_counter, _ = self.step_size_search_search_fn(
                     model, x, y, target, new_theta, queries_counter, min_g2, beta / 500, search_lower_bound)
                 alpha *= 2
                 if new_g2 < min_g2:
@@ -151,7 +151,7 @@ class SignOPT(OPT):
                     else:
                         new_theta = xg - alpha * sign_gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter, _, search_lower_bound, _ = self.step_size_search_search_fn(
+                    new_g2, queries_counter, _ = self.step_size_search_search_fn(
                         model, x, y, target, new_theta, queries_counter, min_g2, beta / 500, search_lower_bound)
                     if new_g2 < gg:
                         min_theta = new_theta

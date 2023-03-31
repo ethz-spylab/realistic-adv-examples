@@ -105,6 +105,7 @@ def setup_attack(args: Namespace) -> BaseAttack:
             "gamma": args.hsja_gamma,
             "fixed_delta": args.hsja_delta,
             "gradient_estimation_mode": GradientEstimationMode(args.hsja_grad_est_mode),
+            "search": search,
         }
         return HSJA(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "opt":
