@@ -34,6 +34,6 @@ for distances_list, distances_list_fixes in tqdm.tqdm(zip(items, item_fixes), to
     assert len(fixed_distances_list) == len(distances_list)
 
     fixed_items_jsonlist.append(fixed_distances_list)
-    
+
 f.close()
 f_fix.close()

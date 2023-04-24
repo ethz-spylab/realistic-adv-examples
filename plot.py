@@ -1,18 +1,18 @@
 import numpy as np
-import json
 import matplotlib.pyplot as plt
 import sys
 import ijson
 from tqdm import tqdm
 
-
 MAX_BAD_QUERIES = 1000
 MAX_SAMPLES = 100
+
 
 def process(dists, bad):
     dists[bad] = np.inf
     dists = np.minimum.accumulate(dists)
     return dists
+
 
 def clamp(arr, size):
     if len(arr) >= size:
@@ -23,6 +23,7 @@ def clamp(arr, size):
         new_arr[len(arr):] = arr[-1]
         return new_arr
 
+
 def is_safe(ddd):
     s = ddd['safe']
     if isinstance(s, list):
@@ -30,10 +31,12 @@ def is_safe(ddd):
     else:
         return s
 
+
 def keep_if_simulated(ddd):
     if is_safe(ddd):
         return True
     return ddd["equivalent_simulated_queries"] == 1
+
 
 def load(dir):
     with open(f"{dir}/distances_traces.json", "rb") as f:
@@ -60,6 +63,7 @@ def load(dir):
                 break
 
         return np.asarray(all_dists_bad), np.asarray(all_dists_bad_sim)
+
 
 """
 def load(dir, simulate=False, d=None):
