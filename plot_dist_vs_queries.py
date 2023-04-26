@@ -380,6 +380,7 @@ COLORS_STYLES_MARKERS = {
     "Stealthy SignOPT": ("darkgoldenrod", "-", "x"),
     "Boundary": ("tab:red", "dotted", "^"),
     "HSJA": ("tab:green", "dotted", "o"),
+    "HSJA+Stealthy OPT grad estimation": ("royalblue", "--", "x"),
     "RayS": ("darkviolet", "dotted", "s"),
     "RayS (binary)": ("tab:green", "dotted", "s"),
     "RayS (line search)": ("tab:blue", "-", "x"),
