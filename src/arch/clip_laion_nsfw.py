@@ -24,7 +24,8 @@ class PortedCLIPClassifier(nn.Module):
         x = (x - self.mean) / self.std
         x = nn.functional.relu(self.linear_1(x))
         x = nn.functional.relu(self.linear_2(x))
-        # x = nn.functional.dropout(x, self.DROPOUT_RATE)  # for some reason this breaks the model equivalency tests even in eval mode
+        # for some reason this breaks the model equivalency tests even in eval mode
+        # x = nn.functional.dropout(x, self.DROPOUT_RATE)
         x = self.linear_3(x)
         return torch.sigmoid(x)
 

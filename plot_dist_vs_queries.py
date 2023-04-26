@@ -137,7 +137,8 @@ def generate_ideal_line_simulated_distances(
         theta = 10_000 / (math.sqrt(d) * d)
         attack = ""
         for distance in distance_list:
-            if distance["phase"] in {OPTAttackPhase.direction_search, HSJAttackPhase.initialization}:
+            if distance["phase"] in {OPTAttackPhase.direction_search, HSJAttackPhase.initialization
+                                     } and previous_phase != distance["phase"]:
                 if distance["phase"] == OPTAttackPhase.direction_search:
                     attack = "OPT"
                 elif distance["phase"] == HSJAttackPhase.initialization:
@@ -176,10 +177,11 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(HSJAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
                 iterations += 1
-            elif (distance["phase"] == HSJAttackPhase.binary_search and previous_phase != HSJAttackPhase.binary_search):
+            elif (distance["phase"] == HSJAttackPhase.boundary_projection
+                  and previous_phase != HSJAttackPhase.boundary_projection):
                 # One unsafe query is done for the step size search
                 simulated_distances.append(
-                    make_dummy_distance_info(HSJAttackPhase.binary_search, distance["distance"],
+                    make_dummy_distance_info(HSJAttackPhase.boundary_projection, distance["distance"],
                                              distance["best_distance"]))
                 iterations += 1
             previous_phase = distance["phase"]
@@ -649,7 +651,7 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
         cost_array = overall_queries_cost_array + bad_cost_array
         arrays_to_plot.append((cost_array, distances_array[:, :queries_to_plot]))
 
-    # n_samples_to_plot = min(len(distances_array[0]) for distances_array in arrays_to_plot)
+    n_samples_to_plot = min(len(distances_array[0]) for distances_array in arrays_to_plot)
     n_samples_to_plot = min(float("inf"), max_samples or n_samples_to_plot)
 
     if max_samples is not None and n_samples_to_plot < max_samples:

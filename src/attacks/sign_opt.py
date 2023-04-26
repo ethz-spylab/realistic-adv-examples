@@ -81,7 +81,7 @@ class SignOPT(OPT):
             if success.item():
                 theta, initial_lbd = normalize(theta)
                 lbd, queries_counter, _ = self.fine_grained_search(model, x, y, target, theta, queries_counter,
-                                                                         initial_lbd.item(), g_theta)
+                                                                   initial_lbd.item(), g_theta)
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
                     if self.verbose:
@@ -131,8 +131,9 @@ class SignOPT(OPT):
                 else:
                     new_theta = xg - alpha * sign_gradient
                 new_theta, _ = normalize(new_theta)
-                new_g2, queries_counter, _ = self.step_size_search_search_fn(
-                    model, x, y, target, new_theta, queries_counter, min_g2, beta / 500, search_lower_bound)
+                new_g2, queries_counter, _ = self.step_size_search_search_fn(model, x, y, target, new_theta,
+                                                                             queries_counter, min_g2, beta / 500,
+                                                                             search_lower_bound)
                 alpha *= 2
                 if new_g2 < min_g2:
                     min_theta = new_theta
@@ -151,8 +152,9 @@ class SignOPT(OPT):
                     else:
                         new_theta = xg - alpha * sign_gradient
                     new_theta, _ = normalize(new_theta)
-                    new_g2, queries_counter, _ = self.step_size_search_search_fn(
-                        model, x, y, target, new_theta, queries_counter, min_g2, beta / 500, search_lower_bound)
+                    new_g2, queries_counter, _ = self.step_size_search_search_fn(model, x, y, target, new_theta,
+                                                                                 queries_counter, min_g2, beta / 500,
+                                                                                 search_lower_bound)
                     if new_g2 < gg:
                         min_theta = new_theta
                         min_g2 = new_g2
