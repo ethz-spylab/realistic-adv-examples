@@ -76,10 +76,6 @@ def load_binary_imagenet_test_data(test_batch_size=1, data_dir=Path("/data/image
     return val_loader
 
 
-def make_dataset_tuples(sample, image_name="image", sample_name="label"):
-    return sample[image_name], sample[sample_name]
-
-
 def load_imagenet_nsfw_test_data(test_batch_size=1, indices_path: Optional[Path] = None) -> data.DataLoader:
     processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
     im_mean = torch.tensor(processor.feature_extractor.image_mean).view(1, 3, 1, 1)  # type: ignore
