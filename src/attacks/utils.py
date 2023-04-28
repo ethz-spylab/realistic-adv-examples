@@ -103,10 +103,11 @@ def opt_line_search(attack: PerturbationAttack | DirectionAttack,
                     initial_phase: AttackPhase,
                     current_best: float | None,
                     n_searches: int,
-                    max_search_steps: int,
+                    max_search_steps: int | None,
                     batch_size: int,
                     lower_b: float | None = None,
-                    upper_b: float | None = None) -> tuple[float, QueriesCounter]:
+                    upper_b: float | None = None,
+                    step_size: float | None = None) -> tuple[float, QueriesCounter]:
     if current_best is not None and initial_lbd > current_best:
         if isinstance(attack, DirectionAttack):
             x_adv = attack.get_x_adv(x, theta, current_best)
@@ -127,15 +128,26 @@ def opt_line_search(attack: PerturbationAttack | DirectionAttack,
 
     if upper_b is not None:
         lbd = lbd * upper_b
-
+        
     assert n_searches in {1, 2}
-    if n_searches == 2:
-        search_max_steps = math.ceil(math.sqrt(max_search_steps))
+    
+    if max_search_steps is None:
+        assert step_size is not None, 'Either step_size or max_search_steps must be specified'
+        if n_searches == 2:
+            search_max_steps = math.ceil(math.sqrt((lbd - lower_lbd) / step_size))
+            first_search_step_size = ((lbd - lower_lbd) / math.sqrt((lbd - lower_lbd) / step_size))
+        else:
+            search_max_steps = math.ceil(((lbd - lower_lbd) / step_size))
+            first_search_step_size = step_size
     else:
-        search_max_steps = max_search_steps
+        assert step_size is None, 'Only one of step_size or max_search_steps must be specified'
+        if n_searches == 2:
+            search_max_steps = math.ceil(math.sqrt(max_search_steps))
+        else:
+            search_max_steps = max_search_steps
+        first_search_step_size = (lbd - lower_lbd) / search_max_steps
+    
     search_batch_size = min(search_max_steps, batch_size)
-    first_search_step_size = (lbd - lower_lbd) / search_max_steps
-
     first_search_lbd, first_search_queries_counter, first_query_failed = _batched_line_search_body(
         attack,
         model,

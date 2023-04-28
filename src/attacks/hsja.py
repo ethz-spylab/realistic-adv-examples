@@ -2,7 +2,6 @@ from enum import Enum
 import itertools
 import math
 
-import numpy as np
 import torch
 from foolbox.distances import LpDistance, l2, linf
 
@@ -14,6 +13,7 @@ from src.model_wrappers import ModelWrapper
 from src.utils import compute_distance
 
 MAX_BATCH_SIZE = 100
+OVERSHOOT_VALUE = 1.03
 
 
 class HSJAttackPhase(AttackPhase):
@@ -35,6 +35,8 @@ class HSJA(PerturbationAttack):
     OPT_GRAD_EVALS = 10
     GRAD_BOUNDARY_DISTANCE = 1e-3
     N_SEARCHES = 2
+    GRAD_EST_SEARCH_LOWER_BOUND = 1 - (OVERSHOOT_VALUE - 1)
+    GRAD_EST_SEARCH_UPPER_BOUND = OVERSHOOT_VALUE
 
     def __init__(self,
                  epsilon: float | None,
@@ -47,12 +49,12 @@ class HSJA(PerturbationAttack):
                  gamma: float = 1.0,
                  gradient_estimation_mode: GradientEstimationMode = GradientEstimationMode.hsja,
                  search: SearchMode = SearchMode.binary,
-                 grad_batch_size: int = 200,
+                 grad_batch_size: int = 1024,
                  fixed_delta: float | None = None,
                  stepsize_search: str = "geometric_progression",
                  max_num_evals: int = int(1e4),
                  init_num_evals: int = 100,
-                 max_opt_search_steps: int = 40_000,
+                 max_opt_search_steps: int = 10_000,
                  n_searches: int = 2):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.init_num_evals = init_num_evals
@@ -311,8 +313,8 @@ class HSJA(PerturbationAttack):
         if self.search == SearchMode.binary:
             search_tolerance = params['theta']
         else:
-            search_tolerance = initial_lbd // self.max_opt_search_steps
-        expected_search_queries = math.log2(initial_lbd // search_tolerance)
+            search_tolerance = initial_lbd / self.max_opt_search_steps
+        expected_search_queries = math.log2(initial_lbd / search_tolerance)
         num_evals = int(num_evals / expected_search_queries)
 
         u = torch.randn((num_evals, ) + x.shape, device=x.device, dtype=x.dtype)
@@ -413,7 +415,8 @@ class HSJA(PerturbationAttack):
                         phase: HSJAttackPhase) -> tuple[float, QueriesCounter]:
         distance, queries_counter = opt_line_search(self, model, x, y, target, theta, queries_counter, initial_lbd,
                                                     phase, HSJAttackPhase.direction_probing, None, self.N_SEARCHES,
-                                                    self.max_opt_search_steps, self.grad_batch_size)
+                                                    self.max_opt_search_steps, self.grad_batch_size,
+                                                    self.GRAD_EST_SEARCH_LOWER_BOUND, self.GRAD_EST_SEARCH_UPPER_BOUND)
         return distance, queries_counter
 
     def binary_search_batch(
@@ -485,48 +488,69 @@ class HSJA(PerturbationAttack):
             queries_counter: QueriesCounter,
             phase: HSJAttackPhase = HSJAttackPhase.boundary_projection) -> tuple[torch.Tensor, float, QueriesCounter]:
         # Compute distance between each of perturbed image and original image.
-        dists_post_update = compute_distance(original_image, perturbed_images, params['distance'])
+        dists_post_update = compute_distance(original_image.unsqueeze(0), perturbed_images.unsqueeze(0),
+                                             params['distance'])
 
         dists: torch.Tensor
         # Choose upper thresholds in binary searchs based on constraint.
         if params['distance'] == linf:
             dists = dists_post_update
             # Stopping criteria.
-            step_size = torch.minimum(dists_post_update * params['theta'], params['theta'])
+            step_size = torch.minimum(dists_post_update * params['theta'] / 2, params['theta'])
         else:
             dists = torch.ones_like(dists_post_update)
-            step_size = params['theta']
+            step_size = params['theta'] / 2
 
         if self.n_searches == 2:
-            search_max_steps = math.ceil(math.sqrt(self.max_opt_search_steps))
+            search_max_steps = math.ceil(math.sqrt(dists_post_update / step_size))
+            first_search_step_size = (dists_post_update / math.sqrt(dists_post_update / step_size)).cpu().item()
         else:
-            search_max_steps = self.max_opt_search_steps
+            search_max_steps = math.ceil((dists_post_update / step_size).item())
+            first_search_step_size = step_size.item()
 
         search_batch_size = min(search_max_steps, self.grad_batch_size)
-        first_search_step_size = dists_post_update / search_max_steps
 
-        success = torch.tensor([True])
-        batch_idx = 0
+        first_search_distance, first_search_queries_counter = self._batched_line_search_body(
+            model,
+            original_image,
+            params['original_label'],
+            params['target_label'],
+            perturbed_images,
+            params,
+            queries_counter,
+            dists[0],
+            phase,
+            first_search_step_size,
+            search_batch_size,
+            # Here we count each query of the first search as equivalent to search_max_steps queries of when we do 1
+            equivalent_simulated_queries=1 if self.n_searches == 1 else search_max_steps,
+            # But we don't count the queries from the last batch as they will be counted in the second search
+            count_last_batch_for_sim=self.n_searches == 1)
 
-        while success.all():
-            # projection to the given distances
-            images = self.project(original_image, perturbed_images, dists, params)
+        if self.n_searches == 2:
+            second_search_step_size = step_size.item()
+            final_distance, second_search_queries_counter = self._batched_line_search_body(
+                model,
+                original_image,
+                params['original_label'],
+                params['target_label'],
+                perturbed_images,
+                params,
+                first_search_queries_counter,
+                first_search_distance,
+                phase,
+                second_search_step_size,
+                search_batch_size,
+                # Here each query has the same step size as if we were doing one search only
+                equivalent_simulated_queries=1,
+                # And we count the queries from the last batch as they are not counted in the first search
+                count_last_batch_for_sim=True)
+        else:
+            second_search_queries_counter = first_search_queries_counter
+            final_distance = first_search_distance
 
-            # Update distances based on model decisions
-            decisions, queries_counter = self.decision_function(model, images, params, queries_counter, phase,
-                                                                original_image)
-            # Subtract step size from distances where the model predicts the good class
-            dists = torch.where(decisions == 1, dists - step_size, dists)
-
-            if not decisions.any():
-                # Break when we are beyond the boundary for all the images,
-                # backtrack to the good side of the boundary
-                dists = dists + step_size
-                break
-
-        out_images = self.project(original_image, perturbed_images, dists, params)
-        decisions, _ = self.decision_function(model, out_images, params, queries_counter, phase, original_image)
-        assert decisions.all()
+        out_images = self.project(original_image, perturbed_images, final_distance.unsqueeze(0) + step_size / 2, params)
+        out_images = self.clip_image(out_images, params['clip_min'], params['clip_max'])
 
         # Compute distance of the output image to select the best choice.
         # (only used when stepsize_search is grid_search.)
@@ -536,7 +560,7 @@ class HSJA(PerturbationAttack):
         dist = dists_post_update[idx].item()
         out_image = out_images[idx]
 
-        return out_image, dist, queries_counter
+        return out_image, dist, second_search_queries_counter
 
     def _batched_line_search_body(self,
                                   model: ModelWrapper,
@@ -546,31 +570,33 @@ class HSJA(PerturbationAttack):
                                   perturbed_images: torch.Tensor,
                                   params,
                                   queries_counter: QueriesCounter,
-                                  initial_distance: float,
-                                  phase: AttackPhase,
+                                  initial_distance: torch.Tensor,
+                                  phase: HSJAttackPhase,
                                   step_size: float,
                                   batch_size: int = MAX_BATCH_SIZE,
                                   equivalent_simulated_queries: int = 1,
-                                  count_last_batch_for_sim: bool = False):
+                                  count_last_batch_for_sim: bool = False) -> tuple[torch.Tensor, QueriesCounter]:
         success = torch.tensor([True])
         batch_idx = 0
         distances_inner_shape = tuple([1] * (len(x.shape) - 1))
-        previous_last_distance = torch.tensor([initial_distance])
-        distances = np.array([initial_distance])
+        previous_last_distance = torch.tensor([initial_distance], device=initial_distance.device)
+        distances = torch.tensor([initial_distance], device=initial_distance.device)
 
         while success.all():
             # Update the last distance (in case the whole next batch is unsafe) and the index
             previous_last_distance = distances[-1]
             # Get steps bounds based on the batch index
             start = batch_idx * batch_size
+            if batch_idx == 0:
+                start = 1
             end = (batch_idx + 1) * batch_size
             # Compute the steps to take
-            steps_sizes = np.arange(start, end) * step_size
+            steps_sizes = torch.arange(start, end, device=x.device) * step_size
             # Subtract the steps from the original distance
             distances = (initial_distance - steps_sizes).reshape(-1, *distances_inner_shape)
             # Compute advex and query the model
-            distances_torch = torch.from_numpy(distances).float().to(device=x.device)
-            batch = self.project(x, perturbed_images, distances_torch, params['distance'])
+            batch = self.project(x, perturbed_images, distances, params)
+            batch = self.clip_image(batch, params['clip_min'], params['clip_max'])
             success, queries_counter = self.is_correct_boundary_side_batched(model, batch, y, target, queries_counter,
                                                                              phase, x, equivalent_simulated_queries,
                                                                              count_last_batch_for_sim, batch_idx == 0)
@@ -580,14 +606,11 @@ class HSJA(PerturbationAttack):
         unsafe_query_idx = torch.argmin(success.to(torch.int))
         if unsafe_query_idx == 0:
             # If no query was safe in the latest batch, then we return the last lbd from the previous batch
-            distance = previous_last_distance.item()
+            distance = previous_last_distance
         else:
-            distance = distances[unsafe_query_idx - 1].item()
+            distance = distances[unsafe_query_idx - 1]
 
-        # If we exited the loop after the first batch and the very first element was unsafe, then it means that
-        # the first query was unsafe
-        first_query_failed = batch_idx == 1 and bool((unsafe_query_idx == 0).item())
-        return distance, queries_counter, first_query_failed
+        return distance, queries_counter
 
     def initialize(self, model: ModelWrapper, sample: torch.Tensor, params,
                    queries_counter: QueriesCounter) -> tuple[torch.Tensor, QueriesCounter]:

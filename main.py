@@ -155,6 +155,11 @@ if __name__ == "__main__":
                         default='hsja',
                         type=str,
                         help='Gradient estimation mode for HSJA, one of `hsja`, `opt` or `sign_opt`')
+    parser.add_argument('--hsja-n-searches',
+                        default=2,
+                        type=int,
+                        help='Number of searches for OPT and Sign OPT',
+                        choices=[1, 2])
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
     parser.add_argument('--opt-beta', default=0.001, type=float, help='beta parameter for OPT and Sign OPT')
     parser.add_argument(
