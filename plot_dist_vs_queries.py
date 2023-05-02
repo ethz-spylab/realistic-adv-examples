@@ -109,7 +109,7 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
     for distances_list in items:
         simulated_distances = []
         for distance in distances_list:
-            if unsafe_only and distance["safe"]:
+            if distance["phase"] == HSJAttackPhase.gradient_estimation_search_start or unsafe_only and distance["safe"]:
                 continue
             simulated_distance = CurrentDistanceInfo(**(distance | {"equivalent_simulated_queries": 1}))  # type: ignore
             simulated_distances += [simulated_distance] * distance["equivalent_simulated_queries"]
@@ -130,11 +130,6 @@ def generate_ideal_line_simulated_distances(
     for distance_list in items:
         simulated_distances = []
         previous_phase = None
-        iterations = 1
-        init_num_evals = 100
-        max_num_evals = int(1e4)
-        d = 3 * 224 * 224
-        theta = 10_000 / (math.sqrt(d) * d)
         attack = ""
         for distance in distance_list:
             if distance["phase"] == OPTAttackPhase.direction_search and previous_phase != distance["phase"]:
@@ -155,14 +150,9 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(OPTAttackPhase.gradient_estimation, distance["distance"],
                                              distance["best_distance"])
                 ] * 10
-            elif (attack == "HSJ" and distance["phase"] == HSJAttackPhase.gradient_estimation
-                  and previous_phase != HSJAttackPhase.gradient_estimation):
-                num_evals = int(init_num_evals * math.sqrt(iterations))
-                num_evals = max(num_evals // 200, 1) * 10
-                simulated_distances += [
-                    make_dummy_distance_info(HSJAttackPhase.gradient_estimation, distance["distance"],
-                                             distance["best_distance"])
-                ] * num_evals
+            elif (attack == "HSJ" and distance["phase"] == HSJAttackPhase.gradient_estimation_search_start):
+                simulated_distances.append(
+                    make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
             elif distance["phase"] == OPTAttackPhase.step_size_search_start:
                 # One unsafe query is done for the step size search
                 simulated_distances.append(
@@ -174,14 +164,12 @@ def generate_ideal_line_simulated_distances(
                 simulated_distances.append(
                     make_dummy_distance_info(HSJAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
-                iterations += 1
             elif (distance["phase"] == HSJAttackPhase.boundary_projection
                   and previous_phase != HSJAttackPhase.boundary_projection):
                 # One unsafe query is done for the step size search
                 simulated_distances.append(
                     make_dummy_distance_info(HSJAttackPhase.boundary_projection, distance["distance"],
                                              distance["best_distance"]))
-                iterations += 1
             previous_phase = distance["phase"]
 
         yield simulated_distances
@@ -333,6 +321,15 @@ def load_distances_from_json(exp_path: Path, checksum_check: bool) -> Iterator[l
     return map(lambda x: list(map(lambda y: CurrentDistanceInfo(**y), x)), raw_results)
 
 
+PHASES = {HSJAttackPhase.gradient_estimation_search_start}
+
+
+def filter_distances_based_on_phase(
+        distances: Iterator[list[CurrentDistanceInfo]]) -> Iterator[list[CurrentDistanceInfo]]:
+    for sample_distances in distances:
+        yield list(filter(lambda x: x.phase not in PHASES, sample_distances))
+
+
 def load_distances_from_array(exp_path: Path, unsafe_only: bool, check_checksum: bool) -> np.ndarray:
     array_path = exp_path / f"distances_array{'_unsafe_only' if unsafe_only else ''}.npy"
     recompute_array = not array_path.exists()
@@ -345,7 +342,9 @@ def load_distances_from_array(exp_path: Path, unsafe_only: bool, check_checksum:
         recompute_array = True
     if recompute_array:
         print("Converting the distances to arrays")
-        distances = convert_distances_to_array(load_distances_from_json(exp_path, check_checksum), unsafe_only)
+        distances = load_distances_from_json(exp_path, check_checksum)
+        filtered_distances = filter_distances_based_on_phase(distances)
+        distances = convert_distances_to_array(filtered_distances, unsafe_only)
         save_distances_array(exp_path, distances, unsafe_only, check_checksum)
         return distances
     return np.load(array_path)

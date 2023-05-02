@@ -24,6 +24,7 @@ class HSJAttackPhase(AttackPhase):
     initialization = "initialization"
     initialization_search = "initialization_search"
     direction_probing = "direction_probing"
+    gradient_estimation_search_start = "gradient_estimation_search_start"
 
 
 class GradientEstimationMode(Enum):
@@ -151,7 +152,7 @@ class HSJA(PerturbationAttack):
             params['theta'] = params['gamma'] / (params['d']**2)
         params['theta'] = torch.tensor([params['theta']], device=sample.device)
 
-        queries_counter = self._make_queries_counter()
+        queries_counter: QueriesCounter[HSJAttackPhase] = self._make_queries_counter()
 
         # Initialize.
         perturbed, queries_counter = self.initialize(model, sample, params, queries_counter)
@@ -323,6 +324,11 @@ class HSJA(PerturbationAttack):
         distances = torch.zeros(num_evals, device=x.device, dtype=x.dtype)
 
         for j in range(num_evals):
+            queries_counter = queries_counter.increase(
+                HSJAttackPhase.gradient_estimation_search_start,
+                torch.tensor([True]),
+                torch.tensor([torch.nan]),
+            )
             if self.search == SearchMode.binary:
                 g1, queries_counter = self.opt_binary_search(model, x, params['original_label'],
                                                              params['target_label'], new_thetas[j], queries_counter,
