@@ -1,7 +1,7 @@
 import dataclasses
 from collections import Counter, defaultdict
 from enum import Enum
-from typing import Callable, Iterable, TypeVar
+from typing import Callable, Generic, Iterable, TypeVar
 
 import numpy as np
 import torch
@@ -56,12 +56,14 @@ class WrongCurrentDistanceInfo:
     equivalent_simulated_queries: int = 1
 
 
+AttackPhaseT = TypeVar("AttackPhaseT", bound=AttackPhase)
+
 @dataclasses.dataclass
-class QueriesCounter:
+class QueriesCounter(Generic[AttackPhaseT]):
     queries_limit: int | None
     unsafe_queries_limit: int | None = None
-    _queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
-    _unsafe_queries: dict[AttackPhase, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
+    _queries: dict[AttackPhaseT, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
+    _unsafe_queries: dict[AttackPhaseT, int] = dataclasses.field(default_factory=lambda: defaultdict(int))
     _distances: list[CurrentDistanceInfo] = dataclasses.field(default_factory=list)
     _best_distance: float = float("inf")
 
@@ -78,7 +80,7 @@ class QueriesCounter:
         return sum(map(lambda x: x.equivalent_simulated_queries, filter(lambda x: not x.safe, self._distances)))
 
     @property
-    def queries(self) -> dict[AttackPhase, int]:
+    def queries(self) -> dict[AttackPhaseT, int]:
         return self._queries
 
     @property
@@ -86,7 +88,7 @@ class QueriesCounter:
         return sum(self._unsafe_queries.values())
 
     @property
-    def unsafe_queries(self) -> dict[AttackPhase, int]:
+    def unsafe_queries(self) -> dict[AttackPhaseT, int]:
         return self._unsafe_queries
 
     @property
@@ -98,7 +100,7 @@ class QueriesCounter:
         return self._best_distance
 
     def increase(self,
-                 attack_phase: AttackPhase,
+                 attack_phase: AttackPhaseT,
                  safe: torch.Tensor,
                  distance: torch.Tensor,
                  equivalent_simulated_queries: int = 1) -> "QueriesCounter":
@@ -129,7 +131,7 @@ class QueriesCounter:
                                    _unsafe_queries=expanded_unsafe_queries)
 
     def _make_distances_to_log(self,
-                               attack_phase: AttackPhase,
+                               attack_phase: AttackPhaseT,
                                safe_list: torch.Tensor,
                                distance_list: torch.Tensor,
                                equivalent_simulated_queries: int = 0) -> tuple[list[CurrentDistanceInfo], float]:
