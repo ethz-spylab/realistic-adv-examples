@@ -311,12 +311,9 @@ class HSJA(PerturbationAttack):
         theta, initial_lbd = normalize(x_bd - x)
         delta /= initial_lbd
         # SignOPT does 200 evaluations, and OPT does 10, so we get some sort of equivalent number
-        if self.search == SearchMode.binary:
-            search_tolerance = params['theta']
-        else:
-            search_tolerance = initial_lbd / self.max_opt_search_steps
-        expected_search_queries = math.log2(initial_lbd / search_tolerance)
-        num_evals = int(num_evals / expected_search_queries)
+        sign_opt_queries = 200
+        opt_queries = 10
+        num_evals = max(num_evals // sign_opt_queries, 1) * opt_queries
 
         u = torch.randn((num_evals, ) + x.shape, device=x.device, dtype=x.dtype)
         u, _ = normalize(u, batch=True)
