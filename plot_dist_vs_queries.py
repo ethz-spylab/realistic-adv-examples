@@ -157,11 +157,8 @@ def generate_ideal_line_simulated_distances(
                 ] * 10
             elif (attack == "HSJ" and distance["phase"] == HSJAttackPhase.gradient_estimation
                   and previous_phase != HSJAttackPhase.gradient_estimation):
-                # 10 unsafe queries are done for the overall gradient estimation
                 num_evals = int(init_num_evals * math.sqrt(iterations))
-                num_evals = int(min([num_evals, max_num_evals]))
-                expected_search_queries = math.log2(distance["distance"] // theta)
-                num_evals = int(num_evals / expected_search_queries)
+                num_evals = max(num_evals // 200, 1) * 10
                 simulated_distances += [
                     make_dummy_distance_info(HSJAttackPhase.gradient_estimation, distance["distance"],
                                              distance["best_distance"])
