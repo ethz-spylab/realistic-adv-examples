@@ -297,7 +297,8 @@ def convert_distances_to_array(distances: Iterator[list[CurrentDistanceInfo]], u
                                     queries_to_plot)
 
     print("Converting distances to array")
-    limited_queries_to_plot = np.fromiter((pad_to_len(l_, plot_up_to) for l_ in best_distance_up_to_query),
+    limited_queries_to_plot = np.fromiter(tqdm.tqdm((pad_to_len(l_, plot_up_to) for l_ in best_distance_up_to_query),
+                                                    total=MAX_SAMPLES),
                                           dtype=np.dtype((float, plot_up_to)))
     return limited_queries_to_plot
 
