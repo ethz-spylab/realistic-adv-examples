@@ -131,6 +131,7 @@ def generate_ideal_line_simulated_distances(
         simulated_distances = []
         previous_phase = None
         attack = ""
+        iteration = 1
         for distance in distance_list:
             if distance["phase"] == OPTAttackPhase.direction_search and previous_phase != distance["phase"]:
                 attack = "OPT"
@@ -138,7 +139,8 @@ def generate_ideal_line_simulated_distances(
                 # or to measure the boundary distance along the direction
                 simulated_distances.append(
                     make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
-            elif distance["phase"] == HSJAttackPhase.initialization and not distance["safe"]:
+            elif distance["phase"] in {HSJAttackPhase.initialization_search, HSJAttackPhase.initialization
+                                       } and not distance["safe"]:
                 attack = "HSJ"
                 simulated_distances.append(
                     make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
@@ -150,7 +152,7 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(OPTAttackPhase.gradient_estimation, distance["distance"],
                                              distance["best_distance"])
                 ] * 10
-            elif (attack == "HSJ" and distance["phase"] == HSJAttackPhase.gradient_estimation_search_start):
+            elif distance["phase"] == HSJAttackPhase.gradient_estimation_search_start:
                 simulated_distances.append(
                     make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
             elif distance["phase"] == OPTAttackPhase.step_size_search_start:
@@ -159,13 +161,24 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(OPTAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
             elif (distance["phase"] == HSJAttackPhase.step_size_search
-                  and previous_phase != HSJAttackPhase.step_size_search):
+                  and previous_phase != HSJAttackPhase.step_size_search and not distance["safe"]):
                 # One unsafe query is done for the step size search
                 simulated_distances.append(
                     make_dummy_distance_info(HSJAttackPhase.step_size_search, distance["distance"],
                                              distance["best_distance"]))
             elif (distance["phase"] == HSJAttackPhase.boundary_projection
+                  and previous_phase == HSJAttackPhase.step_size_search):
+                simulated_distances.append(
+                    make_dummy_distance_info(HSJAttackPhase.boundary_projection, distance["distance"],
+                                             distance["best_distance"]))
+                # print(simulated_distances)
+                print(
+                    f"Iteration {iteration} bad queries: {len(simulated_distances)}, distance: {distance['best_distance']}"
+                )
+                iteration += 1
+            elif (distance["phase"] == HSJAttackPhase.boundary_projection
                   and previous_phase != HSJAttackPhase.boundary_projection):
+                # print("Boundary projection")
                 # One unsafe query is done for the step size search
                 simulated_distances.append(
                     make_dummy_distance_info(HSJAttackPhase.boundary_projection, distance["distance"],
@@ -284,8 +297,7 @@ def convert_distances_to_array(distances: Iterator[list[CurrentDistanceInfo]], u
                                     queries_to_plot)
 
     print("Converting distances to array")
-    limited_queries_to_plot = np.fromiter(tqdm.tqdm((pad_to_len(l_, plot_up_to) for l_ in best_distance_up_to_query),
-                                                    total=MAX_SAMPLES),
+    limited_queries_to_plot = np.fromiter((pad_to_len(l_, plot_up_to) for l_ in best_distance_up_to_query),
                                           dtype=np.dtype((float, plot_up_to)))
     return limited_queries_to_plot
 

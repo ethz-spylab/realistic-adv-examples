@@ -36,7 +36,6 @@ class GradientEstimationMode(Enum):
 class HSJA(PerturbationAttack):
     OPT_GRAD_EVALS = 10
     GRAD_BOUNDARY_DISTANCE = 1e-3
-    N_SEARCHES = 2
     GRAD_EST_SEARCH_LOWER_BOUND = 1 - (OVERSHOOT_VALUE - 1)
     GRAD_EST_SEARCH_UPPER_BOUND = OVERSHOOT_VALUE
 
@@ -322,12 +321,11 @@ class HSJA(PerturbationAttack):
         new_thetas, _ = normalize(new_thetas, batch=True)
 
         distances = torch.zeros(num_evals, device=x.device, dtype=x.dtype)
-
         for j in range(num_evals):
             queries_counter = queries_counter.increase(
                 HSJAttackPhase.gradient_estimation_search_start,
                 torch.tensor([True]),
-                torch.tensor([torch.nan]),
+                torch.tensor([123123]),
             )
             if self.search == SearchMode.binary:
                 g1, queries_counter = self.opt_binary_search(model, x, params['original_label'],
@@ -418,7 +416,7 @@ class HSJA(PerturbationAttack):
                         theta: torch.Tensor, queries_counter: QueriesCounter, initial_lbd: float,
                         phase: HSJAttackPhase) -> tuple[float, QueriesCounter]:
         distance, queries_counter = opt_line_search(self, model, x, y, target, theta, queries_counter, initial_lbd,
-                                                    phase, HSJAttackPhase.direction_probing, None, self.N_SEARCHES,
+                                                    phase, HSJAttackPhase.direction_probing, None, self.n_searches,
                                                     self.max_opt_search_steps, self.grad_batch_size,
                                                     self.GRAD_EST_SEARCH_LOWER_BOUND, self.GRAD_EST_SEARCH_UPPER_BOUND)
         return distance, queries_counter
