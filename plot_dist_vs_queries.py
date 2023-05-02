@@ -137,16 +137,17 @@ def generate_ideal_line_simulated_distances(
         theta = 10_000 / (math.sqrt(d) * d)
         attack = ""
         for distance in distance_list:
-            if distance["phase"] in {OPTAttackPhase.direction_search, HSJAttackPhase.initialization
-                                     } and previous_phase != distance["phase"]:
-                if distance["phase"] == OPTAttackPhase.direction_search:
-                    attack = "OPT"
-                elif distance["phase"] == HSJAttackPhase.initialization:
-                    attack = "HSJ"
+            if distance["phase"] == OPTAttackPhase.direction_search and previous_phase != distance["phase"]:
+                attack = "OPT"
                 # One unsafe query is done for the initial research, whether it is for the direction test
                 # or to measure the boundary distance along the direction
                 simulated_distances.append(
                     make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
+            elif distance["phase"] == HSJAttackPhase.initialization and not distance["safe"]:
+                attack = "HSJ"
+                simulated_distances.append(
+                    make_dummy_distance_info(distance["phase"], distance["distance"], distance["best_distance"]))
+            # TODO: add HSJAttackPhase.initialization_search
             elif (attack == "OPT" and distance["phase"] == OPTAttackPhase.gradient_estimation
                   and previous_phase != OPTAttackPhase.gradient_estimation):
                 # 10 unsafe queries are done for the overall gradient estimation

@@ -22,6 +22,7 @@ class HSJAttackPhase(AttackPhase):
     binary_search = "binary_search"  # deprecated, left for compatibiilitty
     step_size_search = "step_size_search"
     initialization = "initialization"
+    initialization_search = "initialization_search"
     direction_probing = "direction_probing"
 
 
@@ -642,7 +643,7 @@ class HSJA(PerturbationAttack):
                 mid = (high + low) / 2.0
                 blended = (1 - mid) * sample + mid * random_noise
                 success, queries_counter = self.decision_function(model, blended[None], params, queries_counter,
-                                                                  HSJAttackPhase.initialization, sample)
+                                                                  HSJAttackPhase.initialization_search, sample)
                 if success:
                     high = mid
                 else:
