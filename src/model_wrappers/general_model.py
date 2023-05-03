@@ -47,5 +47,5 @@ class ModelWrapper(nn.Module, metaclass=abc.ABCMeta):
             probs = torch.sigmoid(logits)
         else:
             probs = logits
-        predict = torch.round(probs).to(torch.long)
+        predict = torch.round(probs).to(torch.long).flatten()
         return predict
