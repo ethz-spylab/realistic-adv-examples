@@ -36,6 +36,10 @@ class BaseAttack(abc.ABC):
                                  target: torch.Tensor | None, queries_counter: QueriesCounter,
                                  attack_phase: AttackPhase,
                                  original_x: torch.Tensor) -> tuple[torch.Tensor, QueriesCounter]:
+        if len(x_adv.size()) != 4:
+            x_adv = x_adv.unsqueeze(0)
+        if len(original_x.size()) != 4:
+            original_x = original_x.unsqueeze(0)
         if target is not None:
             success = model.predict_label(x_adv) == target
         else:
@@ -91,7 +95,7 @@ class BaseAttack(abc.ABC):
             safe_success = torch.tensor([], device=success.device, dtype=success.dtype)
 
         # Add the unsafe query
-        unsafe_distance = self.distance(original_x, x_adv[first_unsafe_query_idx]).unsqueeze(0)
+        unsafe_distance = self.distance(original_x, x_adv[first_unsafe_query_idx][None]).unsqueeze(0)
         updated_queries_counter_with_unsafe = updated_queries_counter.increase(
             attack_phase,
             safe=success[first_unsafe_query_idx].unsqueeze(0),

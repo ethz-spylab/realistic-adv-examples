@@ -1,6 +1,5 @@
 import argparse
 from io import TextIOWrapper
-import math
 from pathlib import Path
 from typing import Any, Iterator
 import warnings
@@ -105,10 +104,19 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
 
 
 def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
-                                 unsafe_only: bool) -> Iterator[list[CurrentDistanceInfo]]:
+                                 unsafe_only: bool,
+                                 verbose: bool = False) -> Iterator[list[CurrentDistanceInfo]]:
     for distances_list in items:
         simulated_distances = []
+        tot_unsafe_queries = 0
+        iteration = 1
+        previous_phase = None
         for distance in distances_list:
+            if (distance["phase"] == HSJAttackPhase.boundary_projection
+                    and previous_phase == HSJAttackPhase.step_size_search and verbose):
+                print(f"Iteration {iteration} bad queries: {tot_unsafe_queries}, distance: {distance['best_distance']}")
+                iteration += 1
+            previous_phase = distance["phase"]
             if distance["phase"] == HSJAttackPhase.gradient_estimation_search_start or unsafe_only and distance["safe"]:
                 continue
             simulated_distance = CurrentDistanceInfo(**(distance | {"equivalent_simulated_queries": 1}))  # type: ignore
@@ -117,6 +125,9 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
                 break
             elif len(simulated_distances) >= MAX_QUERIES:
                 break
+            if not distance["safe"]:
+                tot_unsafe_queries += distance["equivalent_simulated_queries"]
+
         yield simulated_distances
 
 
@@ -125,8 +136,8 @@ def make_dummy_distance_info(phase: OPTAttackPhase | HSJAttackPhase, distance: f
     return CurrentDistanceInfo(phase, False, distance, best_distance)
 
 
-def generate_ideal_line_simulated_distances(
-        items: Iterator[list[dict[str, Any]]]) -> Iterator[list[CurrentDistanceInfo]]:
+def generate_ideal_line_simulated_distances(items: Iterator[list[dict[str, Any]]],
+                                            verbose: bool = False) -> Iterator[list[CurrentDistanceInfo]]:
     for distance_list in items:
         simulated_distances = []
         previous_phase = None
@@ -172,9 +183,10 @@ def generate_ideal_line_simulated_distances(
                     make_dummy_distance_info(HSJAttackPhase.boundary_projection, distance["distance"],
                                              distance["best_distance"]))
                 # print(simulated_distances)
-                print(
-                    f"Iteration {iteration} bad queries: {len(simulated_distances)}, distance: {distance['best_distance']}"
-                )
+                if verbose:
+                    print(
+                        f"Iteration {iteration} bad queries: {len(simulated_distances)}, distance: {distance['best_distance']}"
+                    )
                 iteration += 1
             elif (distance["phase"] == HSJAttackPhase.boundary_projection
                   and previous_phase != HSJAttackPhase.boundary_projection):
