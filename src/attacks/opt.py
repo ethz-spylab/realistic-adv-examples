@@ -54,9 +54,11 @@ class OPT(DirectionAttack):
     def __init__(self, epsilon: float | None, distance: LpDistance, bounds: Bounds, discrete: bool,
                  queries_limit: int | None, unsafe_queries_limit: int | None, max_iter: int | None, alpha: float,
                  beta: float, search: SearchMode, num_grad_queries: int, grad_estimation_search: SearchMode,
-                 step_size_search: SearchMode, n_searches: int, max_search_steps: int, batch_size: int | None):
+                 step_size_search: SearchMode, n_searches: int, max_search_steps: int, batch_size: int | None,
+                 num_init_directions: int, get_one_init_direction: bool):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
-        self.num_directions = 100 if distance == l2 else 500
+        self.num_directions = num_init_directions
+        self.get_one_init_direction = get_one_init_direction
         self.iterations = max_iter
         self.alpha = alpha  # 0.2
         self.beta = beta  # 0.001
@@ -132,6 +134,8 @@ class OPT(DirectionAttack):
                 if lbd < g_theta:
                     best_theta, g_theta = theta, lbd
                     self.log(f"---> Found distortion {g_theta:.4f}")
+                if self.get_one_init_direction:
+                    break
 
         if g_theta == float("inf"):
             # TODO: is this just trying the exact same again?

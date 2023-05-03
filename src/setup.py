@@ -83,7 +83,9 @@ def setup_attack(args: Namespace) -> BaseAttack:
         "n_searches": args.opt_n_searches,
         "max_search_steps": args.opt_max_search_steps,
         "batch_size": args.opt_bs,
-        "num_grad_queries": args.opt_num_grad_queries
+        "num_grad_queries": args.opt_num_grad_queries,
+        "num_init_directions": args.opt_num_init_directions,
+        "get_one_init_direction": args.opt_get_one_init_direction == '1',
     }
     if args.attack == "rays":
         if args.rays_flip_squares == '1' and args.rays_flip_rand_pixels == '1':
@@ -112,8 +114,11 @@ def setup_attack(args: Namespace) -> BaseAttack:
     if args.attack == "opt":
         return OPT(**base_attack_kwargs, **opt_kwargs)
     if args.attack == "sign_opt":
-        attack_kwargs = {"num_grad_queries": args.sign_opt_num_grad_queries, "momentum": args.sign_opt_momentum}
-        return SignOPT(**base_attack_kwargs, **opt_kwargs, **attack_kwargs)
+        attack_kwargs = opt_kwargs | {
+            "num_grad_queries": args.sign_opt_num_grad_queries,
+            "momentum": args.sign_opt_momentum
+        }
+        return SignOPT(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "boundary":
         return BoundaryAttack(**base_attack_kwargs)
     else:

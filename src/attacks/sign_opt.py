@@ -35,11 +35,12 @@ class SignOPT(OPT):
         max_search_steps: int,
         momentum: float = 0.,
         batch_size: int | None = None,
+        num_init_directions: int = 100,
+        get_one_init_direction: bool = False,
     ):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit, max_iter, alpha,
                          beta, search, num_grad_queries, grad_estimation_search, step_size_search, n_searches,
-                         max_search_steps, batch_size)
-        self.num_directions = 100
+                         max_search_steps, batch_size, num_init_directions, get_one_init_direction)
         self.momentum = momentum  # (default: 0)
         if batch_size is not None:
             self.grad_batch_size = min(batch_size, self.num_grad_queries)
@@ -86,6 +87,8 @@ class SignOPT(OPT):
                     best_theta, g_theta = theta, lbd
                     if self.verbose:
                         print("--------> Found distortion %.4f" % g_theta)
+                if self.get_one_init_direction:
+                        break
 
         if g_theta == float("inf"):
             print("Failed to find a good initial direction.")

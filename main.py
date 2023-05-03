@@ -186,7 +186,12 @@ if __name__ == "__main__":
                         type=int,
                         help='Max number of line search steps for OPT and Sign OPT')
     parser.add_argument('--opt-bs', default=100, type=int, help='Batch size for for OPT and Sign OPT')
-    parser.add_argument('--opt-num-grad-queries', default=10, type=int, help='Number of gradient queries for Sign OPT')
+    parser.add_argument('--opt-num-grad-queries', default=10, type=int, help='Number of gradient queries for OPT')
+    parser.add_argument('--opt-num-init-directions', default=100, type=int, help='Number of init directions OPT')
+    parser.add_argument('--opt-get-one-init-direction',
+                        default='0',
+                        type=str,
+                        help='Whether OPT should stop when it finds one good initial direction')
     parser.add_argument('--sign-opt-num-grad-queries',
                         default=200,
                         type=int,
