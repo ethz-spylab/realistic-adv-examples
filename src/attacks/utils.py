@@ -58,13 +58,10 @@ def opt_binary_search(attack: DirectionAttack | PerturbationAttack,
 
     if not success:
         lbd_lo = lbd
-        lbd_hi = lbd * 1.01
+        lbd_hi = lbd * 1.02
         while not (iter_result := is_correct_boundary_side_local(lbd_hi, queries_counter))[0].item():
             _, queries_counter = iter_result
-            lbd_hi *= 1.01
-            if lbd_hi > 20:
-                # Here we return 2 * lbd_hi because inf breaks the attack
-                return lbd_hi * 2, queries_counter, (lbd_hi / lbd) * 2
+            return lbd * 1.02, queries_counter, 1.02
     else:
         lbd_hi = lbd
         lbd_lo = lbd * 0.99
@@ -166,7 +163,7 @@ def opt_line_search(attack: PerturbationAttack | DirectionAttack,
         count_last_batch_for_sim=False)
 
     if first_query_failed:
-        lbd_to_return = lbd * 2
+        lbd_to_return = lbd * 1.02
         if upper_b is not None:
             print("Warning: line search overshoot was not enough")
         return lbd_to_return, first_search_queries_counter

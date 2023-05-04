@@ -161,7 +161,7 @@ if __name__ == "__main__":
                         help='Number of searches for OPT and Sign OPT',
                         choices=[1, 2])
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
-    parser.add_argument('--opt-beta', default=0.001, type=float, help='beta parameter for OPT and Sign OPT')
+    parser.add_argument('--opt-beta', default=0.01, type=float, help='beta parameter for OPT and Sign OPT')
     parser.add_argument(
         '--opt-grad-est-search',
         default=None,
