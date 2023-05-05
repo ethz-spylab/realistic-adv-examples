@@ -44,7 +44,7 @@ def setup_model_and_data(args: Namespace, device: torch.device) -> tuple[ModelWr
                                   im_mean=(0.48145466, 0.4578275, 0.40821073),
                                   im_std=(0.26862954, 0.26130258, 0.27577711),
                                   take_sigmoid=False)
-        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch)
+        test_loader = dataset.load_imagenet_nsfw_test_data(args.batch, args.data_dir)
     else:
         raise ValueError("Invalid model")
 

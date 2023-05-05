@@ -1,15 +1,16 @@
 import random
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any, Tuple
 
 import numpy as np
 import torch
 import torchvision.datasets as dsets
 import torchvision.transforms as transforms
-from datasets.load import load_dataset
 from torch.utils import data
 from torchvision.datasets import ImageNet
 from transformers import CLIPProcessor
+
+from src.imagenet_nsfw import ImageNetNSFW
 
 
 def load_mnist_test_data(test_batch_size=1) -> data.DataLoader:
@@ -76,23 +77,18 @@ def load_binary_imagenet_test_data(test_batch_size=1, data_dir=Path("/data/image
     return val_loader
 
 
-def load_imagenet_nsfw_test_data(test_batch_size=1, indices_path: Optional[Path] = None) -> data.DataLoader:
+def load_imagenet_nsfw_test_data(test_batch_size=1,
+                                 data_dir=Path("/data/imagenet")) -> data.DataLoader:
     processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
     im_mean = torch.tensor(processor.feature_extractor.image_mean).view(1, 3, 1, 1)  # type: ignore
     im_std = torch.tensor(processor.feature_extractor.image_std).view(1, 3, 1, 1)  # type: ignore
 
-    def transform(batch):
-        preprocessed_images = processor(images=batch["image"], return_tensors="pt", padding=True)["pixel_values"]
+    def transform(x):
+        preprocessed_images = processor(images=x, return_tensors="pt", padding=True)["pixel_values"][0]  # type: ignore
         unnormalized_images = torch.round((preprocessed_images * im_std + im_mean) * 255) / 255
-        batch["image"] = unnormalized_images
-        return batch
+        return unnormalized_images
 
-    val_dataset = load_dataset("ethz-privsec/imagenet-nsfw", split="train")
-    val_dataset = val_dataset.with_transform(transform)  # type: ignore
-    if indices_path is not None:
-        print(f"Filtering datasets keeping indices in {indices_path}")
-        indices = np.load(indices_path)
-        val_dataset = val_dataset.select(indices)  # type: ignore
+    val_dataset = ImageNetNSFW(str(data_dir), top_k=1000, split="val", transform=transform)
 
     rand_seed = 42
     torch.manual_seed(rand_seed)
