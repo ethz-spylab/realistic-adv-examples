@@ -50,7 +50,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=Path("/data/imagenet"))
     parser.add_argument("--split", type=str, required=True)
-    parser.add_argument("--batch-size", type=int, default=4096)
+    parser.add_argument("--batch-size", type=int, default=2048)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--device", type=str, default="cuda")
     args = parser.parse_args()

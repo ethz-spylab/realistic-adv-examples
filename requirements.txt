@@ -6,3 +6,4 @@ torchvision~=0.14.1
 transformers~=4.24.0
 matplotlib~=3.6.2
 datasets~=2.7.0
+requests~=2.28.2

@@ -10,7 +10,7 @@ def compute_distance(x_ori: torch.Tensor, x_pert: torch.Tensor, distance: LpDist
     return distance(x_ori, x_pert)
 
 
-def sha256sum(filename: Path):
+def sha256sum(filename: Path) -> str:
     h = hashlib.sha256()
     b = bytearray(128 * 1024)
     mv = memoryview(b)
