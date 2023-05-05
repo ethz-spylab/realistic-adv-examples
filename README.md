@@ -34,11 +34,11 @@ The model is automatically downloaded by `torchvision`, and the dataset should b
 
 #### Binary ImageNet
 
-The model can be downloaded from [here](), and should be placed in a "checkpoints" folder placed in the working directory from which the `main.py` script is launched. The dataset is generated on the fly from `torchvision`'s ImageNet.
+The model can be downloaded from [here](https://github.com/ethz-privsec/realistic-adv-examples/releases/download/v0.1/binary_imagenet.ckpt), and should be placed in a "checkpoints" folder placed in the working directory from which the `main.py` script is launched. The dataset is generated on the fly from `torchvision`'s ImageNet.
 
 #### ImageNet NSFW
 
-The model can be downloaded from [here](), and should be placed in a "checkpoints" folder placed in the working directory from which the `main.py` script is launched. The dataset is generated from `torchvision`'s ImageNet. The dataset is also automatically initialized and downloads the files needed to build the dataset. The files are downloaded to the `nsfw_imagenet` directory, which is created in the parent folder of where the `ImageNet` dataset is placed.
+The model can be downloaded from [here](https://github.com/ethz-privsec/realistic-adv-examples/releases/download/v0.1/clip_autokeras_nsfw_torch.pth), and should be placed in a "checkpoints" folder placed in the working directory from which the `main.py` script is launched. The dataset is generated from `torchvision`'s ImageNet. The dataset is also automatically initialized and downloads the files needed to build the dataset. The files are downloaded to the `nsfw_imagenet` directory, which is created in the parent folder of where the `ImageNet` dataset is placed.
 
 > **Note**
 > The downloaded files **do not contain** any NSFW content. They are just ther outputs of the CLIP NSFW classifier as a NumPy array and filenames of the corresponding images. The content classified as NSFW is already contained in ImageNet itself.
