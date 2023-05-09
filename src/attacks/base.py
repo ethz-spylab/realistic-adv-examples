@@ -101,7 +101,7 @@ class BaseAttack(abc.ABC):
             safe=success[first_unsafe_query_idx].unsqueeze(0),
             distance=unsafe_distance,
             equivalent_simulated_queries=equivalent_unsafe_simulated_queries)
-        relevant_success = torch.cat([safe_success, success[first_unsafe_query_idx].unsqueeze(0)])
+        relevant_success = torch.cat((safe_success, success[first_unsafe_query_idx].unsqueeze(0)))
 
         return relevant_success, updated_queries_counter_with_unsafe
 

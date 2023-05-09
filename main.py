@@ -61,7 +61,8 @@ def main(args):
             target = np.random.randint(model.n_class) * torch.ones(len(xi), dtype=torch.long).to(device)
 
         model.num_queries = 0
-        adv, queries_counter, dist, succ, extra_results = attack(model, xi, yi, target)
+        with torch.no_grad():
+            adv, queries_counter, dist, succ, extra_results = attack(model, xi, yi, target)
 
         if args.save_img_every is not None and count % args.save_img_every == 0:
             np.save(exp_out_dir / f"{i}_adv.npy", adv[0].cpu().numpy())

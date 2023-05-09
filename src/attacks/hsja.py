@@ -551,8 +551,7 @@ class HSJA(PerturbationAttack):
             second_search_queries_counter = first_search_queries_counter
             final_distance = first_search_distance
 
-        out_images = self.project(original_image, perturbed_images, final_distance.unsqueeze(0) + step_size / 2, params)
-        out_images = self.clip_image(out_images, params['clip_min'], params['clip_max'])
+        out_images = self.project(original_image, perturbed_images, final_distance.unsqueeze(0), params)
 
         # Compute distance of the output image to select the best choice.
         # (only used when stepsize_search is grid_search.)
@@ -611,6 +610,17 @@ class HSJA(PerturbationAttack):
             distance = previous_last_distance
         else:
             distance = distances[unsafe_query_idx - 1]
+        
+        perturbed = self.project(x, perturbed_images, distance.unsqueeze(0), params)
+        success, _ = self.decision_function(model, perturbed, params, queries_counter, phase, x)
+        i = 0
+        while not success.all():
+            distance += step_size
+            out_images = self.project(x, perturbed_images, distance.unsqueeze(0), params)
+            success, _ = self.decision_function(model, out_images, params, queries_counter, phase, x)
+            i += 1
+        if i > 0:
+            print(f"Precision issues with second search, increasing distance by step size {i} times")
 
         return distance, queries_counter
 
