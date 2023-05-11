@@ -739,17 +739,19 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
     fig.show()
 
 
-def get_median_distances_at_queries(exp_path: Path, queries: list[int], simulate: bool) -> None:
+def get_median_distances_at_queries(exp_path: Path, queries: list[int], name: str, simulate: bool) -> None:
     if simulate:
         distances = get_simulated_array(exp_path, unsafe_only=True)
     else:
         distances = load_distances_from_array(exp_path, False, False)
     tradeoff_array = get_good_to_bad_queries_array(exp_path, simulate)
 
+    final_string = f"| {name} |"
+    
     for query in queries:
         median_distance = np.median(distances[:, query])
         total_queries = np.median(tradeoff_array[:, query - 1])
-        print(f"{query = }, {median_distance = }, {total_queries = }")
+        final_string += f"{total_queries:.0f} / {median_distance:.2f} | "
 
 
 if __name__ == "__main__":
@@ -790,7 +792,7 @@ if __name__ == "__main__":
                                args.to_simulate_ideal, args.draw_legend, args.max_queries, args.query_cost,
                                args.bad_query_cost, args.checksum_check)
     elif args.plot_type == "distances_at_queries":
-        get_median_distances_at_queries(args.exp_paths[0], args.queries, args.to_simulate is not None)
+        get_median_distances_at_queries(args.exp_paths[0], args.queries, args.names[0], args.to_simulate is not None)
     else:
         raise ValueError(f"Unknown plot type {args.plot_type}")
 
