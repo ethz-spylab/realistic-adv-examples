@@ -760,7 +760,7 @@ if __name__ == "__main__":
                         default="distance")
     parser.add_argument("--exp-paths", type=Path, nargs="+", required=True)
     parser.add_argument("--names", type=str, nargs="+", required=False, default=None)
-    parser.add_argument("--out-path", type=Path, required=True)
+    parser.add_argument("--out-path", type=Path, required=False, default=None)
     parser.add_argument("--unsafe-only", action="store_true", default=False)
     parser.add_argument("--max-queries", type=int, default=None)
     parser.add_argument("--max-samples", type=int, default=500)
@@ -774,13 +774,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.plot_type == "distance":
+        assert args.out_path is not None
         plot_median_distances_per_query(args.exp_paths, args.names, args.max_queries, args.max_samples,
                                         args.unsafe_only, args.out_path, args.checksum_check, args.to_simulate,
                                         args.to_simulate_ideal, args.draw_legend)
     elif args.plot_type == "tradeoff":
+        assert args.out_path is not None
         plot_bad_vs_good_queries(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
                                  args.draw_legend, args.max_queries)
     elif args.plot_type == "cost":
+        assert args.out_path is not None
         assert args.query_cost is not None
         assert args.bad_query_cost is not None
         plot_distance_per_cost(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
