@@ -610,7 +610,7 @@ class HSJA(PerturbationAttack):
             distance = previous_last_distance
         else:
             distance = distances[unsafe_query_idx - 1]
-        
+
         perturbed = self.project(x, perturbed_images, distance.unsqueeze(0), params)
         success, _ = self.decision_function(model, perturbed, params, queries_counter, phase, x)
         i = 0

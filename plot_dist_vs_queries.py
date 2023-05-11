@@ -184,9 +184,8 @@ def generate_ideal_line_simulated_distances(items: Iterator[list[dict[str, Any]]
                                              distance["best_distance"]))
                 # print(simulated_distances)
                 if verbose:
-                    print(
-                        f"Iteration {iteration} bad queries: {len(simulated_distances)}, distance: {distance['best_distance']}"
-                    )
+                    print(f"Iteration {iteration} bad queries: {len(simulated_distances)}"
+                          f", distance: {distance['best_distance']}")
                 iteration += 1
             elif (distance["phase"] == HSJAttackPhase.boundary_projection
                   and previous_phase != HSJAttackPhase.boundary_projection):

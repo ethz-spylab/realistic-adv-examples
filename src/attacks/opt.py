@@ -2,7 +2,7 @@ import itertools
 from typing import Callable
 
 import torch
-from foolbox.distances import LpDistance, l2
+from foolbox.distances import LpDistance
 
 from src.attacks.base import Bounds, DirectionAttack, ExtraResultsDict, SearchMode
 from src.attacks.queries_counter import AttackPhase, QueriesCounter

@@ -58,6 +58,7 @@ class WrongCurrentDistanceInfo:
 
 AttackPhaseT = TypeVar("AttackPhaseT", bound=AttackPhase)
 
+
 @dataclasses.dataclass
 class QueriesCounter(Generic[AttackPhaseT]):
     queries_limit: int | None

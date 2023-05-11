@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,8 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import ImageNet
 from transformers import CLIPProcessor
 
-from arch.clip_laion_nsfw import CLIPNSFWDetector
+sys.path.append(str(Path(__file__).parent.parent))
+from src.arch.clip_laion_nsfw import CLIPNSFWDetector
 
 
 def get_filename(path: str, data_dir: str, split: str) -> str:
@@ -27,14 +29,15 @@ def compute_outputs(model: nn.Module, dataloader: DataLoader, device: torch.devi
 
 def main(args):
     processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-    
+
     def transform(batch):
-        preprocessed_images = processor(images=batch, return_tensors="pt", padding=True)["pixel_values"][0]  # type: ignore
+        preprocessed_images = processor(images=batch, return_tensors="pt",
+                                        padding=True)["pixel_values"][0]  # type: ignore
         return preprocessed_images
-    
+
     ds = ImageNet(root=args.data_dir, split=args.split, transform=transform)
     dl = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=32)
-    
+
     device = torch.device(args.device)
     model = CLIPNSFWDetector().to(device)
     outputs = compute_outputs(model, dl, device).detach().cpu().numpy()
@@ -43,7 +46,7 @@ def main(args):
     imgs = list(map(lambda x: (get_filename(x[0], args.data_dir, args.split), x[1]), ds.imgs))
     imgs = np.array(imgs)[sorted_indices].tolist()
     np.savez(args.output, outputs=sorted_outputs, imgs=imgs)
-    
+
 
 if __name__ == "__main__":
     import argparse

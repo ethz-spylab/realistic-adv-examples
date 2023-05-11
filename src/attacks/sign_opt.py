@@ -88,7 +88,7 @@ class SignOPT(OPT):
                     if self.verbose:
                         print("--------> Found distortion %.4f" % g_theta)
                 if self.get_one_init_direction:
-                        break
+                    break
 
         if g_theta == float("inf"):
             print("Failed to find a good initial direction.")
