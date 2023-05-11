@@ -1,6 +1,6 @@
-# Evading Black-box Defenses Without Breaking Eggs
+# Evading Black-box Classifier Without Breaking Eggs
 
-Code to reproduce results of the submission *"Evading Black-box Defenses Without Breaking Eggs"*.
+Code to reproduce results of the submission *"Evading Black-box Classifier Without Breaking Eggs"*.
 
 ## Environment
 
