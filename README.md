@@ -4,24 +4,24 @@ Code to reproduce results of the submission *"Evading Black-box Classifiers With
 
 ## Leaderboard
 
-Leaderboards which show, for each attack, the distances achieved after 100, 200, 500, and 1000 bad queries, and how many total queries have been issued at that amount of bad queries. We sort the attacks by publication date and bold the best result for each column. The leaderboard refers to untargeted attacks against an ImageNet ResNet-50. The results are presented in the form `distance`/`total_queries`. The $\ell_2$ norm is for images in the $[0, 1]$ range, and the $\ell_\infty$ one is for images in the $[0, 255]$ one.
+Leaderboards which show, for each attack, the distances achieved after 100, 200, 500, and 1000 bad queries, and how many total queries have been issued at that amount of bad queries. We sort the attacks by publication date and bold the best result for each column. The leaderboard refers to untargeted attacks against an ImageNet ResNet-50. The results are presented in the form `distance` <sup><sub>(`total_queries`)</sub></sup>. The $\ell_2$ norm is for images in the $[0, 1]$ range, and the $\ell_\infty$ one is for images in the $[0, 255]$ one.
 
 ### $\ell_2$
 
 |                         | 100            | 200            | 500            | 1000           |
 |:------------------------|:--------------:|:--------------:|:--------------:|:--------------:|
-| OPT (Jul 2018)          | 37.57/1.99e+02 | 35.24/3.97e+02 | 28.98/1.01e+03 | 22.20/2.01e+03 |
-| HSJA (Jun 2019)         | 40.82/2.17e+02 | 29.00/4.33e+02 | 14.88/9.85e+02 | 9.36/1.81e+03  |
-| SignOPT (Sep 2019)      | 37.78/2.00e+02 | 34.80/3.96e+02 | 18.68/1.02e+03 | 12.12/1.96e+03 |
-| Stealthy OPT (May 2023) | **35.58**/1.24e+04 | **22.50**/8.02e+05 | **12.38**/2.51e+06 | **7.72**/4.89e+06  |
+| OPT (2018) | 37.57 <sub><sup>(2.0e+02)</sup></sub> | 35.24 <sub><sup>(4.0e+02)</sup></sub> | 28.98 <sub><sup>(1.0e+03)</sup></sub> | 22.20 <sub><sup>(2.0e+03)</sup></sub> |
+| SignOPT (2019) | 37.78 <sub><sup>(2.0e+02)</sup></sub> | 34.80 <sub><sup>(4.0e+02)</sup></sub> | 18.68 <sub><sup>(1.0e+03)</sup></sub> | 12.12 <sub><sup>(2.0e+03)</sup></sub> |
+| HSJA (2019) | 40.82 <sub><sup>(2.2e+02)</sup></sub> | 29.00 <sub><sup>(4.3e+02)</sup></sub> | 14.88 <sub><sup>(9.8e+02)</sup></sub> | 9.36 <sub><sup>(1.8e+03)</sup></sub> |
+| Stealthy OPT (2023) | **35.58** <sub><sup>(1.2e+04)</sup></sub> | **22.50** <sub><sup>(8.0e+05)</sup></sub> | **12.38** <sub><sup>(2.5e+06)</sup></sub> | **7.72** <sub><sup>(4.9e+06)</sup></sub> |
 
 ### $\ell_\infty$
 
 |                            | 100            | 200            | 500            | 1000           |
 |:---------------------------|:--------------:|:--------------:|:--------------:|:--------------:|
-| HSJA (Apr 2019)            | 34.22/2.01e+02 | 30.78/4.02e+02 | 19.66/9.99e+02 | 12.43/2.00e+03 |
-| RayS (Jun 2020)            | 13.62/1.50e+02 | 8.73/2.76e+02  | 6.02/6.33e+02  | **5.16**/1.21e+03  |
-| Stealthy RayS (May 2023)   | **8.16**/1.13e+03  | **6.63**/1.26e+03  | **5.99**/1.68e+03  | 5.87/2.41e+03  |
+| HSJA (2019) | 34.22 <sub><sup>(2.0e+02)</sup></sub> | 30.78 <sub><sup>(4.0e+02)</sup></sub> | 19.66 <sub><sup>(1.0e+03)</sup></sub> | 12.43 <sub><sup>(2.0e+03)</sup></sub> |
+| RayS (2020) | 13.62 <sub><sup>(1.5e+02)</sup></sub> | 8.73 <sub><sup>(2.8e+02)</sup></sub> | 6.02 <sub><sup>(6.3e+02)</sup></sub> | **5.16** <sub><sup>(1.2e+03)</sup></sub> |
+| Stealthy RayS (2023) | **8.16** <sub><sup>(1.1e+03)</sup></sub> | **6.63** <sub><sup>(1.3e+03)</sup></sub> | **5.99** <sub><sup>(1.7e+03)</sup></sub> | 5.87 <sub><sup>(2.4e+03)</sup></sub> |
 
 ## Environment
 
