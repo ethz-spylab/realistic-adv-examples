@@ -2,6 +2,27 @@
 
 Code to reproduce results of the submission *"Evading Black-box Classifiers Without Breaking Eggs"*.
 
+## Leaderboard
+
+Leaderboards which show, for each attack, the distances achieved after 100, 200, 500, and 1000 bad queries, and how many total queries have been issued at that amount of bad queries. We sort the attacks by publication date and bold the best result for each column. The leaderboard refers to untargeted attacks against an ImageNet ResNet-50. The results are presented in the form `distance`/`total_queries`. The $\ell_2$ norm is for images in the $[0, 1]$ range, and the $\ell_\infty$ one is for images in the $[0, 255]$ one.
+
+### $\ell_2$
+
+|                         | 100            | 200            | 500            | 1000           |
+|:------------------------|:--------------:|:--------------:|:--------------:|:--------------:|
+| OPT (Jul 2018)          | 37.57/1.99e+02 | 35.24/3.97e+02 | 28.98/1.01e+03 | 22.20/2.01e+03 |
+| HSJA (Jun 2019)         | 40.82/2.17e+02 | 29.00/4.33e+02 | 14.88/9.85e+02 | 9.36/1.81e+03  |
+| SignOPT (Sep 2019)      | 37.78/2.00e+02 | 34.80/3.96e+02 | 18.68/1.02e+03 | 12.12/1.96e+03 |
+| Stealthy OPT (May 2023) | **35.58**/1.24e+04 | **22.50**/8.02e+05 | **12.38**/2.51e+06 | **7.72**/4.89e+06  |
+
+### $\ell_\infty$
+
+|                            | 100            | 200            | 500            | 1000           |
+|:---------------------------|:--------------:|:--------------:|:--------------:|:--------------:|
+| HSJA (Apr 2019)            | 34.22/2.01e+02 | 30.78/4.02e+02 | 19.66/9.99e+02 | 12.43/2.00e+03 |
+| RayS (Jun 2020)            | 13.62/1.50e+02 | 8.73/2.76e+02  | 6.02/6.33e+02  | **5.16**/1.21e+03  |
+| Stealthy RayS (May 2023)   | **8.16**/1.13e+03  | **6.63**/1.26e+03  | **5.99**/1.68e+03  | 5.87/2.41e+03  |
+
 ## Environment
 
 The code was developed using Python 3.10.6 and Conda. The environment can be reproduced by creating the Conda environment in [`environment.yml`](./environment.yml) via
