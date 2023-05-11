@@ -739,9 +739,25 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
     fig.show()
 
 
+def get_median_distances_at_queries(exp_path: Path, queries: list[int], simulate: bool) -> None:
+    if simulate:
+        distances = get_simulated_array(exp_path, unsafe_only=True)
+    else:
+        distances = load_distances_from_array(exp_path, False, False)
+    tradeoff_array = get_good_to_bad_queries_array(exp_path, simulate)
+
+    for query in queries:
+        median_distance = np.median(distances[:, query])
+        total_queries = np.median(tradeoff_array[:, query - 1])
+        print(f"{query = }, {median_distance = }, {total_queries = }")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("plot_type", type=str, choices=["distance", "tradeoff", "cost"], default="median_distances")
+    parser.add_argument("plot_type",
+                        type=str,
+                        choices=["distance", "tradeoff", "cost", "distances_at_queries"],
+                        default="distance")
     parser.add_argument("--exp-paths", type=Path, nargs="+", required=True)
     parser.add_argument("--names", type=str, nargs="+", required=False, default=None)
     parser.add_argument("--out-path", type=Path, required=True)
@@ -754,6 +770,7 @@ if __name__ == "__main__":
     parser.add_argument("--draw-legend", type=str, required=False, default="")
     parser.add_argument("--query-cost", type=float, required=False, default=None)
     parser.add_argument("--bad-query-cost", type=float, required=False, default=None)
+    parser.add_argument("--queries", type=int, nargs="+", required=False, default=[100, 200, 500, 1000])
 
     args = parser.parse_args()
     if args.plot_type == "distance":
@@ -769,6 +786,8 @@ if __name__ == "__main__":
         plot_distance_per_cost(args.exp_paths, args.names, args.out_path, args.max_samples, args.to_simulate,
                                args.to_simulate_ideal, args.draw_legend, args.max_queries, args.query_cost,
                                args.bad_query_cost, args.checksum_check)
+    elif args.plot_type == "distances_at_queries":
+        get_median_distances_at_queries(args.exp_paths[0], args.queries, args.to_simulate is not None)
     else:
         raise ValueError(f"Unknown plot type {args.plot_type}")
 
