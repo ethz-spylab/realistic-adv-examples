@@ -1,6 +1,6 @@
-# Evading Black-box Classifier Without Breaking Eggs
+# Evading Black-box Classifiers Without Breaking Eggs
 
-Code to reproduce results of the submission *"Evading Black-box Classifier Without Breaking Eggs"*.
+Code to reproduce results of the submission *"Evading Black-box Classifiers Without Breaking Eggs"*.
 
 ## Environment
 
@@ -34,11 +34,11 @@ The model is automatically downloaded by `torchvision`, and the dataset should b
 
 #### Binary ImageNet
 
-The model can be downloaded from [here](https://github.com/ethz-privsec/realistic-adv-examples/releases/download/v0.1/binary_imagenet.ckpt), and should be placed in a "checkpoints" folder placed in the working directory from which the `main.py` script is launched. The training of the model can be reproduced with [this](/scripts/train_dogs_model.py) script. The dataset is generated on the fly from `torchvision`'s ImageNet.
+The model can be downloaded from [here](https://github.com/ethz-privsec/realistic-adv-examples/releases/download/v0.1/binary_imagenet.ckpt), and should be placed in the [`checkpoints`](checkpoints) folder placed in the working directory from which the `main.py` script is launched. The training of the model can be reproduced with [this](/scripts/train_dogs_model.py) script. The dataset is generated on the fly from `torchvision`'s ImageNet.
 
 #### ImageNet NSFW
 
-The model can be downloaded from [here](https://github.com/ethz-privsec/realistic-adv-examples/releases/download/v0.1/clip_autokeras_nsfw_torch.pth), and should be placed in a "checkpoints" folder placed in the working directory from which the `main.py` script is launched. The porting of the classifier can be reproduced with [this](/scripts/port_keras_model.py) script.
+The model can be downloaded from [here](https://github.com/ethz-privsec/realistic-adv-examples/releases/download/v0.1/clip_autokeras_nsfw_torch.pth), and should be placed in the [`checkpoints`](checkpoints) folder placed in the working directory from which the `main.py` script is launched. The porting of the classifier can be reproduced with [this](/scripts/port_keras_model.py) script.
 
 > **Note**
 > The porting script requires the installation of `tensorflow` and `autokeras`, which are not included in [`environment.yml`](environment.yml) nor in [`requirements.txt`](requirements.txt) to keep the environment lean. Moreover, it requires the download and uncompression of the Keras model inside of the [`checkpoints`](checkpoints) directory. Instructions for this can be found here on the [original repository](https://github.com/LAION-AI/CLIP-based-NSFW-Detector/).
