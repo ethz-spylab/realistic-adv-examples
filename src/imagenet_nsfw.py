@@ -27,6 +27,7 @@ class ImageNetNSFW(ImageNet):
                  top_k: int | None,
                  threshold: float | None = None,
                  split: str = "train",
+                 only_positives: bool = True,
                  **kwargs: Any) -> None:
         super().__init__(root, split, **kwargs)
         self.nsfw_outputs_path = Path(root).parent / self._ROOT_FILENAME / self._BASE_FILENAME.format(split=split)
@@ -50,7 +51,17 @@ class ImageNetNSFW(ImageNet):
         else:
             assert threshold is not None, "Must specify either top_k or threshold"
             imgs_to_keep = np.array(imgs)[nsfw_outputs >= threshold].tolist()
+        imgs_to_keep = list(map(lambda x: (x[0], 1), imgs_to_keep))
+
+        if not only_positives:
+            if top_k is not None:
+                positives = imgs[top_k:]
+            else:
+                positives = np.array(imgs)[nsfw_outputs < threshold].tolist()
+            imgs_to_keep += list(map(lambda x: (x[0], 0), positives))
+        
         full_path_imgs_to_keep = list(map(lambda x: (str(Path(self.root) / split / x[0]), x[1]), imgs_to_keep))
+        
         self.samples = full_path_imgs_to_keep
         self.imgs = self.samples
 

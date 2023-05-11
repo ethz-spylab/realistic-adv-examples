@@ -80,15 +80,15 @@ def load_binary_imagenet_test_data(test_batch_size=1, data_dir=Path("/data/image
 def load_imagenet_nsfw_test_data(test_batch_size=1,
                                  data_dir=Path("/data/imagenet")) -> data.DataLoader:
     processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-    im_mean = torch.tensor(processor.feature_extractor.image_mean).view(1, 3, 1, 1)  # type: ignore
-    im_std = torch.tensor(processor.feature_extractor.image_std).view(1, 3, 1, 1)  # type: ignore
+    im_mean = torch.tensor(processor.feature_extractor.image_mean).view(3, 1, 1)  # type: ignore
+    im_std = torch.tensor(processor.feature_extractor.image_std).view(3, 1, 1)  # type: ignore
 
     def transform(x):
         preprocessed_images = processor(images=x, return_tensors="pt", padding=True)["pixel_values"][0]  # type: ignore
         unnormalized_images = torch.round((preprocessed_images * im_std + im_mean) * 255) / 255
         return unnormalized_images
 
-    val_dataset = ImageNetNSFW(str(data_dir), top_k=1000, split="val", transform=transform)
+    val_dataset = ImageNetNSFW(str(data_dir), top_k=1000, split="train", transform=transform)
 
     rand_seed = 42
     torch.manual_seed(rand_seed)
