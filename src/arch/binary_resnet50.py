@@ -30,8 +30,8 @@ class BinaryResNet50(LightningModule):
             self, train_batch: tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         x, y = train_batch
         y_hat = self.model(x)
-        loss = F.binary_cross_entropy_with_logits(y_hat.flatten(), y)
-        accuracy = (torch.round(torch.sigmoid(y_hat)) == y).to(y.dtype).mean()
+        loss = F.binary_cross_entropy_with_logits(y_hat.flatten(), y.to(y_hat.dtype))
+        accuracy = (torch.round(torch.sigmoid(y_hat)) == y).to(y_hat.dtype).mean()
         self.log('train_loss', loss, sync_dist=True)
         self.log('train_acc', accuracy, sync_dist=True, prog_bar=True, on_step=False, on_epoch=True)
         return loss
@@ -39,7 +39,7 @@ class BinaryResNet50(LightningModule):
     def validation_step(self, val_batch, batch_idx):  # type: ignore
         x, y = val_batch
         y_hat = self(x).flatten()
-        loss = F.binary_cross_entropy_with_logits(y_hat, y.to(x.dtype))
+        loss = F.binary_cross_entropy_with_logits(y_hat, y.to(y_hat.dtype))
         self.val_accuracy.update(y_hat.sigmoid(), y)
         self.val_precision.update(y_hat.sigmoid(), y)
         self.val_recall.update(y_hat.sigmoid(), y)
