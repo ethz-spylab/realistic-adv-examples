@@ -11,7 +11,7 @@ Leaderboards which show, for each attack, the distances achieved after 100, 200,
 <p align="center">
 
 |                         | 100            | 200            | 500            | 1000           |
-|:------------------------|:--------------:|:--------------:|:--------------:|:--------------:|
+|:------------------------|--------------:|--------------:|--------------:|--------------:|
 | OPT (2018) | 37.57 <sub><sup>(2.0e+02)</sup></sub> | 35.24 <sub><sup>(4.0e+02)</sup></sub> | 28.98 <sub><sup>(1.0e+03)</sup></sub> | 22.20 <sub><sup>(2.0e+03)</sup></sub> |
 | SignOPT (2019) | 37.78 <sub><sup>(2.0e+02)</sup></sub> | 34.80 <sub><sup>(4.0e+02)</sup></sub> | 18.68 <sub><sup>(1.0e+03)</sup></sub> | 12.12 <sub><sup>(2.0e+03)</sup></sub> |
 | HSJA (2019) | 40.82 <sub><sup>(2.2e+02)</sup></sub> | 29.00 <sub><sup>(4.3e+02)</sup></sub> | 14.88 <sub><sup>(9.8e+02)</sup></sub> | 9.36 <sub><sup>(1.8e+03)</sup></sub> |
@@ -24,7 +24,7 @@ Leaderboards which show, for each attack, the distances achieved after 100, 200,
 <p align="center">
 
 |                            | 100            | 200            | 500            | 1000           |
-|:---------------------------|:--------------:|:--------------:|:--------------:|:--------------:|
+|:---------------------------|--------------:|--------------:|--------------:|--------------:|
 | HSJA (2019) | 34.22 <sub><sup>(2.0e+02)</sup></sub> | 30.78 <sub><sup>(4.0e+02)</sup></sub> | 19.66 <sub><sup>(1.0e+03)</sup></sub> | 12.43 <sub><sup>(2.0e+03)</sup></sub> |
 | RayS (2020) | 13.62 <sub><sup>(1.5e+02)</sup></sub> | 8.73 <sub><sup>(2.8e+02)</sup></sub> | 6.02 <sub><sup>(6.3e+02)</sup></sub> | **5.16** <sub><sup>(1.2e+03)</sup></sub> |
 | Stealthy RayS (2023) | **8.16** <sub><sup>(1.1e+03)</sup></sub> | **6.63** <sub><sup>(1.3e+03)</sup></sub> | **5.99** <sub><sup>(1.7e+03)</sup></sub> | 5.87 <sub><sup>(2.4e+03)</sup></sub> |
