@@ -403,7 +403,7 @@ COLORS_STYLES_MARKERS = {
     "Stealthy SignOPT": ("darkgoldenrod", "-", "x"),
     "Boundary": ("tab:red", "dotted", "^"),
     "HSJA": ("tab:green", "dotted", "o"),
-    "Stealthy HSJA": ("darkgreen", "-", "x"),
+    "Stealthy HSJA": ("darkgreen", "-", "o"),
     "RayS": ("darkviolet", "dotted", "s"),
     "RayS (binary)": ("tab:green", "dotted", "s"),
     "RayS (line search)": ("tab:blue", "-", "x"),
@@ -765,11 +765,15 @@ def get_median_queries_at_distance(exp_path: Path, distances: list[float], name:
     tradeoff_array = get_good_to_bad_queries_array(exp_path, simulate)
     for distance in distances:
         if "/linf/" in str(exp_path):
-            distance /= 255
+            distance_for_array = distance / 255
+            norm = "linf"
+        else:
+            distance_for_array = distance
+            norm = "l2"
         median_distances = np.median(distances_array[:max_samples], axis=0)
-        queries_for_distance = np.argmax(median_distances < distance)
+        queries_for_distance = np.argmax(median_distances < distance_for_array)
         total_queries = np.median(tradeoff_array[:max_samples, queries_for_distance - 1])
-        distance_string = f"{name},{distance},{queries_for_distance},{total_queries}"
+        distance_string = f"{name},{norm},{distance},{queries_for_distance},{int(total_queries)}"
         print(distance_string)
 
 
