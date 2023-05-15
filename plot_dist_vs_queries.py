@@ -415,6 +415,16 @@ COLORS_STYLES_MARKERS = {
     "k = 2": ("tab:blue", "-", "x"),
     "k = 2.5": ("tab:orange", "-", "o"),
     "k = 3": ("tab:red", "-", "^"),
+    "1 step": ("indigo", "-", "*"),
+    "10 steps": ("tab:green", "-", "s"),
+    "20 steps": ("tab:blue", "-", "x"),
+    "50 steps": ("tab:orange", "-", "o"),
+    "100 steps": ("tab:red", "-", "^"),
+    "5 queries": ("indigo", "-", "*"),
+    "8 queries": ("tab:green", "-", "s"),
+    "10 queries": ("tab:blue", "-", "x"),
+    "15 queries": ("tab:orange", "-", "o"),
+    "20 queries": ("tab:red", "-", "^"),
 }
 
 PLOTS_HEIGHT = 3
