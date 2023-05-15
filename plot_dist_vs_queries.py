@@ -425,6 +425,7 @@ RAYS_PLOTS_WIDTH = 3
 
 TOT_MARKERS = 5
 
+LEGEND_FONTSIZE = 'normal'
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
@@ -534,9 +535,9 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
     ax.set_ylabel("Median distance")
     if draw_legend == "tr":
-        ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
+        ax.legend(fontsize=LEGEND_FONTSIZE, bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
-        ax.legend(fontsize='small')
+        ax.legend(fontsize=LEGEND_FONTSIZE)
     if any("ideal" in name for name in names):
         print("Annotating")
         ax.annotate("Stealthy SignOPT (Sim)",
@@ -645,9 +646,9 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
     ax.set_xlabel("Number of bad queries")
     ax.set_ylabel("Total number of queries")
     if draw_legend == "tr":
-        ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
+        ax.legend(fontsize=LEGEND_FONTSIZE, bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
-        ax.legend(fontsize='small')
+        ax.legend(fontsize=LEGEND_FONTSIZE)
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
@@ -732,9 +733,9 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
     ax.set_xlabel(f"Cost ($c_0$ = {query_cost:.1e}, $c_{{bad}}$ = {bad_query_cost:.1f})")
     ax.set_ylabel("Distance")
     if draw_legend == "tr":
-        ax.legend(fontsize='small', bbox_to_anchor=(1.04, 1), loc="upper left")
+        ax.legend(fontsize=LEGEND_FONTSIZE, bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
-        ax.legend(fontsize='small')
+        ax.legend(fontsize=LEGEND_FONTSIZE)
     fig.savefig(str(out_path), bbox_inches="tight")
     fig.show()
 
