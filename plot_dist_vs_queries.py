@@ -739,7 +739,8 @@ def plot_distance_per_cost(exp_paths: list[Path], names: list[str] | None, out_p
     fig.show()
 
 
-def get_median_distances_at_queries(exp_path: Path, queries: list[int], name: str, max_samples: int, simulate: bool) -> None:
+def get_median_distances_at_queries(exp_path: Path, queries: list[int], name: str, max_samples: int,
+                                    simulate: bool) -> None:
     if simulate:
         distances = get_simulated_array(exp_path, True)
     else:
@@ -754,11 +755,29 @@ def get_median_distances_at_queries(exp_path: Path, queries: list[int], name: st
         final_string += f" {median_distance:.2f} <sub><sup>({total_queries:.1e})</sup></sub> |"
     print(final_string)
 
+
+def get_median_queries_at_distance(exp_path: Path, distances: list[float], name: str, max_samples: int,
+                                   simulate: bool) -> None:
+    if simulate:
+        distances_array = get_simulated_array(exp_path, True)
+    else:
+        distances_array = load_distances_from_array(exp_path, True, False)
+    tradeoff_array = get_good_to_bad_queries_array(exp_path, simulate)
+    for distance in distances:
+        if "/linf/" in str(exp_path):
+            distance /= 255
+        median_distances = np.median(distances_array[:max_samples], axis=0)
+        queries_for_distance = np.argmax(median_distances < distance)
+        total_queries = np.median(tradeoff_array[:max_samples, queries_for_distance - 1])
+        distance_string = f"{name},{distance},{queries_for_distance},{total_queries}"
+        print(distance_string)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("plot_type",
                         type=str,
-                        choices=["distance", "tradeoff", "cost", "distances_at_queries"],
+                        choices=["distance", "tradeoff", "cost", "distances_at_queries", "queries_at_distance"],
                         default="distance")
     parser.add_argument("--exp-paths", type=Path, nargs="+", required=True)
     parser.add_argument("--names", type=str, nargs="+", required=False, default=None)
@@ -773,6 +792,7 @@ if __name__ == "__main__":
     parser.add_argument("--query-cost", type=float, required=False, default=None)
     parser.add_argument("--bad-query-cost", type=float, required=False, default=None)
     parser.add_argument("--queries", type=int, nargs="+", required=False, default=[100, 200, 500, 1000])
+    parser.add_argument("--distances", type=float, nargs="+", required=False, default=[10, 20])
 
     args = parser.parse_args()
     if args.plot_type == "distance":
@@ -792,7 +812,11 @@ if __name__ == "__main__":
                                args.to_simulate_ideal, args.draw_legend, args.max_queries, args.query_cost,
                                args.bad_query_cost, args.checksum_check)
     elif args.plot_type == "distances_at_queries":
-        get_median_distances_at_queries(args.exp_paths[0], args.queries, args.names[0], args.max_samples, args.to_simulate is not None)
+        get_median_distances_at_queries(args.exp_paths[0], args.queries, args.names[0], args.max_samples,
+                                        args.to_simulate is not None)
+    elif args.plot_type == "queries_at_distance":
+        get_median_queries_at_distance(args.exp_paths[0], args.distances, args.names[0], args.max_samples,
+                                       args.to_simulate is not None)
     else:
         raise ValueError(f"Unknown plot type {args.plot_type}")
 
