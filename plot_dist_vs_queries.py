@@ -425,7 +425,7 @@ RAYS_PLOTS_WIDTH = 3
 
 TOT_MARKERS = 5
 
-LEGEND_FONTSIZE = 'normal'
+LEGEND_FONTSIZE = 'medium'
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
