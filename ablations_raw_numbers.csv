@@ -1,0 +1,39 @@
+attack,l2,eps,unsafe_queries,total_queries
+HSJA,l2,10,953,1731
+HSJA,l2,20,339,701
+Stealthy HSJA,l2,10,629,2528756
+Stealthy HSJA,l2,20,212,869204
+Stealthy HSJA (2-stage),l2,10,1227,52009
+Stealthy HSJA (2-stage),l2,20,397,18778
+OPT,10,l2,4975,9729
+OPT,20,l2,1220,2449
+Stealhy OPT,l2,10,735,3680863
+Stealhy OPT,l2,20,260,1160345
+Stealhy OPT (2-stage),l2,10,1308,48171
+Stealhy OPT (2-stage),l2,20,410,14902
+SignOPT,l2,10,1528,2970
+SignOPT,l2,20,625,1274
+SignOPT (with optimal k),l2,10,1445,2753
+SignOPT (with optimal k),l2,20,456,932
+Stealthy SignOPT,l2,10,1214,1168997
+Stealthy SignOPT,l2,20,569,555826
+Stealthy SignOPT (with optimal k),l2,10,843,1148199
+Stealthy SignOPT (with optimal k),l2,20,344,519532
+Stealthy SignOPT (2-stage),l2,10,1235,14811
+Stealthy SignOPT (2-stage),l2,20,575,7158
+Stealthy SignOPT (2-stage with optimal k),l2,10,862,14238
+Stealthy SignOPT (2-stage with optimal k),l2,20,353,6403
+HSJA,linf,8.0,1789,3564
+HSJA,linf,16.0,685,1370
+RayS,linf,8.0,244,330
+RayS,linf,16.0,78,121
+Stealthy RayS,linf,8.0,123,1129
+Stealthy RayS,linf,16.0,33,980
+Stealthy RayS (early stopping),linf,8.0,103,1130
+Stealthy RayS (early stopping),linf,16.0,26,991
+Stealthy RayS (2-stage),linf,8.0,160,341
+Stealthy RayS (2-stage),linf,16.0,44,168
+Stealthy RayS (2-stage with early stopping),linf,8.0,138,305
+Stealthy RayS (2-stage with early stopping),linf,16.0,34,143
+
+
