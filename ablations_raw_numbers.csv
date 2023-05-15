@@ -1,12 +1,12 @@
-attack,feature,l2,eps,unsafe_queries,total_queries
+attack,feature,norm,eps,unsafe_queries,total_queries
 HSJA,,l2,10,953,1731
 HSJA,,l2,20,339,701
 HSJA,OPT grad estimation,l2,10,629,2528756
 HSJA,OPT grad estimation,l2,20,212,869204
 HSJA,OPT grad estimation and 2-stage search,l2,10,1227,52009
 HSJA,OPT grad estimation and 2-stage search,l2,20,397,18778
-OPT,,10,l2,4975,9729
-OPT,,20,l2,1220,2449
+OPT,,l2,10,4975,9729
+OPT,,l2,20,1220,2449
 OPT,line search,l2,10,735,3680863
 OPT,line search,l2,20,260,1160345
 OPT,2-stage line search,l2,10,1308,48171
