@@ -111,11 +111,19 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         tot_unsafe_queries = 0
         iteration = 1
         previous_phase = None
+        unsafe_queries_for_phase = 0
+        phases_to_check_unsafe_queries = {HSJAttackPhase.binary_search, HSJAttackPhase.gradient_estimation, HSJAttackPhase.boundary_projection}
         for distance in distances_list:
             if (distance["phase"] == HSJAttackPhase.boundary_projection
                     and previous_phase == HSJAttackPhase.step_size_search and verbose):
                 print(f"Iteration {iteration} bad queries: {tot_unsafe_queries}, distance: {distance['best_distance']}")
                 iteration += 1
+            if not distance["safe"]:
+                unsafe_queries_for_phase += distance["equivalent_simulated_queries"]
+            if distance["phase"] in phases_to_check_unsafe_queries and unsafe_queries_for_phase > 1:
+                print("Extra unsafe query found")
+            if distance["phase"] != previous_phase:
+                unsafe_queries_for_phase = 0
             previous_phase = distance["phase"]
             if distance["phase"] == HSJAttackPhase.gradient_estimation_search_start or unsafe_only and distance["safe"]:
                 continue
