@@ -112,16 +112,22 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         iteration = 1
         previous_phase = None
         unsafe_queries_for_phase = 0
-        phases_to_check_unsafe_queries = {HSJAttackPhase.binary_search, HSJAttackPhase.gradient_estimation, HSJAttackPhase.boundary_projection}
+        phases_to_check_unsafe_queries = {
+            HSJAttackPhase.binary_search, HSJAttackPhase.gradient_estimation, HSJAttackPhase.boundary_projection,
+            OPTAttackPhase.gradient_estimation, OPTAttackPhase.search, OPTAttackPhase.step_size_search
+        }
         for distance in distances_list:
             if (distance["phase"] == HSJAttackPhase.boundary_projection
                     and previous_phase == HSJAttackPhase.step_size_search and verbose):
                 print(f"Iteration {iteration} bad queries: {tot_unsafe_queries}, distance: {distance['best_distance']}")
                 iteration += 1
+            if distance["phase"] in phases_to_check_unsafe_queries and not distance[
+                    "safe"] and distance["phase"] != previous_phase:
+                distance["equivalent_simulated_queries"] = 0
             if not distance["safe"]:
                 unsafe_queries_for_phase += distance["equivalent_simulated_queries"]
             if distance["phase"] in phases_to_check_unsafe_queries and unsafe_queries_for_phase > 1:
-                print("Extra unsafe query found")
+                assert distance["phase"] != previous_phase
             if distance["phase"] != previous_phase:
                 unsafe_queries_for_phase = 0
             previous_phase = distance["phase"]
@@ -444,6 +450,7 @@ RAYS_PLOTS_WIDTH = 3
 TOT_MARKERS = 5
 
 LEGEND_FONTSIZE = 'medium'
+
 
 def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | None, max_queries: int | None,
                                     max_samples: int | None, unsafe_only: bool, out_path: Path, checksum_check: bool,
