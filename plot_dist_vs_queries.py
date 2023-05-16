@@ -1,5 +1,6 @@
 import argparse
 from io import TextIOWrapper
+import json
 from pathlib import Path
 from typing import Any, Iterator
 import warnings
@@ -104,7 +105,7 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
 
 
 def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
-                                 unsafe_only: bool,
+                                 unsafe_only: bool, opt_grad_estimations: int = 10,
                                  verbose: bool = False) -> Iterator[list[CurrentDistanceInfo]]:
     for distances_list in items:
         simulated_distances = []
@@ -115,6 +116,7 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         phases_to_check_unsafe_queries = {
             HSJAttackPhase.binary_search, HSJAttackPhase.gradient_estimation, HSJAttackPhase.boundary_projection,
         }
+        attack = None
         for distance in distances_list:
             if distance["phase"] == OPTAttackPhase.direction_search:
                 attack = "OPT"
@@ -132,7 +134,7 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
             if attack == "HSJ" and distance["phase"] in phases_to_check_unsafe_queries and unsafe_queries_for_phase > 1:
                 assert distance["phase"] != previous_phase
             if attack == "OPT" and distance["phase"] == OPTAttackPhase.gradient_estimation and not distance["safe"]:
-                if unsafe_queries_for_phase > 10:
+                if unsafe_queries_for_phase > opt_grad_estimations:
                     distance["equivalent_simulated_queries"] = 0
             if distance["phase"] != previous_phase:
                 unsafe_queries_for_phase = 0
@@ -233,9 +235,10 @@ def get_simulated_array(exp_path: Path, unsafe_only: bool, simulate_ideal_line: 
     f = (exp_path / original_distances_filename).open("r")
     OPENED_FILES.append(f)
     raw_results = wrap_ijson_iterator(ijson.items(f, "item", use_float=True))
+    opt_queries = json.load((exp_path / "args.json").open("r"))["opt_num_grad_queries"]
     if not simulate_ideal_line:
         print("Generating simulated distances")
-        simulated_distances = generate_simulated_distances(raw_results, unsafe_only)
+        simulated_distances = generate_simulated_distances(raw_results, unsafe_only, opt_queries)
     else:
         assert unsafe_only
         print("Generating simulated distances with ideal line search")
