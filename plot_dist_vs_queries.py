@@ -114,20 +114,26 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         unsafe_queries_for_phase = 0
         phases_to_check_unsafe_queries = {
             HSJAttackPhase.binary_search, HSJAttackPhase.gradient_estimation, HSJAttackPhase.boundary_projection,
-            OPTAttackPhase.gradient_estimation, OPTAttackPhase.search, OPTAttackPhase.step_size_search
         }
         for distance in distances_list:
+            if distance["phase"] == OPTAttackPhase.direction_search:
+                attack = "OPT"
+            elif distance["phase"] in {HSJAttackPhase.initialization_search, HSJAttackPhase.initialization}:
+                attack = "HSJ"
             if (distance["phase"] == HSJAttackPhase.boundary_projection
                     and previous_phase == HSJAttackPhase.step_size_search and verbose):
                 print(f"Iteration {iteration} bad queries: {tot_unsafe_queries}, distance: {distance['best_distance']}")
                 iteration += 1
-            if distance["phase"] in phases_to_check_unsafe_queries and not distance[
+            if attack == "HSJ" and distance["phase"] in phases_to_check_unsafe_queries and not distance[
                     "safe"] and distance["phase"] != previous_phase:
                 distance["equivalent_simulated_queries"] = 0
             if not distance["safe"]:
                 unsafe_queries_for_phase += distance["equivalent_simulated_queries"]
-            if distance["phase"] in phases_to_check_unsafe_queries and unsafe_queries_for_phase > 1:
+            if attack == "HSJ" and distance["phase"] in phases_to_check_unsafe_queries and unsafe_queries_for_phase > 1:
                 assert distance["phase"] != previous_phase
+            if attack == "OPT" and distance["phase"] == OPTAttackPhase.gradient_estimation and not distance["safe"]:
+                if unsafe_queries_for_phase > 10:
+                    distance["equivalent_simulated_queries"] = 0
             if distance["phase"] != previous_phase:
                 unsafe_queries_for_phase = 0
             previous_phase = distance["phase"]
