@@ -638,8 +638,8 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
             linewidth = 1.5 * BASE_LINEWIDTH
         else:
             linewidth = 1 * BASE_LINEWIDTH
-
-        markers_frequency = MAX_BAD_QUERIES_TRADEOFF_PLOT // TOT_MARKERS
+        n_to_plot = max_queries or distances.shape[1]
+        markers_frequency = n_to_plot // TOT_MARKERS
         marker_start = markers_frequency // len(names) * i
         ax.plot(np.median(distances, axis=0),
                 label=name,
