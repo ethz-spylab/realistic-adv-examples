@@ -609,3 +609,7 @@ imgs/
 launch_experiment_slurm.sh
 TODO.md
 queries_table.csv
+
+ablations_improvements.ipynb
+ablations_raw_numbers.csv
+plots.sh
