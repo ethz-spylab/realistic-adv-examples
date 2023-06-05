@@ -1,6 +1,8 @@
 # Evading Black-box Classifiers Without Breaking Eggs
 
-Code to reproduce results of the submission *"Evading Black-box Classifiers Without Breaking Eggs"*.
+*Edoardo Debenedetti (ETH Zurich), Nicholas Carlini (Google), Florian Tramèr (ETH Zurich)*
+
+Code to reproduce results of the paper *"Evading Black-box Classifiers Without Breaking Eggs"*.
 
 ## Leaderboard
 
@@ -32,7 +34,11 @@ Leaderboards which show, for each attack, the distances achieved after 100, 200,
 
 </p>
 
-## Environment
+## Abstract
+
+> Decision-based evasion attacks repeatedly query a black-box classifier to generate adversarial examples. Prior work measures the cost of such attacks by the total number of queries made to the classifier. We argue this metric is flawed. Most security-critical machine learning systems aim to weed out "bad" data (e.g., malware, harmful content, etc). Queries to such systems carry a fundamentally \emph{asymmetric cost}: queries detected as "bad" come at a higher cost because they trigger additional security filters, e.g., usage throttling or account suspension. Yet, we find that existing decision-based attacks issue a large number of ``bad'' queries, which likely renders them ineffective against security-critical systems. We then design new attacks that reduce the number of bad queries by $1.5$-$7.3\times$, but often at a significant increase in total (non-bad) queries. We thus pose it as an open problem to build black-box attacks that are more effective under realistic cost metrics.
+
+## Environment setup
 
 The code was developed using Python 3.10.6 and Conda. The environment can be reproduced by creating the Conda environment in [`environment.yml`](./environment.yml) via
 
@@ -46,7 +52,13 @@ This should install all the libraries needed to run the code. Please note that t
 pip install -r requirements.txt
 ```
 
-## Running the experiments
+## Evaluate your own attack
+
+To evaluate your own attack against our benchmarks, your attack should implement the `BaseAttack` interface, defined in [src/attacks/base.py](src/attacks/base.py). In particular, if it follows the HSJA scheme of optimizing a perturbation, we suggest to implement the `PerturbationAttack` interface, while if it follows the OPT scheme of optimizing a direction, we suggest to implement the `DirectionAttack` interface. Of course, your attack does not have to follow one of these schemes. When calling the model, you should make sure that you are using the `is_correct_boundary_side` method from `BaseAttack` to make sure that the queries counter is updated correctly. This method returns a tensor of booleans (`True` if the input is classified as *good* and `False` otherwise) and the updated queries counter (which is **not** updated in place to avoid side effects!).
+
+Once you evaluated your own attack, you can submit it to our leaderboard by opening an issue or a pull request.
+
+## Running the paper's experiments
 
 The entry point to run the attacks is the main [`main.py`](main.py) file. In particular, the file supports several arguments to run different attacks with different parameters on different datasets.
 
