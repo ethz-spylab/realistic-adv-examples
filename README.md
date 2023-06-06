@@ -2,7 +2,7 @@
 
 *Edoardo Debenedetti (ETH Zurich), Nicholas Carlini (Google), Florian Tramèr (ETH Zurich)*
 
-Code to reproduce results of the paper *"Evading Black-box Classifiers Without Breaking Eggs"*.
+Code to reproduce results of the paper [*"Evading Black-box Classifiers Without Breaking Eggs"*](https://arxiv.org/abs/2306.02895).
 
 ## Leaderboard
 
