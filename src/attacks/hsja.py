@@ -56,7 +56,11 @@ class HSJA(PerturbationAttack):
                  max_num_evals: int = int(1e4),
                  init_num_evals: int = 100,
                  max_opt_search_steps: int = 10_000,
-                 n_searches: int = 2):
+                 n_searches: int = 2,
+                 bias_coef: float = 0.0,
+                 lower_bad_query_bound: int = 10,
+                 upper_bad_query_bound: int = 20,
+                 bias_coef_change_rate: float = 1e-1):
         super().__init__(epsilon, distance, bounds, discrete, queries_limit, unsafe_queries_limit)
         self.init_num_evals = init_num_evals
         self.max_num_evals = max_num_evals
@@ -69,6 +73,10 @@ class HSJA(PerturbationAttack):
         self.max_opt_search_steps = max_opt_search_steps
         self.search = search
         self.n_searches = n_searches
+        self.bias_coef = bias_coef
+        self.lower_bad_query_bound = lower_bad_query_bound
+        self.upper_bad_query_bound = upper_bad_query_bound
+        self.bias_coef_change_rate = bias_coef_change_rate
 
     def __call__(
             self,
@@ -78,7 +86,8 @@ class HSJA(PerturbationAttack):
             target: torch.Tensor | None = None) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         return self.hsja(model, x, label, self.bounds.upper, self.bounds.lower, self.distance, self.num_iterations,
                          self.gamma, self.fixed_delta, target, None, self.stepsize_search, self.max_num_evals,
-                         self.init_num_evals)
+                         self.init_num_evals, self.bias_coef, self.lower_bad_query_bound, self.upper_bad_query_bound,
+                         self.bias_coef_change_rate)
 
     def hsja(self,
              model: ModelWrapper,
@@ -95,6 +104,10 @@ class HSJA(PerturbationAttack):
              stepsize_search: str = 'geometric_progression',
              max_num_evals: int = int(1e4),
              init_num_evals: int = 100,
+             bias_coef: float = 0.0,
+             lower_bad_query_bound: int = 10,
+             upper_bad_query_bound: int = 20,
+             bias_coef_change_rate: float = 1e-1,
              verbose: bool = True) -> tuple[torch.Tensor, QueriesCounter, float, bool, ExtraResultsDict]:
         """
         Main algorithm for HopSkipJumpAttack.
@@ -117,6 +130,10 @@ class HSJA(PerturbationAttack):
             set a counter of model evaluations by yourself to get that. To increase the total number
             of model evaluations, set a larger num_iterations.
             init_num_evals: initial number of evaluations for estimating gradient.
+            bias_coef: used to move boundary point further before gradient estimation.
+            lower_bad_query_bound: desired lower bound on the number of bad queries in the gradient esitmation phase.
+            upper_bad_query_bound: desired upper bound on the number of bad queries in the gradient esitmation phase.
+            bias_coef_change_rate: used to change the bias coefficient adaptively.
 
             Output:
             perturbed image.
@@ -142,6 +159,10 @@ class HSJA(PerturbationAttack):
             'fixed_delta': fixed_delta,
             'opt_grad_evals': self.OPT_GRAD_EVALS,
             'grad_boundary_distance': self.GRAD_BOUNDARY_DISTANCE,
+            'bias_coef': bias_coef,
+            'lower_bad_query_bound': lower_bad_query_bound,
+            'upper_bad_query_bound': upper_bad_query_bound,
+            'bias_coef_change_rate': bias_coef_change_rate,
         }
 
         # Set binary search threshold.
@@ -281,13 +302,35 @@ class HSJA(PerturbationAttack):
             raise ValueError(f'Unknown constraint {params["constraint"]}.')
 
         rv = rv / torch.sqrt(torch.sum(rv**2, dim=(1, 2, 3), keepdim=True))
-        perturbed = sample + delta * rv
+
+        # Move the current boundary point further to limit the number of bad queries.
+        bias = (sample - original_sample) / torch.norm(sample - original_sample) * delta * params['bias_coef']
+        biased_sample = sample + bias
+
+        # Estimate gradient similar to vanilla HSJA
+        perturbed = biased_sample + delta * rv
         perturbed = self.clip_image(perturbed, clip_min, clip_max)
-        rv = (perturbed - sample) / delta
+        rv = (perturbed - biased_sample) / delta
 
         # query the model.
         decisions, updated_queries_counter = self.decision_function(model, perturbed, params, queries_counter,
                                                                     HSJAttackPhase.gradient_estimation, original_sample)
+        
+        # As the algorithm goes by, in most cases, the bias coefficient should decrease \
+        # to keep the number of bad queries sufficient for gradient estimation
+        
+        bad_queries_num = len(decisions) - decisions.sum()
+        
+        if bad_queries_num < params['lower_bad_query_bound']:
+            params['bias_coef'] = (1 - params['bias_coef_change_rate']) * params['bias_coef']
+        if bad_queries_num > params['upper_bad_query_bound']:
+            params['bias_coef'] = (1 + params['bias_coef_change_rate']) * params['bias_coef']
+        
+        if params['verbose']:
+            print('Gradient estimation results: number of total queries {:.0f}, nubmer of bad queries {:.0f}, bias coefficient {:.4f}'.format(
+                        len(decisions), bad_queries_num, params['bias_coef']))
+            
+        # Use importance sampling for a better estimation. (This part is similar to vanilla HSJA)
         decision_shape = [len(decisions)] + [1] * len(params['shape'])
         fval = 2 * decisions.to(torch.float).reshape(decision_shape) - 1.0
 

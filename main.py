@@ -157,6 +157,23 @@ if __name__ == "__main__":
                         type=int,
                         help='Number of searches for OPT and Sign OPT',
                         choices=[1, 2])
+    parser.add_argument('--hsja-bias-coef',
+                        default=0.0,
+                        type=float,
+                        help='bias coefficient for HSJA (used to move boundary point farther before gradient estimation.)')
+    parser.add_argument('--hsja-lower-bad-query-bound',
+                        default=10,
+                        type=int,
+                        help='desired lower bound on the number of bad queries in the gradient esitmation phase.')
+    parser.add_argument('--hsja-upper-bad-query-bound',
+                        default=20,
+                        type=int,
+                        help='desired upper bound on the number of bad queries in the gradient esitmation phase.')
+    parser.add_argument('--hsja-bias-coef-change-rate',
+                        default=0.1,
+                        type=float,
+                        help='used to change the bias coefficient adaptively.')
+    
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
     parser.add_argument('--opt-beta', default=0.01, type=float, help='beta parameter for OPT and Sign OPT')
     parser.add_argument(

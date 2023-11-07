@@ -109,6 +109,10 @@ def setup_attack(args: Namespace) -> BaseAttack:
             "gradient_estimation_mode": GradientEstimationMode(args.hsja_grad_est_mode),
             "search": search,
             "n_searches": args.hsja_n_searches,
+            "bias_coef": args.hsja_bias_coef,
+            'lower_bad_query_bound': args.hsja_lower_bad_query_bound,
+            'upper_bad_query_bound': args.hsja_upper_bad_query_bound,
+            'bias_coef_change_rate': args.hsja_bias_coef_change_rate
         }
         return HSJA(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "geoda":
