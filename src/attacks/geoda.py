@@ -291,7 +291,7 @@ class GeoDA(PerturbationAttack):
             params['bias_coef'] = (1 + params['bias_coef_change_rate']) * params['bias_coef']
         
         if params['verbose']:
-            print('Gradient estimation results: number of total queries {:.0f}, nubmer of bad queries {:.0f}, bias coefficient {:.4f}'.format(
+            print('Gradient estimation results: number of total queries {:.0f}, number of bad queries {:.0f}, bias coefficient {:.4f}'.format(
                         len(decisions), bad_queries_num, params['bias_coef']))
             
         # Use importance sampling for a better estimation. (This part is similar to vanilla HSJA)
