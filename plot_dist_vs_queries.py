@@ -685,7 +685,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}_overall.csv", index=False)
 
     ax.set_yscale("log")
-    ax.set_xlabel("Number of bad queries")
+    ax.set_xlabel("Number of flagged queries")
     ax.set_ylabel("Total number of queries")
     if draw_legend == "tr":
         ax.legend(fontsize=LEGEND_FONTSIZE, bbox_to_anchor=(1.04, 1), loc="upper left")
