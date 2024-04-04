@@ -575,7 +575,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         ax.set_ylim(2e-2, 1.1)
     ax.set_yscale("log")
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
-    ax.set_ylabel("Median distance")
+    ax.set_ylabel("Median perturbation size")
     if draw_legend == "tr":
         ax.legend(fontsize=LEGEND_FONTSIZE, bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
