@@ -1,4 +1,5 @@
 foolbox~=3.3.3
+ijson~=3.2.3
 numpy~=1.23.3
 pytorch_lightning~=1.8.1
 torch~=1.13.1
