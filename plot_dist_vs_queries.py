@@ -105,7 +105,7 @@ def get_good_to_bad_queries_array(exp_path: Path, simulated: bool) -> np.ndarray
 
 
 def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
-                                 unsafe_only: bool, opt_grad_estimations: int = 10,
+                                 unsafe_only: bool, attack: str, opt_grad_estimations: int = 10,
                                  verbose: bool = False) -> Iterator[list[CurrentDistanceInfo]]:
     for distances_list in items:
         simulated_distances = []
@@ -116,24 +116,19 @@ def generate_simulated_distances(items: Iterator[list[dict[str, Any]]],
         phases_to_check_unsafe_queries = {
             HSJAttackPhase.binary_search, HSJAttackPhase.gradient_estimation, HSJAttackPhase.boundary_projection,
         }
-        attack = None
         for distance in distances_list:
-            if distance["phase"] == OPTAttackPhase.direction_search:
-                attack = "OPT"
-            elif distance["phase"] in {HSJAttackPhase.initialization_search, HSJAttackPhase.initialization}:
-                attack = "HSJ"
             if (distance["phase"] == HSJAttackPhase.boundary_projection
                     and previous_phase == HSJAttackPhase.step_size_search and verbose):
                 print(f"Iteration {iteration} bad queries: {tot_unsafe_queries}, distance: {distance['best_distance']}")
                 iteration += 1
-            if attack == "HSJ" and distance["phase"] in phases_to_check_unsafe_queries and not distance[
+            if attack == "hsja" and distance["phase"] in phases_to_check_unsafe_queries and not distance[
                     "safe"] and distance["phase"] != previous_phase:
                 distance["equivalent_simulated_queries"] = 0
             if not distance["safe"]:
                 unsafe_queries_for_phase += distance["equivalent_simulated_queries"]
-            if attack == "HSJ" and distance["phase"] in phases_to_check_unsafe_queries and unsafe_queries_for_phase > 1:
+            if attack == "hsja" and distance["phase"] in phases_to_check_unsafe_queries and unsafe_queries_for_phase > 1:
                 assert distance["phase"] != previous_phase
-            if attack == "OPT" and distance["phase"] == OPTAttackPhase.gradient_estimation and not distance["safe"]:
+            if attack in {"opt", "sign_opt"} and distance["phase"] == OPTAttackPhase.gradient_estimation and not distance["safe"]:
                 if unsafe_queries_for_phase > opt_grad_estimations:
                     distance["equivalent_simulated_queries"] = 0
             if distance["phase"] != previous_phase:
@@ -235,10 +230,23 @@ def get_simulated_array(exp_path: Path, unsafe_only: bool, simulate_ideal_line: 
     f = (exp_path / original_distances_filename).open("r")
     OPENED_FILES.append(f)
     raw_results = wrap_ijson_iterator(ijson.items(f, "item", use_float=True))
-    opt_queries = json.load((exp_path / "args.json").open("r"))["opt_num_grad_queries"]
+    with (exp_path / "args.json").open("r") as f: 
+        config = json.load(f)
+    attack = config["attack"]
+    if attack == "opt":
+        try:
+            opt_queries = config["opt_num_grad_queries"]
+        except KeyError:
+            opt_queries = 10
+    else:
+        try:
+            opt_queries = config["sign_opt_num_grad_queries"]
+        except KeyError:
+            opt_queries = 10
+
     if not simulate_ideal_line:
         print("Generating simulated distances")
-        simulated_distances = generate_simulated_distances(raw_results, unsafe_only, opt_queries)
+        simulated_distances = generate_simulated_distances(raw_results, unsafe_only, attack, opt_queries)
     else:
         assert unsafe_only
         print("Generating simulated distances with ideal line search")
@@ -427,6 +435,8 @@ COLORS_STYLES_MARKERS = {
     "Boundary": ("black", "dotted", "^"),
     "HSJA": ("#FF8D13", "dotted", "o"),
     "Stealthy HSJA": ("#DA7100", "-", "o"),
+    "Original attack": ("#00DA71", "-", "o"),
+    "Our stealthy version": ("#7100DA", "-", "x"),
     "RayS": ("#1385FF", "dotted", "s"),
     "RayS (binary)": ("tab:green", "dotted", "s"),
     "RayS (line search)": ("tab:blue", "-", "x"),
@@ -567,7 +577,7 @@ def plot_median_distances_per_query(exp_paths: list[Path], names: list[str] | No
         ax.set_ylim(2e-2, 1.1)
     ax.set_yscale("log")
     ax.set_xlabel(f"Number of {'bad ' if unsafe_only else ''}queries")
-    ax.set_ylabel("Median distance")
+    ax.set_ylabel("Median perturbation size")
     if draw_legend == "tr":
         ax.legend(fontsize=LEGEND_FONTSIZE, bbox_to_anchor=(1.04, 1), loc="upper left")
     elif draw_legend == "y":
@@ -677,7 +687,7 @@ def plot_bad_vs_good_queries(exp_paths: list[Path], names: list[str] | None, out
         queries_per_epsilon_df.to_csv(out_path.parent / f"queries_per_epsilon_{out_path.stem}_overall.csv", index=False)
 
     ax.set_yscale("log")
-    ax.set_xlabel("Number of bad queries")
+    ax.set_xlabel("Number of flagged queries")
     ax.set_ylabel("Total number of queries")
     if draw_legend == "tr":
         ax.legend(fontsize=LEGEND_FONTSIZE, bbox_to_anchor=(1.04, 1), loc="upper left")
