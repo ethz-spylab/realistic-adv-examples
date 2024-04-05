@@ -1,5 +1,7 @@
 # Evading Black-box Classifiers Without Breaking Eggs
 
+**2nd IEEE Conference on Secure and Trustworthy Machine Learning (2024)**
+
 *Edoardo Debenedetti (ETH Zurich), Nicholas Carlini (Google), Florian Tramèr (ETH Zurich)*
 
 Code to reproduce results of the paper [*"Evading Black-box Classifiers Without Breaking Eggs"*](https://arxiv.org/abs/2306.02895).
