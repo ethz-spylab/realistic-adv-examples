@@ -12,7 +12,7 @@ from torchvision.models import ResNet50_Weights
 
 from src import dataset
 from src.arch import binary_resnet50, clip_laion_nsfw
-from src.attacks import HSJA, OPT, BoundaryAttack, RayS, SignOPT
+from src.attacks import HSJA, OPT, BoundaryAttack, RayS, SignOPT, GeoDA
 from src.attacks.base import BaseAttack, Bounds, SearchMode
 from src.attacks.hsja import GradientEstimationMode
 from src.model_wrappers import ModelWrapper, TorchModelWrapper
@@ -109,8 +109,29 @@ def setup_attack(args: Namespace) -> BaseAttack:
             "gradient_estimation_mode": GradientEstimationMode(args.hsja_grad_est_mode),
             "search": search,
             "n_searches": args.hsja_n_searches,
+            "bias_coef": args.hsja_bias_coef,
+            'lower_bad_query_bound': args.hsja_lower_bad_query_bound,
+            'upper_bad_query_bound': args.hsja_upper_bad_query_bound,
+            'bias_coef_change_rate': args.hsja_bias_coef_change_rate
         }
         return HSJA(**base_attack_kwargs, **attack_kwargs)
+    if args.attack == "geoda":
+        attack_kwargs = {
+            "num_iterations": args.max_iter,
+            "max_num_evals": args.geoda_max_num_evals,
+            "init_num_evals": args.geoda_init_num_evals,
+            "theta": args.geoda_theta,
+            "delta": args.geoda_delta,
+            "search": search,
+            "n_searches": args.geoda_n_searches,
+            "bias_coef": args.geoda_bias_coef,
+            'lower_bad_query_bound': args.geoda_lower_bad_query_bound,
+            'upper_bad_query_bound': args.geoda_upper_bad_query_bound,
+            'bias_coef_change_rate': args.geoda_bias_coef_change_rate,
+            "dim_reduc_factor": args.geoda_dim_reduc_factor,
+            "search_radius_increase": args.geoda_search_radius_increase
+        }
+        return GeoDA(**base_attack_kwargs, **attack_kwargs)
     if args.attack == "opt":
         return OPT(**base_attack_kwargs, **opt_kwargs)
     if args.attack == "sign_opt":

@@ -17,8 +17,10 @@ Leaderboards which show, for each attack, the distances achieved after 100, 200,
 | OPT (2018) | 37.57 <sub><sup>(2.0e+02)</sup></sub> | 35.24 <sub><sup>(4.0e+02)</sup></sub> | 28.98 <sub><sup>(1.0e+03)</sup></sub> | 22.20 <sub><sup>(2.0e+03)</sup></sub> |
 | SignOPT (2019) | 37.78 <sub><sup>(2.0e+02)</sup></sub> | 34.80 <sub><sup>(4.0e+02)</sup></sub> | 18.68 <sub><sup>(1.0e+03)</sup></sub> | 12.12 <sub><sup>(2.0e+03)</sup></sub> |
 | HSJA (2019) | 40.82 <sub><sup>(2.2e+02)</sup></sub> | 29.00 <sub><sup>(4.3e+02)</sup></sub> | 14.88 <sub><sup>(9.8e+02)</sup></sub> | 9.36 <sub><sup>(1.8e+03)</sup></sub> |
+| GeoDA (2020) | 24.82 <sub><sup>(2.2e+02)</sup></sub> | 15.12 <sub><sup>(4.8e+02)</sup></sub> | 6.63 <sub><sup>(1.2e+03)</sup></sub> | 3.25 <sub><sup>(2.5e+03)</sup></sub> |
 | Stealthy OPT (2023) | 35.58 <sub><sup>(1.2e+04)</sup></sub> | 22.50 <sub><sup>(8.0e+05)</sup></sub> | 12.38 <sub><sup>(2.5e+06)</sup></sub> | 7.72 <sub><sup>(4.9e+06)</sup></sub> |
-| Stealthy HSJA (2023) | **26.62** <sub><sup>(4.2e+05)</sup></sub> | **19.42** <sub><sup>(8.2e+05)</sup></sub> | **11.50** <sub><sup>(2.0e+06)</sup></sub> | **6.74** <sub><sup>(4.0e+06)</sup></sub> |
+| Stealthy HSJA (2023) | 26.62 <sub><sup>(4.2e+05)</sup></sub> | 19.42 <sub><sup>(8.2e+05)</sup></sub> | 11.50 <sub><sup>(2.0e+06)</sup></sub> | 6.74 <sub><sup>(4.0e+06)</sup></sub> |
+| Stealthy GeoDA (2023)| **15.70** <sub><sup>(6.9e+02)</sup></sub> | **7.27** <sub><sup>(2.5e+03)</sup></sub> | **2.68** <sub><sup>(1.0e+04)</sup></sub> | **1.51** <sub><sup>(2.5e+04)</sup></sub> |
 
 </p>
 
@@ -106,6 +108,8 @@ where `$ATTACK_CONFIG` corresponds to different parameters for different attacks
 - SignOPT: `--attack sign_opt --opt-beta 0.01`
 - Stealthy SignOPT: `--attack sign_opt --search line --opt-beta 0.01 --opt-n-searches 2`
 - HSJA: `--attack hsja --hsja-gamma 10000`
+- GoeDA: `--attack geoda --geoda-bias-coef 0.0 --geoda-dim-reduc-factor 4.0`
+- Stealthy GeoDA: `--attack geoda --geoda-bias-coef 30.0 --geoda-dim-reduc-factor 4.0`
 
 ### ImageNet $\ell_\infty$ (Fig 3.d)
 

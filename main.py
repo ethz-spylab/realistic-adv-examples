@@ -157,6 +157,23 @@ if __name__ == "__main__":
                         type=int,
                         help='Number of searches for OPT and Sign OPT',
                         choices=[1, 2])
+    parser.add_argument('--hsja-bias-coef',
+                        default=0.0,
+                        type=float,
+                        help='bias coefficient for HSJA (used to move boundary point farther before gradient estimation.)')
+    parser.add_argument('--hsja-lower-bad-query-bound',
+                        default=10,
+                        type=int,
+                        help='desired lower bound on the number of bad queries in the gradient esitmation phase.')
+    parser.add_argument('--hsja-upper-bad-query-bound',
+                        default=20,
+                        type=int,
+                        help='desired upper bound on the number of bad queries in the gradient esitmation phase.')
+    parser.add_argument('--hsja-bias-coef-change-rate',
+                        default=0.1,
+                        type=float,
+                        help='used to change the bias coefficient adaptively.')
+    
     parser.add_argument('--opt-alpha', default=0.2, type=float, help='alpha parameter for OPT and Sign OPT')
     parser.add_argument('--opt-beta', default=0.01, type=float, help='beta parameter for OPT and Sign OPT')
     parser.add_argument(
@@ -194,5 +211,47 @@ if __name__ == "__main__":
                         type=int,
                         help='Number of gradient queries for Sign OPT')
     parser.add_argument('--sign-opt-momentum', default=0., type=float, help='Momentum for Sign OPT')
+    
+    
+    parser.add_argument('--geoda-n-searches',
+                        default=2,
+                        type=int,
+                        help='Number of searches for GeoDA',
+                        choices=[1, 2])
+    parser.add_argument('--geoda-theta',
+                        default=1e-4,
+                        type=float,
+                        help='Theta parameter for GeoDA')
+    parser.add_argument('--geoda-delta',
+                        default=2e-4,
+                        type=float,
+                        help='Delta parameter for GeoDA')
+    parser.add_argument('--geoda-max-num-evals', default=1e4, type=int, help='Max number of evaluations for GeoDA')
+    parser.add_argument('--geoda-init-num-evals', default=100, type=int, help='GeoDA init num evals')
+    parser.add_argument('--geoda-bias-coef',
+                        default=0.0,
+                        type=float,
+                        help='bias coefficient for GeoDA (used to move boundary point further before gradient estimation.)')
+    parser.add_argument('--geoda-lower-bad-query-bound',
+                        default=10,
+                        type=int,
+                        help='desired lower bound on the number of bad queries in the gradient esitmation phase.')
+    parser.add_argument('--geoda-upper-bad-query-bound',
+                        default=20,
+                        type=int,
+                        help='desired upper bound on the number of bad queries in the gradient esitmation phase.')
+    parser.add_argument('--geoda-bias-coef-change-rate',
+                        default=0.1,
+                        type=float,
+                        help='used to change the bias coefficient adaptively.')
+    parser.add_argument('--geoda-dim-reduc-factor',
+                        default=1e0,
+                        type=float,
+                        help='Dimension reduciton factor for creating subspace in GeoDA')
+    parser.add_argument('--geoda-search-radius-increase',
+                        default=1.1,
+                        type=float,
+                        help='Multiplier used to increase search radius')
+    
     _args = parser.parse_args()
     main(_args)
