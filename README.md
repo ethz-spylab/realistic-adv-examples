@@ -22,7 +22,7 @@ Leaderboards which show, for each attack, the distances achieved after 100, 200,
 | GeoDA (2020) | 24.82 <sub><sup>(2.2e+02)</sup></sub> | 15.12 <sub><sup>(4.8e+02)</sup></sub> | 6.63 <sub><sup>(1.2e+03)</sup></sub> | 3.25 <sub><sup>(2.5e+03)</sup></sub> |
 | Stealthy OPT (2023) | 35.58 <sub><sup>(1.2e+04)</sup></sub> | 22.50 <sub><sup>(8.0e+05)</sup></sub> | 12.38 <sub><sup>(2.5e+06)</sup></sub> | 7.72 <sub><sup>(4.9e+06)</sup></sub> |
 | Stealthy HSJA (2023) | 26.62 <sub><sup>(4.2e+05)</sup></sub> | 19.42 <sub><sup>(8.2e+05)</sup></sub> | 11.50 <sub><sup>(2.0e+06)</sup></sub> | 6.74 <sub><sup>(4.0e+06)</sup></sub> |
-| Stealthy GeoDA (2023)| **15.70** <sub><sup>(6.9e+02)</sup></sub> | **7.27** <sub><sup>(2.5e+03)</sup></sub> | **2.68** <sub><sup>(1.0e+04)</sup></sub> | **1.51** <sub><sup>(2.5e+04)</sup></sub> |
+| Stealthy GeoDA (2023, by [@mahdisalmani](https://github.com/mahdisalmani))| **15.70** <sub><sup>(6.9e+02)</sup></sub> | **7.27** <sub><sup>(2.5e+03)</sup></sub> | **2.68** <sub><sup>(1.0e+04)</sup></sub> | **1.51** <sub><sup>(2.5e+04)</sup></sub> |
 
 </p>
 
